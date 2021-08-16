@@ -19,6 +19,7 @@ from ._internal import FromRelay
 from ._internal import FuseOps
 from ._internal import GradientInputSelection
 from ._internal import InferType
+from ._internal import InitShardOpAttrs
 from ._internal import InlineBackward
 from ._internal import InlineLet
 from ._internal import InlinePrimitives

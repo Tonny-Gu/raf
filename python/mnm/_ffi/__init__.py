@@ -16,6 +16,7 @@ from . import model
 from . import op
 from . import pass_
 from . import profiler
+from . import sharding
 from . import tensor
 from . import value
 from . import vm

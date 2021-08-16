@@ -279,5 +279,12 @@ Pass ValidateInplaceUpdate(bool enforce_inplace_update);
  */
 Pass StreamSchedule();
 
+/*!
+ * \brief Initiate ShardOpAttrs for every CallNodes
+ *
+ * \return The created pass.
+ */
+Pass InitShardOpAttrs();
+
 }  // namespace pass
 }  // namespace mnm

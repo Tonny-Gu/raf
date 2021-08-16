@@ -36,6 +36,8 @@ FuseOps = _APIS.get("mnm.pass_.FuseOps", None)
 GradientInputSelection = _APIS.get("mnm.pass_.GradientInputSelection", None)
 # Defined in ./src/pass/type_infer.cc
 InferType = _APIS.get("mnm.pass_.InferType", None)
+# Defined in ./src/pass/init_shard_op_attrs.cc
+InitShardOpAttrs = _APIS.get("mnm.pass_.InitShardOpAttrs", None)
 # Defined in ./src/pass/inline_backward.cc
 InlineBackward = _APIS.get("mnm.pass_.InlineBackward", None)
 # Defined in ./src/pass/inline_let.cc
