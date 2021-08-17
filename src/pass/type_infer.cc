@@ -21,17 +21,10 @@ namespace mnm {
 namespace pass {
 namespace type_infer {
 
-using namespace mnm::ir;
 using namespace mnm::op;
 using namespace mnm::value;
-using tvm::kType;
-using tvm::TypeFunctor;
 
 Type Unify(const Type& src, const Type& dst);
-
-Value GetValue(Type type);
-
-Value GetValue(Expr expr);
 
 #define MNM_NODE_NOT_IMPL(NodeType)                     \
   Expr VisitExpr_(const NodeType* node) override {      \
@@ -187,9 +180,7 @@ class TypeInferencer : public ExprMutator {
     FuncType fty = Downcast<FuncType>(fn->checked_type());
     CHECK_EQ(call->args.size(), fty->arg_types.size());
     for (size_t i = 0; i < call->args.size(); ++i) {
-      CHECK(tvm::StructuralEqual()(call->args[i]->checked_type(), fty->arg_types[i]))
-          << "Type of argument and function parameter mismatch: " << call->args[i]->checked_type()
-          << " vs " << fty->arg_types[i];
+      Unify(call->args[i]->checked_type(), fty->arg_types[i]);
     }
     return fty->ret_type;
   }
@@ -410,9 +401,9 @@ class Unifier : public TypeFunctor<Type(const Type&, const Type&)> {
     auto left_index = lhs.as<tvm::IntImmNode>();
     auto right_index = rhs.as<tvm::IntImmNode>();
     if (!left_index && right_index) {
-      return rhs;
-    } else if (left_index && !right_index) {
       return lhs;
+    } else if (left_index && !right_index) {
+      return rhs;
     } else if (left_index && right_index && left_index->value == right_index->value) {
       return lhs;
     }
@@ -519,60 +510,6 @@ class Unifier : public TypeFunctor<Type(const Type&, const Type&)> {
     return TypeCall(func, args);
   }
 };
-
-class TypeGetter : public TypeFunctor<Value(const Type&)> {
-  Value VisitType_(const TensorTypeNode* op) {
-    return TensorTypeValue::make(GetRef<TensorType>(op));
-  }
-
-  Value VisitType_(const TupleTypeNode* op) {
-    Array<Value> ret;
-    for (const auto& ty : op->fields) {
-      ret.push_back(VisitType(ty));
-    }
-    return TupleValue::make(ret);
-  }
-
-  Value VisitType_(const FuncTypeNode* op) {
-    // FuncType doesn't really carry value so we return void
-    return VoidValue::make();
-  }
-};
-
-class ValueGetter : public ExprFunctor<Value(const Expr&)> {
-  Value VisitExpr_(const RelayConstantNode* op) {
-    const ConstantNode* node = static_cast<const ConstantNode*>(op);
-    if (const ArrayNode* arr = node->value.as<ArrayNode>()) {
-      Array<Value> fields;
-      for (const auto& it : *arr) {
-        fields.push_back(IntValue::make(DataType::Int(64), (Downcast<IntImm>(it))->value));
-      }
-      return TupleValue::make(fields);
-    }
-    return node->value.defined() ? Downcast<Value>(node->value) : NullValue<Value>();
-  }
-
-  Value VisitExpr_(const OpNode* op) {
-    return OpValue::make(GetRef<Op>(op));
-  }
-
-  Value VisitExpr_(const FunctionNode* op) {
-    return ClosureValue::make({}, GetRef<Function>(op));
-  }
-
-  Value VisitExprDefault_(const Object* op) {
-    const auto* e = static_cast<const ExprNode*>(op);
-    return GetValue(e->checked_type());
-  }
-};
-
-Value GetValue(Type type) {
-  return TypeGetter()(type);
-}
-
-Value GetValue(Expr expr) {
-  return ValueGetter()(expr);
-}
 
 Type Unify(const Type& src, const Type& dst) {
   Unifier unifier;
