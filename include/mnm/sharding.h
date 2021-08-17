@@ -18,9 +18,9 @@ class ShardSpecObj : public Object {
   bool immutable;
   bool replicated;
   // TODO: replace with new Device object. PR: https://github.com/meta-project/meta/pull/725
-  Array<IntValue> assigned_devices;
-  Array<IntValue> num_devices_on_dim;
-  Array<IntValue> num_replicas_on_dim;
+  Array<Integer> assigned_devices;
+  Array<Integer> num_devices_on_dim;
+  Array<Integer> num_replicas_on_dim;
   void VisitAttrs(tvm::AttrVisitor* v) {
     v->Visit("immutable", &immutable);
     v->Visit("replicated", &replicated);
@@ -36,9 +36,9 @@ class ShardSpecObj : public Object {
 class ShardSpec : public ObjectRef {
  public:
   static ShardSpec make(bool immutable, bool replicated,
-                        Array<IntValue> assigned_devices,
-                        Array<IntValue> num_devices_on_dim,
-                        Array<IntValue> num_replicas_on_dim);
+                        Array<Integer> assigned_devices,
+                        Array<Integer> num_devices_on_dim,
+                        Array<Integer> num_replicas_on_dim);
   MNM_OBJECT_REF(ShardSpec, ObjectRef, ShardSpecObj);
 };
 
