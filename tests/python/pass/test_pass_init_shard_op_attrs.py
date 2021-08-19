@@ -1,11 +1,24 @@
 # pylint: disable=attribute-defined-outside-init,invalid-name,protected-access,too-many-locals,too-many-statements
 import pytest
 import mnm
+from mnm._core.core_utils import str2dev
+from mnm._ffi.sharding._make import ShardSpec
 from mnm._ffi.pass_ import AutoDiff, GradientInputSelection, InferType, InitShardOpAttrs
+from mnm._ffi.device import Device
 from mnm._lib import tvm
 from mnm._lib import relay
 from mnm.testing import randn, run_infer_type
 from mnm._core.module import IRModule
+from mnm.testing.common import get_device_list
+from mnm import distributed as dist
+
+def get_dist_device_array(dev_type="cuda"):
+    if dev_type not in get_device_list():
+        raise RuntimeError("Unsupported Device Type: " + dev_type)
+    dev_type_id = str2dev(dev_type).device_type
+    dctx = dist.get_context()
+    dev_array = [Device(dev_type_id, i) for i in range(dctx.size*16)]
+    return dev_array
 
 def test_shardOpAttrs():
 
@@ -36,3 +49,5 @@ def test_shardOpAttrs():
 if __name__ == "__main__":
     # pytest.main([__file__])
     test_shardOpAttrs()
+    # shardspec = ShardSpec(False, False, get_dist_device_array(), [4, 2], [2, 2])
+    # print(shardspec)

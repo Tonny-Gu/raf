@@ -25,7 +25,7 @@ class ShardAttrsInstaller : public ExprMutator {
   Expr VisitExpr_(const CallNode* node) override {
     const Expr& callee = node->op;
     static auto default_spec = ShardSpec::make(false, true,
-                                               NullValue<Array<Integer> >(),
+                                               NullValue<Array<Device> >(),
                                                NullValue<Array<Integer> >(),
                                                NullValue<Array<Integer> >());
     static auto default_attrs = make_object<ShardOpAttrs>();
