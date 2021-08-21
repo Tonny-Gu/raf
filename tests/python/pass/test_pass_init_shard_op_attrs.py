@@ -14,7 +14,7 @@ from mnm import distributed as dist
 
 def get_dist_device_array(dev_type="cuda"):
     if dev_type not in get_device_list():
-        raise RuntimeError("Unsupported Device Type: " + dev_type)
+        raise RuntimeError("Non-existing Device Type: " + dev_type)
     dev_type_id = str2dev(dev_type).device_type
     dctx = dist.get_context()
     dev_array = [Device(dev_type_id, i) for i in range(dctx.size*16)]
@@ -42,12 +42,13 @@ def test_shardOpAttrs():
     # mod_before = AutoDiff(record.requires_grads)(mod_before)
     # mod_before = InferType()(mod_before)
     # mod_before = GradientInputSelection()(mod_before)
-    mod = InitShardOpAttrs()(mod_before)
-    func_after = InferType()(mod)["main"]
-    print(func_after.astext())
+    mod = InitShardOpAttrs()(mod_before)["main"]
+    print(mod.astext())
+    #func_after = InferType()(mod)["main"]
+    #print(func_after.astext())
 
 if __name__ == "__main__":
     # pytest.main([__file__])
     test_shardOpAttrs()
-    # shardspec = ShardSpec(False, False, get_dist_device_array(), [4, 2], [2, 2])
+    # shardspec = ShardSpec(False, get_dist_device_array(), [8, 1], [2, 1])
     # print(shardspec)

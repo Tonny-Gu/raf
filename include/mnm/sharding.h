@@ -13,38 +13,65 @@ namespace sharding {
 using namespace mnm::ir;
 using namespace mnm::value;
 
-/* Sharding Specifications */
-class ShardSpecObj : public Object {
+/* BaseShardSpec */
+class BaseShardSpecObj : public Object {
  public:
   bool immutable;
-  bool replicated;
-  
+  void VisitAttrs(tvm::AttrVisitor* v) {
+    v->Visit("immutable", &immutable);
+  }
+  static constexpr const uint32_t _type_index = ir::TypeIndex::kDynamic;
+  static constexpr const char* _type_key = "mnm.sharding.BaseShardSpec";
+  MNM_BASE_OBJECT(BaseShardSpecObj, Object);
+};
+
+class BaseShardSpec : public ObjectRef {
+ public:
+  MNM_OBJECT_REF(BaseShardSpec, ObjectRef, BaseShardSpecObj);
+};
+
+/* ReplicatedSpec */
+class ReplicatedSpecObj final : public BaseShardSpecObj {
+ public:
+  void VisitAttrs(tvm::AttrVisitor* v) {
+    v->Visit("immutable", &immutable);
+  }
+  static constexpr const char* _type_key = "mnm.sharding.ReplicatedSpec";
+  MNM_FINAL_OBJECT(ReplicatedSpecObj, BaseShardSpecObj);
+};
+
+class ReplicatedSpec final : public BaseShardSpec {
+ public:
+  static ReplicatedSpec make(bool immutable);
+  MNM_OBJECT_REF(ReplicatedSpec, BaseShardSpec, ReplicatedSpecObj);
+};
+
+/* ShardSpec */
+class ShardSpecObj final : public BaseShardSpecObj {
+ public:
   Array<Device> assigned_devices;
   Array<Integer> num_devices_on_dim;
   Array<Integer> num_replicas_on_dim;
 
   void VisitAttrs(tvm::AttrVisitor* v) {
     v->Visit("immutable", &immutable);
-    v->Visit("replicated", &replicated);
     v->Visit("assigned_devices", &assigned_devices);
     v->Visit("num_devices_on_dim", &num_devices_on_dim);
     v->Visit("num_replicas_on_dim", &num_replicas_on_dim);
   }
 
-  static constexpr const uint32_t _type_index = tvm::TypeIndex::kDynamic;
   static constexpr const char* _type_key = "mnm.sharding.ShardSpec";
-  
-  MNM_FINAL_OBJECT(ShardSpecObj, Object);
+  MNM_FINAL_OBJECT(ShardSpecObj, BaseShardSpecObj);
 };
 
-class ShardSpec : public ObjectRef {
+class ShardSpec final : public BaseShardSpec {
  public:
-  static ShardSpec make(bool immutable, bool replicated,
+  static ShardSpec make(bool immutable,
                         Array<Device> assigned_devices,
                         Array<Integer> num_devices_on_dim,
                         Array<Integer> num_replicas_on_dim);
   
-  const void print_alloc_table(std::ostream& ostream = std::cout) const {
+  void printAllocTable(std::ostream& out = std::cout) const {
     size_t dev_idx = 0;
     const auto obj = this->operator->();
     const auto num_dim = obj->num_devices_on_dim.size();
@@ -52,20 +79,19 @@ class ShardSpec : public ObjectRef {
     std::function<void(int)> _print_alloc_table;
     _print_alloc_table = [&](int depth) {
       if (depth == num_dim) {
-        ostream << "[";
+        out << "[";
         for (size_t i = 0; i < num_dim; ++i) {
           auto num_devices = obj->num_devices_on_dim[i]->value;
-          auto num_replicas = obj->num_replicas_on_dim.defined() ?
-                              obj->num_replicas_on_dim[i]->value : 1;
+          auto num_replicas = obj->num_replicas_on_dim[i]->value;
           if (num_devices == 1) {
-            ostream << ":, ";
+            out << ":, ";
           } else {
             auto index = indices[i] / num_replicas;
-            ostream << index << ", ";
+            out << index << ", ";
           }
         }
         auto dev_info = obj->assigned_devices[dev_idx++].c_str();
-        ostream << "\b\b]@" << dev_info << " ";
+        out << "\b\b]@" << dev_info << " ";
       } else {
         auto num_devices = obj->num_devices_on_dim[depth]->value;
         for (size_t i = 0; i < num_devices; ++i) {
@@ -77,29 +103,34 @@ class ShardSpec : public ObjectRef {
     _print_alloc_table(0);
   }
 
-  const char* c_str() const {
-    static thread_local char buf[2048];
-    std::stringstream sstream;
-    const auto obj = this->operator->();
-    sstream.clear();
-    sstream << (obj->immutable ? "Immutable " : "");
-    if (obj->replicated) {
-      sstream << "Replicated ";
-    } else {
-      print_alloc_table(sstream);
-      sstream << "\b";
-    }
-    strncpy(buf, sstream.str().c_str(), 2048);
-    return buf;
-  }
+  MNM_OBJECT_REF(ShardSpec, BaseShardSpec, ShardSpecObj);
+};
 
-  MNM_OBJECT_REF(ShardSpec, ObjectRef, ShardSpecObj);
+/* TupleShardSpec */
+class TupleShardSpecObj final : public BaseShardSpecObj {
+ public:
+  Array<BaseShardSpec> tuple_elem;
+  void VisitAttrs(tvm::AttrVisitor* v) {
+    v->Visit("immutable", &immutable);
+    v->Visit("tuple_elem", &tuple_elem);
+  }
+  static constexpr const char* _type_key = "mnm.sharding.TupleShardSpec";
+  MNM_FINAL_OBJECT(TupleShardSpecObj, BaseShardSpecObj);
+};
+
+class TupleShardSpec final : public BaseShardSpec {
+ public:
+  static TupleShardSpec make(bool immutable,
+                              Array<BaseShardSpec> tuple_elem);
+  MNM_OBJECT_REF(TupleShardSpec, BaseShardSpec, TupleShardSpecObj);
 };
 
 struct ShardOpAttrs : public tvm::AttrsNode<ShardOpAttrs> {
-  Array<ShardSpec> shard_out;
+  BaseShardSpec shard_in, shard_out;
   TVM_DECLARE_ATTRS(ShardOpAttrs, "mnm.attrs.ShardOpAttrs") {
-    TVM_ATTR_FIELD(shard_out).set_default(NullValue<Array<ShardSpec> >())
+    TVM_ATTR_FIELD(shard_in).set_default(NullValue<BaseShardSpec>())
+                             .describe("Sharding Specifications of inputs");
+    TVM_ATTR_FIELD(shard_out).set_default(NullValue<BaseShardSpec>())
                              .describe("Sharding Specifications of outputs");
   }
 };
