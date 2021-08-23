@@ -12,6 +12,7 @@
 #include "mnm/ir.h"
 #include "mnm/ir_ext.h"
 #include "mnm/pass_manager.h"
+#include "mnm/sharding.h"
 
 namespace mnm {
 namespace pass {
@@ -284,11 +285,11 @@ Pass WavefrontStreamSchedule();
 Pass ASAPStreamSchedule();
 
 /*!
- * \brief Initiate ShardOpAttrs for every CallNodes
+ * \brief Set ShardOpAttrs for annotated Relay Expressions
  *
  * \return The created pass.
  */
-Pass InitShardOpAttrs();
+Pass SetShardOpAttrs(const ir::Map<ir::Expr, ir::Attrs>& attrs_map);
 
 }  // namespace pass
 }  // namespace mnm

@@ -13,47 +13,59 @@
 
 namespace mnm {
 namespace pass {
-namespace sharding {
 
 using namespace mnm::ir;
 using namespace mnm::op;
 using namespace mnm::value;
 using namespace mnm::sharding;
 
-class ShardAttrsInstaller : public ExprMutator {
+namespace set_attrs {
+
+class ShardOpAttrsSetter : public ExprMutator {
  public:
+  explicit ShardOpAttrsSetter(const ir::Map<ir::Expr, ir::Attrs>& attrs_map) :
+    _attrs_map(attrs_map) {}
+  
   Expr VisitExpr_(const CallNode* node) override {
     const Expr& callee = node->op;
     static auto default_spec = ReplicatedSpec::make(false);
-    static auto default_attrs = make_object<ShardOpAttrs>();
-    default_attrs->shard_in = default_spec;
-    default_attrs->shard_out = default_spec;
+    static auto default_attrs = ShardOpAttrs::make(BaseShardSpec(default_spec),
+                                                   BaseShardSpec(default_spec));
     if (callee->IsInstance<OpNode>()) {
-      return Call(node->op, node->args, Attrs(default_attrs));
+      auto ref = GetRef<Expr>(node);
+      if (_attrs_map.count(ref)) {
+        auto attrs = _attrs_map[ref];
+        return Call(node->op, node->args, Attrs(attrs));
+      } else {
+        return Call(node->op, node->args, Attrs(default_attrs));
+      }
     }
   }
+ private:
+  const ir::Map<ir::Expr, ir::Attrs>& _attrs_map;
 };
 
 }  // namespace sharding
 
-Pass InitShardOpAttrs() {
+Pass SetShardOpAttrs(const ir::Map<ir::Expr, ir::Attrs>& attrs_map) {
   return CreateModulePass(
       [=](IRModule mod, const PassContext& pass_ctx) {
-        DLOG(INFO) << "pass::InitShardOpAttrs";
+        DLOG(INFO) << "pass::SetShardOpAttrs";
         ir::IRModule updated_mod = ir::IRModule(mod->functions);
         for (auto kv : updated_mod->functions) {
           if (kv.second.as<ir::FunctionNode>()) {
+            auto setter = set_attrs::ShardOpAttrsSetter(attrs_map);
             auto func =
-                tvm::runtime::Downcast<ir::Function>(sharding::ShardAttrsInstaller().VisitExpr(kv.second));
+                tvm::runtime::Downcast<ir::Function>(setter.VisitExpr(kv.second));
             updated_mod->Add(kv.first, func, true);
           }
         }
         return updated_mod;
       },
-      0, "InitShardOpAttrs", {});
+      0, "SetShardOpAttrs", {});
 }
 
-MNM_REGISTER_GLOBAL("mnm.pass_.InitShardOpAttrs").set_body_typed(InitShardOpAttrs);
+MNM_REGISTER_GLOBAL("mnm.pass_.SetShardOpAttrs").set_body_typed(SetShardOpAttrs);
 
 }  // namespace pass
 }  // namespace mnm

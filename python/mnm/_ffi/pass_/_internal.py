@@ -40,8 +40,6 @@ FuseOps = _APIS.get("mnm.pass_.FuseOps", None)
 GradientInputSelection = _APIS.get("mnm.pass_.GradientInputSelection", None)
 # Defined in ./src/pass/type_infer.cc
 InferType = _APIS.get("mnm.pass_.InferType", None)
-# Defined in ./src/pass/init_shard_op_attrs.cc
-InitShardOpAttrs = _APIS.get("mnm.pass_.InitShardOpAttrs", None)
 # Defined in ./src/pass/inline_backward.cc
 InlineBackward = _APIS.get("mnm.pass_.InlineBackward", None)
 # Defined in ./src/pass/inline_let.cc
@@ -70,6 +68,8 @@ PartitionGraph = _APIS.get("mnm.pass_.PartitionGraph", None)
 PrintIR = _APIS.get("mnm.pass_.PrintIR", None)
 # Defined in ./src/pass/rename_vars.cc
 RenameVars = _APIS.get("mnm.pass_.RenameVars", None)
+# Defined in ./src/pass/set_shard_op_attrs.cc
+SetShardOpAttrs = _APIS.get("mnm.pass_.SetShardOpAttrs", None)
 # Defined in ./src/pass/simplify_expr.cc
 SimplifyExpr = _APIS.get("mnm.pass_.SimplifyExpr", None)
 # Defined in ./src/pass/substitute.cc

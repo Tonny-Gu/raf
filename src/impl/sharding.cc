@@ -41,9 +41,22 @@ TupleShardSpec TupleShardSpec::make(bool immutable,
   return TupleShardSpec(n);
 }
 
+Attrs ShardOpAttrs::make(BaseShardSpec shard_in, BaseShardSpec shard_out) {
+  auto attrs = make_object<ShardOpAttrs>();
+  attrs->shard_in = std::move(shard_in);
+  attrs->shard_out = std::move(shard_out);
+  return Attrs(attrs);
+}
+
+static thread_local bool print_brief_alloc_table = false;
+
 MNM_REGISTER_GLOBAL("mnm.sharding._make.ReplicatedSpec").set_body_typed(ReplicatedSpec::make);
 MNM_REGISTER_GLOBAL("mnm.sharding._make.ShardSpec").set_body_typed(ShardSpec::make);
 MNM_REGISTER_GLOBAL("mnm.sharding._make.TupleShardSpec").set_body_typed(TupleShardSpec::make);
+MNM_REGISTER_GLOBAL("mnm.sharding._make.ShardOpAttrs").set_body_typed(ShardOpAttrs::make);
+MNM_REGISTER_GLOBAL("mnm.sharding.TogglePrintMode").set_body_typed([&]() {
+  print_brief_alloc_table = !print_brief_alloc_table;
+});
 
 MNM_REGISTER_OBJECT_NO_REFLECT(BaseShardSpecObj);
 MNM_REGISTER_OBJECT_REFLECT(ReplicatedSpecObj);
@@ -53,12 +66,54 @@ MNM_REGISTER_OBJECT_REFLECT(TupleShardSpecObj);
 using tvm::ReprPrinter;
 using tvm::runtime::ObjectRef;
 
+void PrintAllocTable(const ObjectRef& ref, ReprPrinter* p) {
+  size_t dev_idx = 0;
+  const auto obj = Downcast<ShardSpec>(ref);
+  const auto num_dim = obj->num_devices_on_dim.size();
+  static thread_local size_t *indices = new size_t[num_dim];
+  std::function<void(int)> _print_alloc_table;
+  _print_alloc_table = [&](int depth) {
+    if (depth == num_dim) {
+      p->stream << (dev_idx != 0 ? " [" : "[");
+      for (size_t i = 0; i < num_dim; ++i) {
+        auto num_devices = obj->num_devices_on_dim[i]->value;
+        auto num_replicas = obj->num_replicas_on_dim[i]->value;
+        auto index = std::to_string(indices[i] / num_replicas);
+        p->stream << (num_devices == 1 ? ":" : index)
+                  << (i != num_dim - 1 ? ", " : "");
+      }
+      auto dev_info = obj->assigned_devices[dev_idx++].c_str();
+      p->stream << "]@" << dev_info;
+    } else {
+      auto num_devices = obj->num_devices_on_dim[depth]->value;
+      for (size_t i = 0; i < num_devices; ++i) {
+        indices[depth] = i;
+        _print_alloc_table(depth + 1);
+      }
+    }
+  };
+  _print_alloc_table(0);
+}
+
+void PrintBriefAllocTable(const ObjectRef& ref, ReprPrinter* p) {
+  const auto obj = Downcast<ShardSpec>(ref);
+  const auto num_dim = obj->num_devices_on_dim.size();
+  p->stream << "[";
+  for (size_t i = 0; i < num_dim; ++i) {
+    auto num_devices = obj->num_devices_on_dim[i]->value;
+    auto num_replicas = obj->num_replicas_on_dim[i]->value;
+    p->stream << (num_devices == 1 ? ":" : std::to_string(num_devices))
+              << (num_replicas == 1 ? "" : "/" + std::to_string(num_replicas))
+              << (i != num_dim - 1 ? ", " : "");
+  }
+  p->stream << "]";
+}
+
 TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
     .set_dispatch<ReplicatedSpecObj>([](const ObjectRef& ref, ReprPrinter* p) {
       auto r = Downcast<ReplicatedSpec>(ref);
-      p->stream << "ReplicatedSpec("
-                << (r->immutable ? "Immut" : "")
-                << ")";
+      p->stream << "ReplicatedSpec"
+                << (r->immutable ? "(Immut)" : "");
     });
 
 TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
@@ -66,15 +121,24 @@ TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
       auto r = Downcast<ShardSpec>(ref);
       p->stream << "ShardSpec("
                 << (r->immutable ? "Immut " : "");
-      r.printAllocTable(p->stream);
-      p->stream << "\b)";
+      print_brief_alloc_table ? 
+        PrintBriefAllocTable(ref, p) : PrintAllocTable(ref, p);
+      p->stream << ")";
     });
 
 TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
     .set_dispatch<TupleShardSpecObj>([](const ObjectRef& ref, ReprPrinter* p) {
       auto r = Downcast<TupleShardSpec>(ref);
       p->stream << "TupleShardSpec(" 
-                << (r->immutable ? "Immut" : "")
+                << (r->immutable ? "(Immut)" : "");
+    });
+
+TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
+    .set_dispatch<ShardOpAttrs>([](const ObjectRef& ref, ReprPrinter* p) {
+      const auto* n = static_cast<const ShardOpAttrs*>(ref.get());
+      p->stream << "ShardOpAttrs("
+                << "in=" << n->shard_in
+                << " out=" << n->shard_out
                 << ")";
     });
 

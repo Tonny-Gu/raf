@@ -21,7 +21,6 @@ from ._internal import FromRelay
 from ._internal import FuseOps
 from ._internal import GradientInputSelection
 from ._internal import InferType
-from ._internal import InitShardOpAttrs
 from ._internal import InlineBackward
 from ._internal import InlineLet
 from ._internal import InlinePrimitives
@@ -36,6 +35,7 @@ from ._internal import MergeCompilerRegions
 from ._internal import PartitionGraph
 from ._internal import PrintIR
 from ._internal import RenameVars
+from ._internal import SetShardOpAttrs
 from ._internal import SimplifyExpr
 from ._internal import Substitute
 from ._internal import ToANormalForm

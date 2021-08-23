@@ -70,39 +70,6 @@ class ShardSpec final : public BaseShardSpec {
                         Array<Device> assigned_devices,
                         Array<Integer> num_devices_on_dim,
                         Array<Integer> num_replicas_on_dim);
-  
-  void printAllocTable(std::ostream& out = std::cout) const {
-    size_t dev_idx = 0;
-    const auto obj = this->operator->();
-    const auto num_dim = obj->num_devices_on_dim.size();
-    static thread_local size_t *indices = new size_t[num_dim];
-    std::function<void(int)> _print_alloc_table;
-    _print_alloc_table = [&](int depth) {
-      if (depth == num_dim) {
-        out << "[";
-        for (size_t i = 0; i < num_dim; ++i) {
-          auto num_devices = obj->num_devices_on_dim[i]->value;
-          auto num_replicas = obj->num_replicas_on_dim[i]->value;
-          if (num_devices == 1) {
-            out << ":, ";
-          } else {
-            auto index = indices[i] / num_replicas;
-            out << index << ", ";
-          }
-        }
-        auto dev_info = obj->assigned_devices[dev_idx++].c_str();
-        out << "\b\b]@" << dev_info << " ";
-      } else {
-        auto num_devices = obj->num_devices_on_dim[depth]->value;
-        for (size_t i = 0; i < num_devices; ++i) {
-          indices[depth] = i;
-          _print_alloc_table(depth + 1);
-        }
-      }
-    };
-    _print_alloc_table(0);
-  }
-
   MNM_OBJECT_REF(ShardSpec, BaseShardSpec, ShardSpecObj);
 };
 
@@ -126,6 +93,7 @@ class TupleShardSpec final : public BaseShardSpec {
 };
 
 struct ShardOpAttrs : public tvm::AttrsNode<ShardOpAttrs> {
+  static Attrs make(BaseShardSpec shard_in, BaseShardSpec shard_out);
   BaseShardSpec shard_in, shard_out;
   TVM_DECLARE_ATTRS(ShardOpAttrs, "mnm.attrs.ShardOpAttrs") {
     TVM_ATTR_FIELD(shard_in).set_default(NullValue<BaseShardSpec>())
