@@ -291,5 +291,12 @@ Pass ASAPStreamSchedule();
  */
 Pass SetShardOpAttrs(const ir::Map<ir::Expr, ir::Attrs>& attrs_map);
 
+/*!
+ * \brief Expand operators with ShardOpAttrs to functions
+ *
+ * \return The created pass.
+ */
+Pass ExpandShardOp(const ir::Map<ir::Expr, ir::Expr>& func_map);
+
 }  // namespace pass
 }  // namespace mnm

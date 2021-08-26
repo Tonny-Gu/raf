@@ -24,6 +24,8 @@ ContextAnalysis = _APIS.get("mnm.pass_.ContextAnalysis", None)
 DeadCodeElimination = _APIS.get("mnm.pass_.DeadCodeElimination", None)
 # Defined in ./src/pass/estimate_flops.cc
 EstimateFLOPS = _APIS.get("mnm.pass_.EstimateFLOPS", None)
+# Defined in ./src/pass/sharding.cc
+ExpandShardOp = _APIS.get("mnm.pass_.ExpandShardOp", None)
 # Defined in ./src/pass/substitute.cc
 ExprAppend = _APIS.get("mnm.pass_.ExprAppend", None)
 # Defined in ./src/pass/extract_binding.cc
@@ -68,7 +70,7 @@ PartitionGraph = _APIS.get("mnm.pass_.PartitionGraph", None)
 PrintIR = _APIS.get("mnm.pass_.PrintIR", None)
 # Defined in ./src/pass/rename_vars.cc
 RenameVars = _APIS.get("mnm.pass_.RenameVars", None)
-# Defined in ./src/pass/set_shard_op_attrs.cc
+# Defined in ./src/pass/sharding.cc
 SetShardOpAttrs = _APIS.get("mnm.pass_.SetShardOpAttrs", None)
 # Defined in ./src/pass/simplify_expr.cc
 SimplifyExpr = _APIS.get("mnm.pass_.SimplifyExpr", None)
