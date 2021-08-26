@@ -23,7 +23,7 @@ ContextAnalysis = _APIS.get("mnm.pass_.ContextAnalysis", None)
 # Defined in ./src/pass/dead_code.cc
 DeadCodeElimination = _APIS.get("mnm.pass_.DeadCodeElimination", None)
 # Defined in ./src/pass/estimate_flops.cc
-EstimateFLOPS = _APIS.get("mnm.pass_.EstimateFLOPS", None)
+EstimateGFLOPS = _APIS.get("mnm.pass_.EstimateGFLOPS", None)
 # Defined in ./src/pass/sharding.cc
 ExpandShardOp = _APIS.get("mnm.pass_.ExpandShardOp", None)
 # Defined in ./src/pass/substitute.cc
