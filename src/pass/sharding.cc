@@ -40,6 +40,7 @@ class ShardOpAttrsSetter : public ExprMutator {
         return Call(node->op, node->args, Attrs(default_attrs));
       }
     }
+    return ExprMutator::VisitExpr_(node);
   }
  private:
   const Map<Expr, Attrs>& _attrs_map;
@@ -55,10 +56,10 @@ class ShardOpExpander : public ExprMutator {
     if (callee->IsInstance<OpNode>()) {
       auto ref = GetRef<Expr>(node);
       if (_func_map.count(ref)) {
-        auto func = _func_map[ref];
-        return Call(func, node->args, node->attrs);
+        return _func_map[ref];
       }
     }
+    return ExprMutator::VisitExpr_(node);
   }
  private:
   const Map<Expr, Expr>& _func_map;
