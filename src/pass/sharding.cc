@@ -46,23 +46,20 @@ class ShardOpAttrsSetter : public ExprMutator {
   const Map<Expr, Attrs>& _attrs_map;
 };
 
-class ShardOpExpander : public ExprMutator {
+class ShardOpCallExpander : public ExprMutator {
  public:
-  explicit ShardOpExpander(const Map<Expr, Expr>& func_map) :
-    _func_map(func_map) {}
-  
   Expr VisitExpr_(const CallNode* node) override {
-    const Expr& callee = node->op;
-    if (callee->IsInstance<OpNode>()) {
-      auto ref = GetRef<Expr>(node);
-      if (_func_map.count(ref)) {
-        return _func_map[ref];
-      }
+    const Expr& op = node->op;
+    const Attrs& attrs = node->attrs;
+    const auto *f = tvm::runtime::Registry::Get("mnm.sharding._match_expanding_rule");
+    if (op->IsInstance<OpNode>() && attrs->IsInstance<ShardOpAttrs>()) {
+      auto call = GetRef<Call>(node);
+      Expr new_expr = (*f)(call->op, call->args, call->attrs);
+      return new_expr;
+      // return ShardOpCallExpander::VisitExpr(new_expr); // nested conversion
     }
     return ExprMutator::VisitExpr_(node);
   }
- private:
-  const Map<Expr, Expr>& _func_map;
 };
 
 }  // namespace sharding
@@ -87,14 +84,14 @@ Pass SetShardOpAttrs(const Map<Expr, Attrs>& attrs_map) {
 
 MNM_REGISTER_GLOBAL("mnm.pass_.SetShardOpAttrs").set_body_typed(SetShardOpAttrs);
 
-Pass ExpandShardOp(const Map<Expr, Expr>& func_map) {
+Pass ExpandShardOpCall() {
   return CreateModulePass(
       [=](IRModule mod, const PassContext& pass_ctx) {
-        DLOG(INFO) << "pass::ExpandShardOp";
+        DLOG(INFO) << "pass::ExpandShardOpCall";
         IRModule updated_mod = IRModule(mod->functions);
         for (auto kv : updated_mod->functions) {
           if (kv.second.as<FunctionNode>()) {
-            auto setter = shard_pass::ShardOpExpander(func_map);
+            auto setter = shard_pass::ShardOpCallExpander();
             auto func =
                 tvm::runtime::Downcast<Function>(setter.VisitExpr(kv.second));
             updated_mod->Add(kv.first, func, true);
@@ -102,10 +99,10 @@ Pass ExpandShardOp(const Map<Expr, Expr>& func_map) {
         }
         return updated_mod;
       },
-      0, "ExpandShardOp", {});
+      0, "ExpandShardOpCall", {});
 }
 
-MNM_REGISTER_GLOBAL("mnm.pass_.ExpandShardOp").set_body_typed(ExpandShardOp);
+MNM_REGISTER_GLOBAL("mnm.pass_.ExpandShardOpCall").set_body_typed(ExpandShardOpCall);
 
 }  // namespace pass
 }  // namespace mnm

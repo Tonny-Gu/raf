@@ -25,7 +25,7 @@ DeadCodeElimination = _APIS.get("mnm.pass_.DeadCodeElimination", None)
 # Defined in ./src/pass/estimate_flops.cc
 EstimateGFLOPS = _APIS.get("mnm.pass_.EstimateGFLOPS", None)
 # Defined in ./src/pass/sharding.cc
-ExpandShardOp = _APIS.get("mnm.pass_.ExpandShardOp", None)
+ExpandShardOpCall = _APIS.get("mnm.pass_.ExpandShardOpCall", None)
 # Defined in ./src/pass/substitute.cc
 ExprAppend = _APIS.get("mnm.pass_.ExprAppend", None)
 # Defined in ./src/pass/extract_binding.cc

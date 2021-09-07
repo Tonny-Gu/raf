@@ -13,7 +13,7 @@ from ._internal import CanonicalizeOps
 from ._internal import ContextAnalysis
 from ._internal import DeadCodeElimination
 from ._internal import EstimateGFLOPS
-from ._internal import ExpandShardOp
+from ._internal import ExpandShardOpCall
 from ._internal import ExprAppend
 from ._internal import ExtractBinding
 from ._internal import FlattenClosure
