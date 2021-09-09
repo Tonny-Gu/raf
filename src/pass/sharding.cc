@@ -51,12 +51,11 @@ class ShardOpCallExpander : public ExprMutator {
   Expr VisitExpr_(const CallNode* node) override {
     const Expr& op = node->op;
     const Attrs& attrs = node->attrs;
-    const auto *f = tvm::runtime::Registry::Get("mnm.sharding._match_expanding_rule");
-    if (op->IsInstance<OpNode>() && attrs->IsInstance<ShardOpAttrs>()) {
+    const auto *f = tvm::runtime::Registry::Get("mnm.sharding._match_expansion_pattern");
+    if (attrs.defined() && op->IsInstance<OpNode>() && attrs->IsInstance<ShardOpAttrs>()) {
       auto call = GetRef<Call>(node);
       Expr new_expr = (*f)(call->op, call->args, call->attrs);
-      return new_expr;
-      // return ShardOpCallExpander::VisitExpr(new_expr); // nested conversion
+      return VisitExpr(new_expr); // nested conversion
     }
     return ExprMutator::VisitExpr_(node);
   }

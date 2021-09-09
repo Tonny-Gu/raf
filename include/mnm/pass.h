@@ -299,7 +299,7 @@ Pass SetShardOpAttrs(const ir::Map<ir::Expr, ir::Attrs>& attrs_map);
 
 /*!
  * \brief Expand Op Call with ShardOpAttrs to a series of expressions
- * according to the corresponding expanding rule
+ * according to the corresponding expansion pattern
  *
  * \return The created pass.
  */

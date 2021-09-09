@@ -20,7 +20,7 @@ pattern_map = {
 }
 #TODO: this pattern map is replicated mulitple times in source code
     
-def get_dist_device_list(dev_type="cuda"):
+def get_dist_devices(dev_type="cuda"):
     """Return all available devices in the cluster as a list of Device Objects.
 
     Parameters
@@ -41,33 +41,33 @@ def get_dist_device_list(dev_type="cuda"):
     #TODO: size*16 is only for testing
     return dev_array
 
-_expanding_rules = {}
+_expansion_patterns = {}
 
 def always_apply(op, args, attrs):
-    """Always apply this rule to expand op call"""
+    """Always apply this pattern to expand op call"""
     return True
 
 def expand_when(cond, priority=1):
-    """Specify the priority and the condition when this expanding rule should be used.
+    """Specify the priority and the condition when this expansion pattern should be used.
 
     Parameters
     ----------
     cond : function(op, args, attrs) -> bool
-        A function answering this expanding rule is eligible under particular conditions
+        A function answering this expansion pattern is eligible under particular conditions
         (e.g. with particular sharding specifications)
     """
     def decorator(pyfunc):
         if not hasattr(pyfunc, "op_name"):
-            raise ValueError("Must register expanding rule first")
+            raise ValueError("Must register expansion pattern first")
         op = GetOp(pyfunc.op_name) if pyfunc.op_name is not "_fallback" else "_fallback"
-        if pyfunc.op_name not in _expanding_rules:
-            _expanding_rules[op] = PriorityQueue()
-        _expanding_rules[op].put((priority, cond, pyfunc))
+        if pyfunc.op_name not in _expansion_patterns:
+            _expansion_patterns[op] = PriorityQueue()
+        _expansion_patterns[op].put((priority, cond, pyfunc))
         return pyfunc
     return decorator
 
-def register_expanding_rule(op_name):
-    """Register an expanding rule that converts a full-sized op into a partitioned-size op"""
+def register_expansion_pattern(op_name):
+    """Register an expansion pattern that converts a full-sized op into a partitioned-size op"""
     def decorator(pyfunc):
         @functools.wraps(pyfunc)
         def new_pyfunc(op, args, attrs):
@@ -77,12 +77,13 @@ def register_expanding_rule(op_name):
     return decorator
 
 
-@_register_func("mnm.sharding._match_expanding_rule")
+@_register_func("mnm.sharding._match_expansion_pattern")
 def expand_shardOpCall(op, args, attrs):
-    """Match an eligible expanding rule and return expanded IR expr"""
-    rules = _expanding_rules[op if op in _expanding_rules else "_fallback"]
-    for rule in rules.queue:
-        _, cond, irgen = rule
+    """Match an eligible expansion pattern and return expanded IR expr"""
+    patterns = _expansion_patterns[op if op in _expansion_patterns else "_fallback"]
+    print(op, args, attrs)
+    for pattern in patterns.queue:
+        _, cond, irgen = pattern
         if cond(op, args, attrs):
             break
     return irgen(op, args, attrs)
@@ -93,14 +94,14 @@ def is_elemwise_op_with_same_shardspec(op, args, attrs):
             and attrs.shard_in == attrs.shard_out
 
 @expand_when(is_elemwise_op_with_same_shardspec, priority=1)
-@register_expanding_rule("_fallback")
+@register_expansion_pattern("_fallback")
 def fallback_elemwise_op(op, args, attrs):
     """Convert elemwise op"""
     return relay.Call(op, args)
 
 @expand_when(always_apply, priority=0)
-@register_expanding_rule("_fallback")
+@register_expansion_pattern("_fallback")
 def fallback_reshard_to_replicated(op, args, attrs):
-    """Gather partitioned tensors for op without matched rules"""
+    """Gather partitioned tensors for op without matched patterns"""
     #TODO: add reshard
     return relay.Call(op, args)
