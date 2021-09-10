@@ -81,7 +81,6 @@ def register_expansion_pattern(op_name):
 def expand_shardOpCall(op, args, attrs):
     """Match an eligible expansion pattern and return expanded IR expr"""
     patterns = _expansion_patterns[op if op in _expansion_patterns else "_fallback"]
-    print(op, args, attrs)
     for pattern in patterns.queue:
         _, cond, irgen = pattern
         if cond(op, args, attrs):
@@ -105,3 +104,8 @@ def fallback_reshard_to_replicated(op, args, attrs):
     """Gather partitioned tensors for op without matched patterns"""
     #TODO: add reshard
     return relay.Call(op, args)
+
+@_register_func("mnm.sharding._py_print")
+def _py_print(obj):
+    """Only for debugging"""
+    print(obj)

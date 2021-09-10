@@ -33,12 +33,8 @@ class ShardOpAttrsSetter : public ExprMutator {
                                                    BaseShardSpec(default_spec));
     if (callee->IsInstance<OpNode>()) {
       auto ref = GetRef<Expr>(node);
-      if (_attrs_map.count(ref)) {
-        auto attrs = _attrs_map[ref];
-        return Call(node->op, node->args, Attrs(attrs));
-      } else {
-        return Call(node->op, node->args, Attrs(default_attrs));
-      }
+      auto new_expr = Call(node->op, node->args, Attrs(_attrs_map.count(ref) ? _attrs_map[ref] : default_attrs));
+      return ExprMutator::VisitExpr_(new_expr.as<CallNode>());
     }
     return ExprMutator::VisitExpr_(node);
   }
@@ -55,7 +51,7 @@ class ShardOpCallExpander : public ExprMutator {
     if (attrs.defined() && op->IsInstance<OpNode>() && attrs->IsInstance<ShardOpAttrs>()) {
       auto call = GetRef<Call>(node);
       Expr new_expr = (*f)(call->op, call->args, call->attrs);
-      return VisitExpr(new_expr); // nested conversion
+      return ExprMutator::VisitExpr(new_expr); // nested conversion
     }
     return ExprMutator::VisitExpr_(node);
   }
