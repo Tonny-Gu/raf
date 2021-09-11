@@ -25,6 +25,8 @@ class DistContextObj : public ir::Object {
   bool overlap_comm_forward = false;
   int auto_dp_profiling_start_iter = 2;
   int auto_dp_profiling_end_iter = 4;
+  Array<Device> global_devices;
+  Device local_device;
 
   void VisitAttrs(tvm::AttrVisitor* v) {
     v->Visit("root_rank", &root_rank);
@@ -36,6 +38,8 @@ class DistContextObj : public ir::Object {
     v->Visit("overlap_comm_forward", &overlap_comm_forward);
     v->Visit("auto_dp_profiling_start_iter", &auto_dp_profiling_start_iter);
     v->Visit("auto_dp_profiling_end_iter", &auto_dp_profiling_end_iter);
+    v->Visit("global_devices", &global_devices);
+    v->Visit("local_device", &local_device);
   }
 
  public:

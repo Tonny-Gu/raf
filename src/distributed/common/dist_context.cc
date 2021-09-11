@@ -20,7 +20,14 @@ DistContext DistContext::make() {
   n->size = comm->GetSize();
   n->local_rank = comm->GetLocalRank();
   n->local_size = comm->GetLocalSize();
-
+  auto dev_type = comm->type == "NCCL" ? DevType::kCUDA() : DevType::kCPU();
+  // TODO: it is improper to assume we only have two types of devices supporting MPI-like library
+  for (int i = 0; i < n->size; ++i) {
+    auto device = Device::make(dev_type, i);
+    n->global_devices.push_back(device);
+    if (i == n->rank)
+      n->local_device = device;
+  }
   return DistContext(n);
 }
 

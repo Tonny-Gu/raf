@@ -52,12 +52,16 @@ class ShardSpecObj final : public BaseShardSpecObj {
   Array<Device> assigned_devices;
   Array<Integer> num_devices_on_dim;
   Array<Integer> num_replicas_on_dim;
-
+  Array<Integer> _shard_idx;
+  Array<Integer> _shard_dim;
+  
   void VisitAttrs(tvm::AttrVisitor* v) {
     v->Visit("immutable", &immutable);
     v->Visit("assigned_devices", &assigned_devices);
     v->Visit("num_devices_on_dim", &num_devices_on_dim);
     v->Visit("num_replicas_on_dim", &num_replicas_on_dim);
+    v->Visit("_shard_idx", &_shard_idx);
+    v->Visit("_shard_dim", &_shard_dim);
   }
 
   static constexpr const char* _type_key = "mnm.sharding.ShardSpec";

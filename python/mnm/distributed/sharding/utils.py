@@ -20,26 +20,16 @@ pattern_map = {
 }
 #TODO: this pattern map is replicated mulitple times in source code
     
-def get_dist_devices(dev_type="cuda"):
+def get_global_devices():
     """Return all available devices in the cluster as a list of Device Objects.
-
-    Parameters
-    ----------
-    dev_type : str
-        The device type expected to use
 
     Returns
     -------
     ret: list
         List of Device Objects
     """
-    if dev_type not in get_device_list():
-        raise RuntimeError("Non-existing Device Type: " + dev_type)
-    dev_type_id = str2dev(dev_type).device_type
-    dctx = dist.get_context()
-    dev_array = [Device(dev_type_id, i) for i in range(dctx.size*16)]
     #TODO: size*16 is only for testing
-    return dev_array
+    return dist.get_context().global_devices
 
 _expansion_patterns = {}
 

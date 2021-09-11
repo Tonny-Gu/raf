@@ -7,6 +7,7 @@
 #include "mnm/ir.h"
 #include "mnm/registry.h"
 #include "mnm/sharding.h"
+#include "mnm/dist_context.h"
 #include <string>
 
 namespace mnm {
@@ -14,6 +15,7 @@ namespace sharding {
 
 using namespace mnm::ir;
 using namespace mnm::value;
+using namespace mnm::distributed;
 
 ReplicatedSpec ReplicatedSpec::make(bool immutable) {
   auto n = make_object<ReplicatedSpecObj>();
@@ -25,11 +27,34 @@ ShardSpec ShardSpec::make(bool immutable,
                           Array<Device> assigned_devices,
                           Array<Integer> num_devices_on_dim,
                           Array<Integer> num_replicas_on_dim) {
+  CHECK_EQ(num_devices_on_dim.size(), num_replicas_on_dim.size());
   auto n = make_object<ShardSpecObj>();
+  auto ndim = num_devices_on_dim.size();
+  auto shard_dim = std::vector<Integer>(ndim);
+  auto shard_idx = std::vector<Integer>(ndim);
+
+  int64_t shard_id = -1;
+  for (int64_t i = 0; i < assigned_devices.size(); ++i) {
+    if (DistContext::Global()->local_device.same_as(assigned_devices[i])) {
+      shard_id = i;
+      break;
+    }
+  }
+  for (int64_t i = ndim - 1; i >= 0; --i) {
+    auto num_devices = num_devices_on_dim[i]->value;
+    auto num_replicas = num_replicas_on_dim[i]->value;
+    shard_dim[i] = num_devices / num_replicas;
+    shard_idx[i] = (shard_id % num_devices) / num_replicas;
+    shard_id /= num_devices;
+  }
+
   n->immutable = immutable;
   n->assigned_devices = std::move(assigned_devices);
   n->num_devices_on_dim = std::move(num_devices_on_dim);
   n->num_replicas_on_dim = std::move(num_replicas_on_dim);
+  n->_shard_dim = Array<Integer>(shard_dim.begin(), shard_dim.end());
+  n->_shard_idx = Array<Integer>(shard_idx.begin(), shard_idx.end());
+
   return ShardSpec(n);
 }
 
