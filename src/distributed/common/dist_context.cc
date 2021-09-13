@@ -24,7 +24,7 @@ DistContext DistContext::make() {
   // TODO: it is improper to assume we only have two types of devices supporting MPI-like library
   for (int i = 0; i < n->size; ++i) {
     auto device = Device::make(dev_type, i);
-    n->global_devices.push_back(device);
+    n->dist_devices.push_back(device);
     if (i == n->rank)
       n->local_device = device;
   }

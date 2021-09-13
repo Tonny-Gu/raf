@@ -5,6 +5,7 @@
  */
 #include <tvm/runtime/data_type.h>
 #include "mnm/ir.h"
+#include "mnm/op.h"
 #include "mnm/registry.h"
 #include "mnm/sharding.h"
 #include "mnm/dist_context.h"
@@ -72,6 +73,9 @@ Attrs ShardOpAttrs::make(BaseShardSpec shard_in, BaseShardSpec shard_out) {
   attrs->shard_out = std::move(shard_out);
   return Attrs(attrs);
 }
+
+MNM_REGISTER_OP("mnm.sharding._reshard");
+/* Dummy Op */
 
 static thread_local bool print_brief_alloc_table = false;
 

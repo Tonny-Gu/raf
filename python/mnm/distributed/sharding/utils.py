@@ -1,12 +1,11 @@
-"""MNM sharding system utilities"""
 # pylint: disable=invalid-name, unused-argument
+"""MNM sharding system utilities"""
 import functools
 from queue import PriorityQueue
-from mnm._core.core_utils import str2dev
-from mnm._ffi.device import Device
+from mnm._ffi.sharding._make import ShardOpAttrs
 from mnm._ffi.op import GetOp
 from mnm._lib import _register_func, relay
-from mnm.testing.common import get_device_list
+from mnm.distributed.sharding.shardspec import ReplicatedSpec, ShardSpec, TupleShardSpec
 from mnm import distributed as dist
 
 pattern_map = {
@@ -20,7 +19,7 @@ pattern_map = {
 }
 #TODO: this pattern map is replicated mulitple times in source code
     
-def get_global_devices():
+def get_dist_devices():
     """Return all available devices in the cluster as a list of Device Objects.
 
     Returns
@@ -28,8 +27,7 @@ def get_global_devices():
     ret: list
         List of Device Objects
     """
-    #TODO: size*16 is only for testing
-    return dist.get_context().global_devices
+    return dist.get_context().dist_devices
 
 _expansion_patterns = {}
 
@@ -77,23 +75,44 @@ def expand_shardOpCall(op, args, attrs):
             break
     return irgen(op, args, attrs)
 
-def is_elemwise_op_with_same_shardspec(op, args, attrs):
-    """Check op is element wise while input's shardspec is the same as output's"""
-    return pattern_map[op.get_attr("TOpPattern")] == "kElemWise" \
-            and attrs.shard_in == attrs.shard_out
+@expand_when(lambda _, __, attrs: isinstance(attrs.shard_in, ReplicatedSpec) and \
+                                  isinstance(attrs.shard_out, ShardSpec), priority=1)
+@register_expansion_pattern("mnm.sharding._reshard")
+def reshard_to_strided_slice(op, args, attrs):
+    """_reshard -> strided_slice"""
+    return relay.Call(op, args)
 
-@expand_when(is_elemwise_op_with_same_shardspec, priority=1)
+def reshard_mismatch(op, args, attrs):
+    """_reshard -> <error>"""
+    raise NotImplementedError("Unable to process the given sharding specifications")
+
+def is_elemwise_op(op, args, attrs):
+    """Check op is element wise"""
+    return pattern_map[op.get_attr("TOpPattern")] == "kElemWise"
+
+@expand_when(is_elemwise_op, priority=1)
 @register_expansion_pattern("_fallback")
 def fallback_elemwise_op(op, args, attrs):
     """Convert elemwise op"""
+    if attrs.shard_in != attrs.shard_out:
+        if len(args) != 1 or \
+                isinstance(attrs.shard_in, TupleShardSpec) or \
+                isinstance(attrs.shard_out, TupleShardSpec):
+            raise NotImplementedError("Currently tuple is not supported")
+        args = relay.Call(GetOp("mnm.sharding._reshard"), args, attrs)
     return relay.Call(op, args)
 
 @expand_when(always_apply, priority=0)
 @register_expansion_pattern("_fallback")
 def fallback_reshard_to_replicated(op, args, attrs):
     """Gather partitioned tensors for op without matched patterns"""
-    #TODO: add reshard
-    return relay.Call(op, args)
+    if len(args) != 1 or \
+            isinstance(attrs.shard_in, TupleShardSpec) or \
+            isinstance(attrs.shard_out, TupleShardSpec):
+        raise NotImplementedError("Currently tuple is not supported")
+    new_attrs = ShardOpAttrs(attrs.shard_in, ReplicatedSpec())
+    new_args = [relay.Call(GetOp("mnm.sharding._reshard"), args, new_attrs)]
+    return relay.Call(op, new_args)
 
 @_register_func("mnm.sharding._py_print")
 def _py_print(obj):
