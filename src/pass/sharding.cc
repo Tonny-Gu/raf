@@ -50,8 +50,9 @@ class ShardOpCallExpander : public ExprMutator {
     const auto *f = tvm::runtime::Registry::Get("mnm.sharding._match_expansion_pattern");
     if (attrs.defined() && op->IsInstance<OpNode>() && attrs->IsInstance<ShardOpAttrs>()) {
       auto call = GetRef<Call>(node);
-      Expr new_expr = (*f)(call->op, call->args, call->attrs);
-      return ExprMutator::VisitExpr(new_expr); // nested conversion
+      Expr new_expr = (*f)(call);
+      return call.same_as(new_expr) ?
+          new_expr : ExprMutator::VisitExpr(new_expr);
     }
     return ExprMutator::VisitExpr_(node);
   }

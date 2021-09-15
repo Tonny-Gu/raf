@@ -1,37 +1,56 @@
-# pylint: disable=attribute-defined-outside-init,invalid-name,protected-access,too-many-locals,too-many-statements
+# pylint: disable=missing-function-docstring, missing-class-docstring, invalid-name, protected-access
 import pytest
 import mnm
 from mnm._core.core_utils import str2dev
-from mnm._ffi.sharding._make import ShardSpec
-from mnm._ffi.pass_ import AutoDiff, GradientInputSelection, InferType, SetShardOpAttrs
+from mnm.distributed.sharding import ShardSpec, ReplicatedSpec, TupleShardSpec, BaseShardSpec, ShardOpAttrs
+from mnm._ffi.pass_ import SetShardOpAttrs, ToGraphNormalForm, ExpandShardOpCall, InferType
 from mnm._ffi.device import Device
-from mnm._lib import tvm
+from mnm._ffi.sharding import TogglePrintMode
 from mnm._lib import relay
-from mnm.testing import randn, run_infer_type
-from mnm._core.module import IRModule
-from mnm.testing.common import get_device_list
+from mnm.testing import randn
 from mnm import distributed as dist
-from mnm.utils.visualizer import draw_dataflow_graph
 from tvm.relay.analysis.analysis import post_order_visit
 
 def test_shardOpAttrs():
 
     class Model(mnm.Model):
         def build(self):
-            self.w, _ = randn((128, 128))
             pass
 
         @mnm.model.trace
-        def forward(self, x):
-            y = mnm.add(x, self.w)
-            z = mnm.relu(y)
+        def forward(self, x, y):
+            z = mnm.add(x, y)
             return z
 
     model = Model()
     m_x, _ = randn((128, 128))
-    m_x.requires_grad = True
-    record = model._internal(m_x)
+    m_y, _ = randn((128, 128))
+    record = model._internal(m_x, m_y)
     mod_before = record.mod
+    mod_before = InferType()(mod_before)
+
+    def get_global_device_list(dev_type="cuda"):
+        dev_type_id = str2dev(dev_type).device_type
+        dctx = dist.get_context()
+        local_id = 6
+        local_id -= 1
+        dev_array = [Device(dev_type_id, i) for i in range(1, local_id)] + \
+                    [dctx.local_device] + [Device(dev_type_id, i) for i in range(local_id, 16)]
+        return dev_array
+    TogglePrintMode()
+    devices = get_global_device_list()
+    attrs = ShardOpAttrs(TupleShardSpec([ReplicatedSpec(), ReplicatedSpec()]),
+                         ShardSpec(devices, [2, 2], [1, 1]))
+    call_list = []
+    post_order_visit(mod_before["main"].body,
+                     lambda op: call_list.append(op) if isinstance(op, relay.Call) else None)
+    attrs_map = {call_list[0] : attrs}
+    
+    mod = SetShardOpAttrs(attrs_map)(mod_before)
+    mod = ToGraphNormalForm()(mod)
+    print(mnm._ffi.ir.AsText(mod))
+    mod1 = ExpandShardOpCall()(mod)
+    print(mnm._ffi.ir.AsText(mod1))
 
 if __name__ == "__main__":
     # pytest.main([__file__])
