@@ -34,18 +34,19 @@ __all__ = [
     "nll_loss_dtrue", "non_max_suppression", "not_equal", "one_hot", "ones",
     "ones_like", "pad", "power", "prod", "prod_dx",
     "relu", "relu_dx", "repeat", "repeat_dx", "reshape",
-    "resize2d", "reverse", "reverse_sequence", "right_shift", "roi_align",
-    "roi_align_dx", "round", "rsqrt", "scatter", "scatter_dx",
-    "sequence_mask", "set_stream", "sgd", "shape", "sigmoid",
-    "sigmoid_dx", "sign", "sin", "smooth_l1_loss", "smooth_l1_loss_dpred",
-    "smooth_l1_loss_dtrue", "softmax", "softmax_dx", "sort", "split",
-    "sqrt", "sqrt_dx", "squeeze", "stack", "stream_barrier",
-    "stream_sync", "strided_slice", "strided_slice_dx", "subtract", "sum",
-    "sum_dx", "swap_axis", "take", "take_dx", "tanh",
-    "tanh_dx", "threefry_generate", "threefry_split", "threshold", "threshold_dx",
-    "topk", "transpose", "transpose_dx", "trunc", "upper_bound_argwhere",
-    "vm_alloc_storage", "vm_alloc_tensor", "vm_free", "vm_infer_type", "vm_invoke_op",
-    "vm_set_shape", "wait_event", "where", "zeros", "zeros_like",
+    "resize2d", "resize2d_dx", "reverse", "reverse_sequence", "right_shift",
+    "roi_align", "roi_align_dx", "round", "rsqrt", "scatter",
+    "scatter_dx", "sequence_mask", "set_stream", "sgd", "shape",
+    "sigmoid", "sigmoid_dx", "sign", "sin", "smooth_l1_loss",
+    "smooth_l1_loss_dpred", "smooth_l1_loss_dtrue", "softmax", "softmax_dx", "sort",
+    "split", "sqrt", "sqrt_dx", "squeeze", "stack",
+    "stream_barrier", "stream_sync", "strided_slice", "strided_slice_dx", "subtract",
+    "sum", "sum_dx", "swap_axis", "take", "take_dx",
+    "tanh", "tanh_dx", "threefry_generate", "threefry_split", "threshold",
+    "threshold_dx", "topk", "transpose", "transpose_dx", "trunc",
+    "upper_bound_argwhere", "vm_alloc_storage", "vm_alloc_tensor", "vm_free", "vm_infer_type",
+    "vm_invoke_op", "vm_set_shape", "wait_event", "where", "zeros",
+    "zeros_like",
 ]
 
 @set_module("mnm")
@@ -74,11 +75,12 @@ def _contrib_dropout(x, p=0.5, in_states=None):
     return imp_utils.ret(ffi._contrib_dropout(x, p, in_states))
 
 @set_module("mnm")
-def _contrib_dropout_dx(dy, reserve_space, p=0.5):
+def _contrib_dropout_dx(dy, mask, reserve_space, p=0.5):
     dy = imp_utils.to_tensor(dy)
+    mask = imp_utils.to_tensor(mask)
     reserve_space = imp_utils.to_tensor(reserve_space)
     p = imp_utils.to_double(p)
-    return imp_utils.ret(ffi._contrib_dropout_dx(dy, reserve_space, p))
+    return imp_utils.ret(ffi._contrib_dropout_dx(dy, mask, reserve_space, p))
 
 @set_module("mnm")
 def _recv(peer, shape, dtype="float32", token=None):
@@ -151,9 +153,10 @@ def add(x1, x2, out=None, where=None):
     return imp_utils.ret(ffi.add(x1, x2, out, where))
 
 @set_module("mnm")
-def add_event(event_id):
+def add_event(event_id, stream_id=-1):
     event_id = imp_utils.to_int(event_id)
-    return imp_utils.ret(ffi.add_event(event_id))
+    stream_id = imp_utils.to_int(stream_id)
+    return imp_utils.ret(ffi.add_event(event_id, stream_id))
 
 @set_module("mnm")
 def adv_index(inputs):
@@ -989,6 +992,20 @@ def resize2d(x, size, layout="NCHW", method="linear", coordinate_transformation_
     return imp_utils.ret(ffi.resize2d(x, size, layout, method, coordinate_transformation_mode, rounding_method, cubic_alpha, cubic_exclude, out_dtype))
 
 @set_module("mnm")
+def resize2d_dx(x, dy, size, layout="NCHW", method="linear", coordinate_transformation_mode="half_pixel", rounding_method="", cubic_alpha=-0.5, cubic_exclude=0, out_dtype=""):
+    x = imp_utils.to_tensor(x)
+    dy = imp_utils.to_tensor(dy)
+    size = imp_utils.to_int_tuple(size)
+    layout = imp_utils.to_string(layout)
+    method = imp_utils.to_string(method)
+    coordinate_transformation_mode = imp_utils.to_string(coordinate_transformation_mode)
+    rounding_method = imp_utils.to_string(rounding_method)
+    cubic_alpha = imp_utils.to_double(cubic_alpha)
+    cubic_exclude = imp_utils.to_int(cubic_exclude)
+    out_dtype = imp_utils.to_string(out_dtype)
+    return imp_utils.ret(ffi.resize2d_dx(x, dy, size, layout, method, coordinate_transformation_mode, rounding_method, cubic_alpha, cubic_exclude, out_dtype))
+
+@set_module("mnm")
 def reverse(x, axis=0):
     x = imp_utils.to_tensor(x)
     axis = imp_utils.to_int(axis)
@@ -1371,9 +1388,10 @@ def vm_set_shape(data, shape):
     return imp_utils.ret(ffi.vm.set_shape(data, shape))
 
 @set_module("mnm")
-def wait_event(event_id):
+def wait_event(event_id, stream_id=-1):
     event_id = imp_utils.to_int(event_id)
-    return imp_utils.ret(ffi.wait_event(event_id))
+    stream_id = imp_utils.to_int(stream_id)
+    return imp_utils.ret(ffi.wait_event(event_id, stream_id))
 
 @set_module("mnm")
 def where(condition, x, y):

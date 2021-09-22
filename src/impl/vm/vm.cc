@@ -17,6 +17,7 @@
 #include <stdexcept>
 #include <vector>
 
+#include "mnm/communicator.h"
 #include "mnm/memory_pool.h"
 #include "mnm/ir.h"
 #include "mnm/op.h"
@@ -28,6 +29,7 @@
 #include "mnm/vm/vm.h"
 #include "mnm/device_api.h"
 #include "mnm/profiler.h"
+#include "mnm/communicator.h"
 #include "mnm/stream_pool.h"
 #include "../../requests.h"
 #include "../../op/ty/utils.h"
@@ -790,22 +792,25 @@ void VirtualMachine::HandleInferType(VMContext& ctx, const Instruction& instr) {
     args.push_back(ctx.ReadRegister(instr.infer_type.args[i]));
   }
   // infer type
-  static auto fschema = Op::GetAttrMap<FMNMSchema>("FMNMSchema");
-  Value callee = ctx.ReadRegister(instr.invoke_jit.op_reg);
+  const Value& callee = ctx.ReadRegister(instr.invoke_jit.op_reg);
   Type ret_type;
   if (const auto* opv = callee.as<OpValueObj>()) {
-    auto call_values = CallValues::make(callee, fschema[opv->op](args));
+    auto fschema = GetOpAttr<FMNMSchema>(opv->op, "FMNMSchema");
+    auto call_values = CallValues::make(callee, fschema(args));
     auto fty = Downcast<FuncType>(opv->op->checked_type());
     TypeInference ti = Downcast<TypeInference>(fty->type_constraints[0]);
     ret_type = ti->func(call_values);
   } else {
     auto func = callee.as<ClosureValueObj>()->func;
     CHECK_EQ(func->params.size(), args.size());
-    auto new_func = Function(func->params, func->body, {}, {});
+    auto new_func =
+        Function(func->params, func->body, {}, func->type_params, func->attrs, func->span);
     for (size_t i = 0; i < args.size(); ++i) {
       new_func->params[i]->checked_type_ = GetType(args[i]);
     }
     new_func = Downcast<Function>(pass::InferType(new_func));
+    // TODO(@hgt312): Do NOT modify the register that is supposed to be an input to the instruction.
+    //   Please fix this by changing the type-inferred closure into an output.
     ctx.WriteRegister(instr.invoke_jit.op_reg, ClosureValue::make({}, new_func));
     FuncType fty = Downcast<FuncType>(new_func->checked_type());
     ret_type = fty->ret_type;
@@ -845,7 +850,10 @@ void VirtualMachine::HandleCudaSetStream(VMContext& ctx, const Instruction& inst
 
 void VirtualMachine::HandleCudaAddEvent(VMContext& ctx, const Instruction& instr) {
   Index device_id = ctx->current_device_id;
-  Index stream_id = ctx->current_stream_id;
+  Index stream_id = instr.cuda_event.stream_id;
+  if (stream_id == -1) {
+    stream_id = ctx->current_stream_id;
+  }
   Index event_id = instr.cuda_event.event_id;
   auto event = utils::GetEventById(ctx, device_id, event_id);
   auto stream = utils::GetStreamById(ctx, device_id, stream_id);
@@ -857,7 +865,10 @@ void VirtualMachine::HandleCudaAddEvent(VMContext& ctx, const Instruction& instr
 
 void VirtualMachine::HandleCudaWaitEvent(VMContext& ctx, const Instruction& instr) {
   Index device_id = ctx->current_device_id;
-  Index stream_id = ctx->current_stream_id;
+  Index stream_id = instr.cuda_event.stream_id;
+  if (instr.cuda_event.stream_id == -1) {
+    stream_id = ctx->current_stream_id;
+  }
   Index event_id = instr.cuda_event.event_id;
   auto event = utils::GetEventById(ctx, device_id, event_id);
   auto stream = utils::GetStreamById(ctx, device_id, stream_id);
@@ -977,14 +988,13 @@ VirtualMachine::PrepareOpEnv(const VMContext& ctx, const Instruction& instr) {
     op_env = *p;
   } else {
     // Create a new OpEnv.
-    static auto fschema = Op::GetAttrMap<FMNMSchema>("FMNMSchema");
     auto call_values = CallValues::make();
     Value callee = ctx.ReadRegister(instr.invoke_jit.op_reg);
     const auto* op = callee.as<OpValueObj>();
     const auto* closure = callee.as<ClosureValueObj>();
     call_values->callee = callee;
     if (op) {
-      call_values->args = fschema[op->op](args);
+      call_values->args = GetOpAttr<FMNMSchema>(op->op, "FMNMSchema")(args);
     } else {
       call_values->args = MakeListArgs(args);
     }
@@ -994,6 +1004,24 @@ VirtualMachine::PrepareOpEnv(const VMContext& ctx, const Instruction& instr) {
     CHECK(op_env != nullptr) << "ValueError: Cannot dispatch "
                              << (op ? op->op->name : PrettyPrint(closure->func)) << " @"
                              << call_values->device.c_str();
+    std::shared_ptr<Requests> requests = op_env->GetRequests();
+    // prepare distributed requests
+    for (size_t i = 0; i < requests->distributed.size(); i++) {
+      Requests::DistributedRequest& entry = requests->distributed[i];
+      *entry.dest = distributed::communicator::CommunicatorManager::Get()->GetCommunicator();
+    }
+#ifdef MNM_USE_CUDA
+    // prepare cuda stream requests
+    for (size_t i = 0; i < requests->stream.size(); i++) {
+      Requests::StreamRequest& entry = requests->stream[i];
+      // currently ignores the stream_idx field in requests, all requests with the same tag_idx will
+      // get the same cuda stream in vm
+      std::shared_ptr<Stream> stream =
+          utils::GetStreamById(ctx, entry.device.device_id(), entry.tag_idx);
+      *entry.dest = stream->data();
+      entry.stream = stream;
+    }
+#endif
     // add to cache
     op_env_cache->Set(input_str, op_env);
   }

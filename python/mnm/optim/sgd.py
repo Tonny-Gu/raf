@@ -1,16 +1,14 @@
 """SGD optimizer."""
 import numpy as np
-from tvm import relay
-from mnm._ffi.ir.constant import ExtractValue
-from mnm._ffi.binding import LookupBoundExpr
-from mnm._core.value import NoGradValue
-from .._core.core_utils import get_chained_attr
-from .._core.ndarray import ndarray, array, get_symbol_handle
+
+from mnm._core.core_utils import get_chained_attr
+from mnm._core.ndarray import ndarray, array
+from mnm.model import trace, Model, trace_mutate_attr
+from mnm.model.trace import _get_func_inputs
+from mnm._op import imp
+from mnm._op.sym import multiply, add, subtract
 from .optim import with_autodiff
-from ..model import trace, Model, trace_mutate_attr
-from ..model.trace import _get_func_inputs
-from .._op import imp
-from .._op.sym import multiply, add, subtract
+from .utils import has_grad
 
 
 # pylint: disable=too-few-public-methods
@@ -52,24 +50,6 @@ class SGD:
             v0.update(v1)
 
 
-def has_grad(dx):
-    """ Check if dx is NoGradValue """
-    def simplify(x):
-        if isinstance(x, relay.Var):
-            return simplify(LookupBoundExpr(x))
-        if isinstance(x, relay.TupleGetItem):
-            tup = simplify(x.tuple_value)
-            if isinstance(tup, relay.Tuple):
-                return simplify(tup[x.index])
-        return x
-
-    dx = simplify(get_symbol_handle(dx))
-    if isinstance(dx, relay.Constant):
-        dx = ExtractValue(dx)
-        return not isinstance(dx, NoGradValue)
-    return True
-
-
 def with_sgd(learning_rate=0.1, momentum=0.01):
     """ Optimizer : stochastic gradient descent
 
@@ -102,8 +82,10 @@ def with_sgd(learning_rate=0.1, momentum=0.01):
                 self.momentum = array(momentum, dtype='float32')
                 self.params = {}
                 for name, x in self.model.state().items():
+                    # For each tensor "w" that requires gradient (i.e., training weights),
+                    # create a tensor "w.v" to be its SGD variant.
                     if x.requires_grad is True:
-                        assert isinstance(x, ndarray), "Only `mnm.ndarray' can be optimized!"
+                        assert isinstance(x, ndarray), "Only `mnm.ndarray` can be optimized!"
                         npa = np.zeros(x.shape, dtype=x.dtype)
                         v_i = ndarray(npa, device=x.device, name=f'{name}.v')
                         setattr(self, f'{name}.v', v_i)
@@ -122,11 +104,13 @@ def with_sgd(learning_rate=0.1, momentum=0.01):
                         name, x, v = self.params[param]
                         # TODO(@anijain2305): Improve the gradient pass for better has_grad results.
                         if "float" in x.dtype:
+                            # Inplace update variant.
                             new_v = add(multiply(self.momentum, v), dxi, out=v)
+                            # Inplace update weight.
                             new_x = subtract(x, multiply(self.learning_rate, new_v), out=x)
                             param_model = get_chained_attr(self.model, name.split('.')[:-1])
+                            # Put the updated weight to the model output to avoid being dead code.
                             trace_mutate_attr(param_model, name.split('.')[-1], new_x)
-                            trace_mutate_attr(self, f'{name}.v', new_v)
                 return y
         return SGDWrapper(model)
     return decorator
