@@ -176,6 +176,9 @@ OPS = [
     Op(name="upper_bound.argwhere", schema_name="argwhere"),
     Op(name="roi_align", schema_name="roi_align"),
     Op(name="roi_align_dx", schema_name="roi_align_dx"),
+    # Sharding ops
+    Op(name="sharding._reshard", schema_name="unary"),
+    Op(name="sharding._get_slice_range", schema_name="unary"),
     # Stream ops
     Op(name="set_stream", schema_name="set_stream"),
     Op(name="add_event", schema_name="event"),
@@ -191,7 +194,7 @@ OPS = [
     Op(name="_broadcast", schema_name="broadcast"),
     Op(name="_send", schema_name="send"),
     Op(name="_recv", schema_name="recv"),
-    # VM ops
+    # VM ops0
     Op(name="vm.alloc_storage", schema_name="alloc_storage"),
     Op(name="vm.alloc_tensor", schema_name="alloc_tensor"),
     Op(name="vm.free", schema_name="free"),

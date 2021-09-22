@@ -186,5 +186,6 @@ from ._internal import wait_event
 from ._internal import where
 from ._internal import zeros
 from ._internal import zeros_like
+from . import sharding
 from . import upper_bound
 from . import vm

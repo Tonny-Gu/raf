@@ -74,9 +74,6 @@ Attrs ShardOpAttrs::make(BaseShardSpec shard_in, BaseShardSpec shard_out) {
   return Attrs(attrs);
 }
 
-MNM_REGISTER_OP("mnm.sharding._reshard");
-/* Dummy Op */
-
 static thread_local bool print_brief_alloc_table = false;
 
 MNM_REGISTER_GLOBAL("mnm.sharding._make.ReplicatedSpec").set_body_typed(ReplicatedSpec::make);

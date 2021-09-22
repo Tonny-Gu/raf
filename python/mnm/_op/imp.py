@@ -37,16 +37,16 @@ __all__ = [
     "resize2d", "resize2d_dx", "reverse", "reverse_sequence", "right_shift",
     "roi_align", "roi_align_dx", "round", "rsqrt", "scatter",
     "scatter_dx", "sequence_mask", "set_stream", "sgd", "shape",
-    "sigmoid", "sigmoid_dx", "sign", "sin", "smooth_l1_loss",
-    "smooth_l1_loss_dpred", "smooth_l1_loss_dtrue", "softmax", "softmax_dx", "sort",
-    "split", "sqrt", "sqrt_dx", "squeeze", "stack",
-    "stream_barrier", "stream_sync", "strided_slice", "strided_slice_dx", "subtract",
-    "sum", "sum_dx", "swap_axis", "take", "take_dx",
-    "tanh", "tanh_dx", "threefry_generate", "threefry_split", "threshold",
-    "threshold_dx", "topk", "transpose", "transpose_dx", "trunc",
-    "upper_bound_argwhere", "vm_alloc_storage", "vm_alloc_tensor", "vm_free", "vm_infer_type",
-    "vm_invoke_op", "vm_set_shape", "wait_event", "where", "zeros",
-    "zeros_like",
+    "sharding__get_slice_range", "sharding__reshard", "sigmoid", "sigmoid_dx", "sign",
+    "sin", "smooth_l1_loss", "smooth_l1_loss_dpred", "smooth_l1_loss_dtrue", "softmax",
+    "softmax_dx", "sort", "split", "sqrt", "sqrt_dx",
+    "squeeze", "stack", "stream_barrier", "stream_sync", "strided_slice",
+    "strided_slice_dx", "subtract", "sum", "sum_dx", "swap_axis",
+    "take", "take_dx", "tanh", "tanh_dx", "threefry_generate",
+    "threefry_split", "threshold", "threshold_dx", "topk", "transpose",
+    "transpose_dx", "trunc", "upper_bound_argwhere", "vm_alloc_storage", "vm_alloc_tensor",
+    "vm_free", "vm_infer_type", "vm_invoke_op", "vm_set_shape", "wait_event",
+    "where", "zeros", "zeros_like",
 ]
 
 @set_module("mnm")
@@ -1103,6 +1103,16 @@ def sgd(x, dx, v, learning_rate, mu):
 def shape(x):
     x = imp_utils.to_any(x)
     return imp_utils.ret(ffi.shape(x))
+
+@set_module("mnm")
+def sharding__get_slice_range(x):
+    x = imp_utils.to_any(x)
+    return imp_utils.ret(ffi.sharding._get_slice_range(x))
+
+@set_module("mnm")
+def sharding__reshard(x):
+    x = imp_utils.to_any(x)
+    return imp_utils.ret(ffi.sharding._reshard(x))
 
 @set_module("mnm")
 def sigmoid(x):

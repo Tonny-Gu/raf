@@ -36,16 +36,16 @@ __all__ = [
     "resize2d", "resize2d_dx", "reverse", "reverse_sequence", "right_shift",
     "roi_align", "roi_align_dx", "round", "rsqrt", "scatter",
     "scatter_dx", "sequence_mask", "set_stream", "sgd", "shape",
-    "sigmoid", "sigmoid_dx", "sign", "sin", "smooth_l1_loss",
-    "smooth_l1_loss_dpred", "smooth_l1_loss_dtrue", "softmax", "softmax_dx", "sort",
-    "split", "sqrt", "sqrt_dx", "squeeze", "stack",
-    "stream_barrier", "stream_sync", "strided_slice", "strided_slice_dx", "subtract",
-    "sum", "sum_dx", "swap_axis", "take", "take_dx",
-    "tanh", "tanh_dx", "threefry_generate", "threefry_split", "threshold",
-    "threshold_dx", "topk", "transpose", "transpose_dx", "trunc",
-    "upper_bound_argwhere", "vm_alloc_storage", "vm_alloc_tensor", "vm_free", "vm_infer_type",
-    "vm_invoke_op", "vm_set_shape", "wait_event", "where", "zeros",
-    "zeros_like",
+    "sharding__get_slice_range", "sharding__reshard", "sigmoid", "sigmoid_dx", "sign",
+    "sin", "smooth_l1_loss", "smooth_l1_loss_dpred", "smooth_l1_loss_dtrue", "softmax",
+    "softmax_dx", "sort", "split", "sqrt", "sqrt_dx",
+    "squeeze", "stack", "stream_barrier", "stream_sync", "strided_slice",
+    "strided_slice_dx", "subtract", "sum", "sum_dx", "swap_axis",
+    "take", "take_dx", "tanh", "tanh_dx", "threefry_generate",
+    "threefry_split", "threshold", "threshold_dx", "topk", "transpose",
+    "transpose_dx", "trunc", "upper_bound_argwhere", "vm_alloc_storage", "vm_alloc_tensor",
+    "vm_free", "vm_infer_type", "vm_invoke_op", "vm_set_shape", "wait_event",
+    "where", "zeros", "zeros_like",
 ]
 
 def _allgather(x, axis, attrs=None):
@@ -1100,6 +1100,16 @@ def sgd(x, dx, v, learning_rate, mu, attrs=None):
 
 def shape(x, attrs=None):
     op = GetOp("mnm.op.shape")
+    x = op_utils.to_any(x)
+    return relay.Call(op, [x], attrs)
+
+def sharding__get_slice_range(x, attrs=None):
+    op = GetOp("mnm.op.sharding._get_slice_range")
+    x = op_utils.to_any(x)
+    return relay.Call(op, [x], attrs)
+
+def sharding__reshard(x, attrs=None):
+    op = GetOp("mnm.op.sharding._reshard")
     x = op_utils.to_any(x)
     return relay.Call(op, [x], attrs)
 
