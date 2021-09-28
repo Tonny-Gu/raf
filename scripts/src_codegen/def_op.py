@@ -194,7 +194,7 @@ OPS = [
     Op(name="_broadcast", schema_name="broadcast"),
     Op(name="_send", schema_name="send"),
     Op(name="_recv", schema_name="recv"),
-    # VM ops0
+    # VM ops
     Op(name="vm.alloc_storage", schema_name="alloc_storage"),
     Op(name="vm.alloc_tensor", schema_name="alloc_tensor"),
     Op(name="vm.free", schema_name="free"),

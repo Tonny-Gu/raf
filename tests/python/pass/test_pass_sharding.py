@@ -45,7 +45,7 @@ def test_shardOpAttrs():
     post_order_visit(mod_before["main"].body,
                      lambda op: call_list.append(op) if isinstance(op, relay.Call) else None)
     attrs_map = {call_list[0] : attrs}
-    
+
     mod = SetShardOpAttrs(attrs_map)(mod_before)
     mod = ToGraphNormalForm()(mod)
     print(mnm._ffi.ir.AsText(mod))

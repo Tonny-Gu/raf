@@ -6,15 +6,20 @@
 #include <tvm/runtime/data_type.h>
 #include "mnm/ir.h"
 #include "mnm/op.h"
+#include "mnm/op_utils.h"
 #include "mnm/registry.h"
 #include "mnm/sharding.h"
 #include "mnm/dist_context.h"
+#include "../op/schema/ufunc.h"
+#include "../op/schema/sharding.h"
 #include <string>
 
 namespace mnm {
 namespace sharding {
 
 using namespace mnm::ir;
+using namespace mnm::op;
+using namespace mnm::op::schema;
 using namespace mnm::value;
 using namespace mnm::distributed;
 
@@ -73,6 +78,23 @@ Attrs ShardOpAttrs::make(BaseShardSpec shard_in, BaseShardSpec shard_out) {
   attrs->shard_out = std::move(shard_out);
   return Attrs(attrs);
 }
+
+MNM_OP_DECLARE("mnm.op.sharding._get_slice_range", [](const CallValues& call) {
+  const auto* args = call->args.as<GetSliceRangeArgs>();
+  CHECK(args != nullptr);
+  DLTensor* x = args->x;
+  auto shard_spec = args->shard_spec;
+  CHECK_EQ(x->ndim, shard_spec->_shard_dim.size());
+  std::vector<int64_t> begin;
+  std::vector<int64_t> end;
+  for (int dim = 0; dim < x->ndim; ++dim) {
+    // shard_spec
+  }
+  
+  call->callee = ir::NullValue<OpValue>();
+});
+
+
 
 static thread_local bool print_brief_alloc_table = false;
 
@@ -155,7 +177,7 @@ TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
 TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
     .set_dispatch<TupleShardSpecObj>([](const ObjectRef& ref, ReprPrinter* p) {
       auto r = Downcast<TupleShardSpec>(ref);
-      p->stream << "TupleShardSpec(" 
+      p->stream << "TupleShardSpec" 
                 << (r->immutable ? "(Immut)" : "");
     });
 
