@@ -30,37 +30,35 @@ ReplicatedSpec ReplicatedSpec::make(bool immutable) {
 }
 
 ShardSpec ShardSpec::make(bool immutable,
-                          Array<Device> assigned_devices,
-                          Array<Integer> num_devices_on_dim,
-                          Array<Integer> num_replicas_on_dim) {
-  CHECK_EQ(num_devices_on_dim.size(), num_replicas_on_dim.size());
+                          Array<Device> devices_in_grid,
+                          Array<Integer> partition_shape,
+                          Array<Integer> subgroup_sizes) {
+  auto ndim = partition_shape.size();
+  CHECK_EQ(ndim, subgroup_sizes.size());
   auto n = make_object<ShardSpecObj>();
-  auto ndim = num_devices_on_dim.size();
-  auto shard_dim = std::vector<Integer>(ndim);
-  auto shard_idx = std::vector<Integer>(ndim);
+  auto subgroup_idx = std::vector<Integer>(ndim);
+  auto grid_shape = std::vector<Integer>(ndim);
 
-  int64_t shard_id = -1;
-  for (int64_t i = 0; i < assigned_devices.size(); ++i) {
-    if (DistContext::Global()->local_device.same_as(assigned_devices[i])) {
-      shard_id = i;
+  int64_t device_rank = -1;
+  for (int64_t i = 0; i < devices_in_grid.size(); ++i) {
+    if (DistContext::Global()->local_device.same_as(devices_in_grid[i])) {
+      device_rank = i;
       break;
     }
-  }
+  } // perhaps it is improper to calculate runtime data here
+
   for (int64_t i = ndim - 1; i >= 0; --i) {
-    auto num_devices = num_devices_on_dim[i]->value;
-    auto num_replicas = num_replicas_on_dim[i]->value;
-    shard_dim[i] = num_devices / num_replicas;
-    shard_idx[i] = (shard_id % num_devices) / num_replicas;
-    shard_id /= num_devices;
+    grid_shape[i] = partition_shape[i]->value / subgroup_sizes[i]->value;
+    subgroup_idx[i] = device_rank % grid_shape[i]->value;
+    device_rank /= grid_shape[i]->value;
   }
 
   n->immutable = immutable;
-  n->assigned_devices = std::move(assigned_devices);
-  n->num_devices_on_dim = std::move(num_devices_on_dim);
-  n->num_replicas_on_dim = std::move(num_replicas_on_dim);
-  n->_shard_dim = Array<Integer>(shard_dim.begin(), shard_dim.end());
-  n->_shard_idx = Array<Integer>(shard_idx.begin(), shard_idx.end());
-
+  n->devices_in_grid = std::move(devices_in_grid);
+  n->grid_shape = Array<Integer>(grid_shape.begin(), grid_shape.end());
+  n->subgroup_sizes = std::move(subgroup_sizes);
+  n->subgroup_idx = (device_rank != -1) ? Array<Integer>(subgroup_idx.begin(), subgroup_idx.end()) : 
+                                          NullValue<Array<Integer>>();
   return ShardSpec(n);
 }
 
@@ -84,7 +82,7 @@ MNM_OP_DECLARE("mnm.op.sharding._get_slice_range", [](const CallValues& call) {
   CHECK(args != nullptr);
   DLTensor* x = args->x;
   auto shard_spec = args->shard_spec;
-  CHECK_EQ(x->ndim, shard_spec->_shard_dim.size());
+  // CHECK_EQ(x->ndim, shard_spec->_shard_dim.size());
   std::vector<int64_t> begin;
   std::vector<int64_t> end;
   for (int dim = 0; dim < x->ndim; ++dim) {
@@ -95,16 +93,10 @@ MNM_OP_DECLARE("mnm.op.sharding._get_slice_range", [](const CallValues& call) {
 });
 
 
-
-static thread_local bool print_brief_alloc_table = false;
-
 MNM_REGISTER_GLOBAL("mnm.sharding._make.ReplicatedSpec").set_body_typed(ReplicatedSpec::make);
 MNM_REGISTER_GLOBAL("mnm.sharding._make.ShardSpec").set_body_typed(ShardSpec::make);
 MNM_REGISTER_GLOBAL("mnm.sharding._make.TupleShardSpec").set_body_typed(TupleShardSpec::make);
 MNM_REGISTER_GLOBAL("mnm.sharding._make.ShardOpAttrs").set_body_typed(ShardOpAttrs::make);
-MNM_REGISTER_GLOBAL("mnm.sharding.TogglePrintMode").set_body_typed([&]() {
-  print_brief_alloc_table = !print_brief_alloc_table;
-});
 
 MNM_REGISTER_OBJECT_NO_REFLECT(BaseShardSpecObj);
 MNM_REGISTER_OBJECT_REFLECT(ReplicatedSpecObj);
@@ -115,46 +107,31 @@ using tvm::ReprPrinter;
 using tvm::runtime::ObjectRef;
 
 void PrintAllocTable(const ObjectRef& ref, ReprPrinter* p) {
-  size_t dev_idx = 0;
+  /*size_t dev_idx = 0;
   const auto obj = Downcast<ShardSpec>(ref);
-  const auto num_dim = obj->num_devices_on_dim.size();
+  const auto num_dim = obj->grid_shape.size();
   static thread_local size_t *indices = new size_t[num_dim];
   std::function<void(int)> _print_alloc_table;
   _print_alloc_table = [&](int depth) {
     if (depth == num_dim) {
       p->stream << (dev_idx != 0 ? " [" : "[");
       for (size_t i = 0; i < num_dim; ++i) {
-        auto num_devices = obj->num_devices_on_dim[i]->value;
-        auto num_replicas = obj->num_replicas_on_dim[i]->value;
-        auto index = std::to_string(indices[i] / num_replicas);
+        auto num_devices = obj->grid_shape[i]->value;
+        auto index = std::to_string(indices[i]);
         p->stream << (num_devices == 1 ? ":" : index)
                   << (i != num_dim - 1 ? ", " : "");
       }
-      auto dev_info = obj->assigned_devices[dev_idx++].c_str();
+      auto dev_info = obj->devices_in_grid[dev_idx++].c_str();
       p->stream << "]@" << dev_info;
     } else {
-      auto num_devices = obj->num_devices_on_dim[depth]->value;
-      for (size_t i = 0; i < num_devices; ++i) {
+      auto subgroup_num = obj->grid_shape[depth]->value;
+      for (size_t i = 0; i < subgroup_num; ++i) {
         indices[depth] = i;
         _print_alloc_table(depth + 1);
       }
     }
   };
-  _print_alloc_table(0);
-}
-
-void PrintBriefAllocTable(const ObjectRef& ref, ReprPrinter* p) {
-  const auto obj = Downcast<ShardSpec>(ref);
-  const auto num_dim = obj->num_devices_on_dim.size();
-  p->stream << "[";
-  for (size_t i = 0; i < num_dim; ++i) {
-    auto num_devices = obj->num_devices_on_dim[i]->value;
-    auto num_replicas = obj->num_replicas_on_dim[i]->value;
-    p->stream << (num_devices == 1 ? ":" : std::to_string(num_devices))
-              << (num_replicas == 1 ? "" : "/" + std::to_string(num_replicas))
-              << (i != num_dim - 1 ? ", " : "");
-  }
-  p->stream << "]";
+  _print_alloc_table(0);*/
 }
 
 TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
@@ -167,11 +144,18 @@ TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
 TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
     .set_dispatch<ShardSpecObj>([](const ObjectRef& ref, ReprPrinter* p) {
       auto r = Downcast<ShardSpec>(ref);
+      auto ndim = r->grid_shape.size();
       p->stream << "ShardSpec("
-                << (r->immutable ? "Immut " : "");
-      print_brief_alloc_table ? 
-        PrintBriefAllocTable(ref, p) : PrintAllocTable(ref, p);
-      p->stream << ")";
+                << (r->immutable ? "Immut " : "")
+                << "[";
+      for (size_t i = 0; i < ndim; ++i) {
+        auto subgroup_num = r->grid_shape[i]->value;
+        auto subgroup_size = r->subgroup_sizes[i]->value;
+        p->stream << (subgroup_num == 1 ? ":" : std::to_string(subgroup_num))
+                  << (subgroup_size == 1 ? "" : "(" + std::to_string(subgroup_size) + ")")
+                  << (i != ndim - 1 ? ", " : "");
+      }
+      p->stream << "])";
     });
 
 TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)

@@ -32,12 +32,12 @@ class TupleShardSpec(BaseShardSpec):
 class ShardSpec(BaseShardSpec):
     """Generic annotation of Sharding Specifications"""
     def __init__(self,
-                 assigned_devices,
-                 num_devices_on_dim,
-                 num_replicas_on_dim,
+                 devices_in_grid,
+                 grid_shape,
+                 subgroup_sizes,
                  immutable=False):
         self.__init_handle_by_constructor__(_make.ShardSpec,
                                             immutable,
-                                            assigned_devices,
-                                            num_devices_on_dim,
-                                            num_replicas_on_dim)
+                                            devices_in_grid,
+                                            grid_shape,
+                                            subgroup_sizes)

@@ -49,19 +49,17 @@ class ReplicatedSpec final : public BaseShardSpec {
 /* ShardSpec */
 class ShardSpecObj final : public BaseShardSpecObj {
  public:
-  Array<Device> assigned_devices;
-  Array<Integer> num_devices_on_dim;
-  Array<Integer> num_replicas_on_dim;
-  Array<Integer> _shard_idx;
-  Array<Integer> _shard_dim;
+  Array<Device> devices_in_grid;
+  Array<Integer> grid_shape;
+  Array<Integer> subgroup_sizes;
+  Array<Integer> subgroup_idx;
   
   void VisitAttrs(tvm::AttrVisitor* v) {
     v->Visit("immutable", &immutable);
-    v->Visit("assigned_devices", &assigned_devices);
-    v->Visit("num_devices_on_dim", &num_devices_on_dim);
-    v->Visit("num_replicas_on_dim", &num_replicas_on_dim);
-    v->Visit("_shard_idx", &_shard_idx);
-    v->Visit("_shard_dim", &_shard_dim);
+    v->Visit("devices_in_grid", &devices_in_grid);
+    v->Visit("grid_shape", &grid_shape);
+    v->Visit("subgroup_sizes", &subgroup_sizes);
+    v->Visit("subgroup_idx", &subgroup_idx);
   }
 
   static constexpr const char* _type_key = "mnm.sharding.ShardSpec";
@@ -71,9 +69,9 @@ class ShardSpecObj final : public BaseShardSpecObj {
 class ShardSpec final : public BaseShardSpec {
  public:
   static ShardSpec make(bool immutable,
-                        Array<Device> assigned_devices,
-                        Array<Integer> num_devices_on_dim,
-                        Array<Integer> num_replicas_on_dim);
+                        Array<Device> devices_in_grid,
+                        Array<Integer> partition_shape,
+                        Array<Integer> subgroup_sizes);
   MNM_OBJECT_REF(ShardSpec, BaseShardSpec, ShardSpecObj);
 };
 

@@ -37,10 +37,11 @@ def test_shardOpAttrs():
         dev_array = [Device(dev_type_id, i) for i in range(1, local_id)] + \
                     [dctx.local_device] + [Device(dev_type_id, i) for i in range(local_id, 16)]
         return dev_array
-    TogglePrintMode()
     devices = get_global_device_list()
     attrs = ShardOpAttrs(TupleShardSpec([ReplicatedSpec(), ReplicatedSpec()]),
-                         ShardSpec(devices, [2, 2], [1, 1]))
+                         ShardSpec(devices, [4, 4], [2, 2]))
+    print(attrs)
+    return
     call_list = []
     post_order_visit(mod_before["main"].body,
                      lambda op: call_list.append(op) if isinstance(op, relay.Call) else None)
