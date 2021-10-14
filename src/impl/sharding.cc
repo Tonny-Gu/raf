@@ -77,21 +77,32 @@ Attrs ShardOpAttrs::make(BaseShardSpec shard_in, BaseShardSpec shard_out) {
   return Attrs(attrs);
 }
 
-MNM_OP_DECLARE("mnm.op.sharding._get_slice_range", [](const CallValues& call) {
+MNM_OP_DECLARE("mnm.op._get_slice_range", [](const CallValues& call) {
   const auto* args = call->args.as<GetSliceRangeArgs>();
   CHECK(args != nullptr);
-  DLTensor* x = args->x;
+  const DLTensor* x = args->x;
   auto shard_spec = args->shard_spec;
-  // CHECK_EQ(x->ndim, shard_spec->_shard_dim.size());
-  std::vector<int64_t> begin;
-  std::vector<int64_t> end;
-  for (int dim = 0; dim < x->ndim; ++dim) {
-    // shard_spec
+  auto ndim = x->ndim;
+  CHECK_EQ(x->ndim, shard_spec->grid_shape.size());
+  std::vector<Value> begin(ndim);
+  std::vector<Value> end(ndim);
+  if (shard_spec->subgroup_idx.defined()) {
+    for (int i = 0; i < ndim; ++i) {
+      auto idx = shard_spec->subgroup_idx[i]->value;
+      auto num = shard_spec->grid_shape[i]->value;
+      CHECK_EQ(x->shape[i] % num, 0) << "Currently automaic padding is unsupported.";
+      begin[i] = ScalarValue::make((x->shape[i] / num) * idx);
+      end[i] = ScalarValue::make((x->shape[i] / num) * (idx + 1) - 1);
+    }
+    call->out = TupleValue::make({
+      TupleValue::make(begin),
+      TupleValue::make(end)
+    });
+  } else {
+    call->out = ir::NullValue<Value>();
   }
-  
   call->callee = ir::NullValue<OpValue>();
 });
-
 
 MNM_REGISTER_GLOBAL("mnm.sharding._make.ReplicatedSpec").set_body_typed(ReplicatedSpec::make);
 MNM_REGISTER_GLOBAL("mnm.sharding._make.ShardSpec").set_body_typed(ShardSpec::make);

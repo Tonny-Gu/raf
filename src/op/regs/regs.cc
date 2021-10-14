@@ -46,9 +46,11 @@ static const char _allreduce[] = "mnm.op._allreduce";
 static const char _broadcast[] = "mnm.op._broadcast";
 static const char _contrib_dropout[] = "mnm.op._contrib_dropout";
 static const char _contrib_dropout_dx[] = "mnm.op._contrib_dropout_dx";
+static const char _get_slice_range[] = "mnm.op._get_slice_range";
 static const char _recv[] = "mnm.op._recv";
 static const char _reduce[] = "mnm.op._reduce";
 static const char _reduce_scatter[] = "mnm.op._reduce_scatter";
+static const char _reshard[] = "mnm.op._reshard";
 static const char _send[] = "mnm.op._send";
 static const char abs[] = "mnm.op.abs";
 static const char adaptive_avg_pool2d[] = "mnm.op.adaptive_avg_pool2d";
@@ -186,8 +188,6 @@ static const char sequence_mask[] = "mnm.op.sequence_mask";
 static const char set_stream[] = "mnm.op.set_stream";
 static const char sgd[] = "mnm.op.sgd";
 static const char shape[] = "mnm.op.shape";
-static const char sharding__get_slice_range[] = "mnm.op.sharding._get_slice_range";
-static const char sharding__reshard[] = "mnm.op.sharding._reshard";
 static const char sigmoid[] = "mnm.op.sigmoid";
 static const char sigmoid_dx[] = "mnm.op.sigmoid_dx";
 static const char sign[] = "mnm.op.sign";
@@ -1342,6 +1342,14 @@ MNM_REGISTER_GLOBAL("mnm.op.imp._contrib_dropout_dx").set_body([](TVMArgs args, 
   *ret = MNM_RET();
 });
 
+MNM_REGISTER_GLOBAL("mnm.op.imp._get_slice_range").set_body([](TVMArgs args, TVMRetValue* ret) {
+  MNM_PRELUDE(_get_slice_range, 1, ffi2schema::Unary,
+              schema::UnaryArgs);  // NOLINT(whitespace/line_length)
+  MNM_SET_ENV(vpack->x[0], schema2value::ArrayLike(schema->x));
+  MNM_SET_ENV(vpack->y, value);
+  *ret = MNM_RET();
+});
+
 MNM_REGISTER_GLOBAL("mnm.op.imp._recv").set_body([](TVMArgs args, TVMRetValue* ret) {
   MNM_PRELUDE(_recv, 4, ffi2schema::Recv, schema::RecvArgs);  // NOLINT(whitespace/line_length)
   MNM_SET_ENV(vpack->x[0], schema2value::Int(schema->peer));
@@ -1366,6 +1374,13 @@ MNM_REGISTER_GLOBAL("mnm.op.imp._reduce_scatter").set_body([](TVMArgs args, TVMR
   MNM_PRELUDE(_reduce_scatter, 1, ffi2schema::ReduceScatter,
               schema::ReduceScatterArgs);  // NOLINT(whitespace/line_length)
   MNM_SET_ENV(vpack->x[0], schema2value::TupleTensor(schema->x));
+  MNM_SET_ENV(vpack->y, value);
+  *ret = MNM_RET();
+});
+
+MNM_REGISTER_GLOBAL("mnm.op.imp._reshard").set_body([](TVMArgs args, TVMRetValue* ret) {
+  MNM_PRELUDE(_reshard, 1, ffi2schema::Unary, schema::UnaryArgs);  // NOLINT(whitespace/line_length)
+  MNM_SET_ENV(vpack->x[0], schema2value::ArrayLike(schema->x));
   MNM_SET_ENV(vpack->y, value);
   *ret = MNM_RET();
 });
@@ -2736,23 +2751,6 @@ MNM_REGISTER_GLOBAL("mnm.op.imp.sgd").set_body([](TVMArgs args, TVMRetValue* ret
 
 MNM_REGISTER_GLOBAL("mnm.op.imp.shape").set_body([](TVMArgs args, TVMRetValue* ret) {
   MNM_PRELUDE(shape, 1, ffi2schema::Unary, schema::UnaryArgs);  // NOLINT(whitespace/line_length)
-  MNM_SET_ENV(vpack->x[0], schema2value::ArrayLike(schema->x));
-  MNM_SET_ENV(vpack->y, value);
-  *ret = MNM_RET();
-});
-
-MNM_REGISTER_GLOBAL("mnm.op.imp.sharding._get_slice_range")
-    .set_body([](TVMArgs args, TVMRetValue* ret) {
-      MNM_PRELUDE(sharding__get_slice_range, 1, ffi2schema::Unary,
-                  schema::UnaryArgs);  // NOLINT(whitespace/line_length)
-      MNM_SET_ENV(vpack->x[0], schema2value::ArrayLike(schema->x));
-      MNM_SET_ENV(vpack->y, value);
-      *ret = MNM_RET();
-    });
-
-MNM_REGISTER_GLOBAL("mnm.op.imp.sharding._reshard").set_body([](TVMArgs args, TVMRetValue* ret) {
-  MNM_PRELUDE(sharding__reshard, 1, ffi2schema::Unary,
-              schema::UnaryArgs);  // NOLINT(whitespace/line_length)
   MNM_SET_ENV(vpack->x[0], schema2value::ArrayLike(schema->x));
   MNM_SET_ENV(vpack->y, value);
   *ret = MNM_RET();
@@ -4220,10 +4218,13 @@ MNM_REGISTER_GLOBAL("mnm.op.sym._contrib_dropout")
     .set_body(MNM_SYMBOLIC_API(_contrib_dropout, 3, Dropout));
 MNM_REGISTER_GLOBAL("mnm.op.sym._contrib_dropout_dx")
     .set_body(MNM_SYMBOLIC_API(_contrib_dropout_dx, 4, DropoutDx));
+MNM_REGISTER_GLOBAL("mnm.op.sym._get_slice_range")
+    .set_body(MNM_SYMBOLIC_API(_get_slice_range, 1, Unary));
 MNM_REGISTER_GLOBAL("mnm.op.sym._recv").set_body(MNM_SYMBOLIC_API(_recv, 4, Recv));
 MNM_REGISTER_GLOBAL("mnm.op.sym._reduce").set_body(MNM_SYMBOLIC_API(_reduce, 3, CommReduce));
 MNM_REGISTER_GLOBAL("mnm.op.sym._reduce_scatter")
     .set_body(MNM_SYMBOLIC_API(_reduce_scatter, 1, ReduceScatter));
+MNM_REGISTER_GLOBAL("mnm.op.sym._reshard").set_body(MNM_SYMBOLIC_API(_reshard, 1, Unary));
 MNM_REGISTER_GLOBAL("mnm.op.sym._send").set_body(MNM_SYMBOLIC_API(_send, 3, Send));
 MNM_REGISTER_GLOBAL("mnm.op.sym.abs").set_body(MNM_SYMBOLIC_API(abs, 1, Unary));
 MNM_REGISTER_GLOBAL("mnm.op.sym.adaptive_avg_pool2d")
@@ -4402,10 +4403,6 @@ MNM_REGISTER_GLOBAL("mnm.op.sym.sequence_mask")
 MNM_REGISTER_GLOBAL("mnm.op.sym.set_stream").set_body(MNM_SYMBOLIC_API(set_stream, 2, SetStream));
 MNM_REGISTER_GLOBAL("mnm.op.sym.sgd").set_body(MNM_SYMBOLIC_API(sgd, 5, Sgd));
 MNM_REGISTER_GLOBAL("mnm.op.sym.shape").set_body(MNM_SYMBOLIC_API(shape, 1, Unary));
-MNM_REGISTER_GLOBAL("mnm.op.sym.sharding._get_slice_range")
-    .set_body(MNM_SYMBOLIC_API(sharding__get_slice_range, 1, Unary));
-MNM_REGISTER_GLOBAL("mnm.op.sym.sharding._reshard")
-    .set_body(MNM_SYMBOLIC_API(sharding__reshard, 1, Unary));
 MNM_REGISTER_GLOBAL("mnm.op.sym.sigmoid").set_body(MNM_SYMBOLIC_API(sigmoid, 1, Unary));
 MNM_REGISTER_GLOBAL("mnm.op.sym.sigmoid_dx").set_body(MNM_SYMBOLIC_API(sigmoid_dx, 3, UnaryDx));
 MNM_REGISTER_GLOBAL("mnm.op.sym.sign").set_body(MNM_SYMBOLIC_API(sign, 1, Unary));
@@ -7563,6 +7560,10 @@ MNM_BIND_SCHEMA("mnm.op._contrib_dropout_dx", names::_contrib_dropout_dx,
                 value2schema::DropoutDx);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op._contrib_dropout_dx", names::_contrib_dropout_dx,
                             schema_field_idx::DropoutDx);  // NOLINT(whitespace/line_length)
+MNM_BIND_SCHEMA("mnm.op._get_slice_range", names::_get_slice_range,
+                value2schema::Unary);  // NOLINT(whitespace/line_length)
+MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op._get_slice_range", names::_get_slice_range,
+                            schema_field_idx::Unary);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA("mnm.op._recv", names::_recv,
                 value2schema::Recv);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op._recv", names::_recv,
@@ -7575,6 +7576,10 @@ MNM_BIND_SCHEMA("mnm.op._reduce_scatter", names::_reduce_scatter,
                 value2schema::ReduceScatter);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op._reduce_scatter", names::_reduce_scatter,
                             schema_field_idx::ReduceScatter);  // NOLINT(whitespace/line_length)
+MNM_BIND_SCHEMA("mnm.op._reshard", names::_reshard,
+                value2schema::Unary);  // NOLINT(whitespace/line_length)
+MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op._reshard", names::_reshard,
+                            schema_field_idx::Unary);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA("mnm.op._send", names::_send,
                 value2schema::Send);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op._send", names::_send,
@@ -8102,14 +8107,6 @@ MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op.sgd", names::sgd,
 MNM_BIND_SCHEMA("mnm.op.shape", names::shape,
                 value2schema::Unary);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op.shape", names::shape,
-                            schema_field_idx::Unary);  // NOLINT(whitespace/line_length)
-MNM_BIND_SCHEMA("mnm.op.sharding._get_slice_range", names::sharding__get_slice_range,
-                value2schema::Unary);  // NOLINT(whitespace/line_length)
-MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op.sharding._get_slice_range", names::sharding__get_slice_range,
-                            schema_field_idx::Unary);  // NOLINT(whitespace/line_length)
-MNM_BIND_SCHEMA("mnm.op.sharding._reshard", names::sharding__reshard,
-                value2schema::Unary);  // NOLINT(whitespace/line_length)
-MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op.sharding._reshard", names::sharding__reshard,
                             schema_field_idx::Unary);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA("mnm.op.sigmoid", names::sigmoid,
                 value2schema::Unary);  // NOLINT(whitespace/line_length)

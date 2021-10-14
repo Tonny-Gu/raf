@@ -708,10 +708,6 @@ SCHEMAS = {
         Arg(name="learning_rate", cxx_type="double"),
         Arg(name="mu", cxx_type="double"),
     ],
-    "sharding.h::get_slice_range": [
-        Arg(name="x", cxx_type="value::BaseTensorValue"),
-        Arg(name="shard_spec", cxx_type="sharding::ShardSpec"),
-    ],
     "stream.h::stream": [
         Arg(name="x", cxx_type="value::BaseTensorValue"),
         Arg(name="stream_tag",

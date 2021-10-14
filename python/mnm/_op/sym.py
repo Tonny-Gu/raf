@@ -9,35 +9,35 @@ from . import sym_utils
 
 __all__ = [
     "_allgather", "_allreduce", "_broadcast", "_contrib_dropout", "_contrib_dropout_dx",
-    "_recv", "_reduce", "_reduce_scatter", "_send", "abs",
-    "adaptive_avg_pool2d", "adaptive_avg_pool2d_dx", "adaptive_max_pool2d", "adaptive_max_pool2d_dx", "add",
-    "add_event", "adv_index", "adv_index_dx", "all", "any",
-    "arange", "argmax", "argmin", "argsort", "argwhere",
-    "atan", "avg_pool2d", "avg_pool2d_dx", "batch_flatten", "batch_matmul",
-    "batch_matmul_nt", "batch_matmul_tn", "batch_matmul_tt", "batch_norm_infer", "batch_norm_train",
-    "batch_norm_train_dxwb", "bias_add", "broadcast_to", "broadcast_to_like", "cast",
-    "cast_like", "ceil", "clip", "clip_dx", "collapse_sum_like",
-    "compiler_begin", "compiler_end", "concatenate", "concatenate_dx", "conv2d",
-    "conv2d_dw", "conv2d_dx", "conv2d_transpose", "conv2d_transpose_dw", "conv2d_transpose_dx",
-    "copy", "cos", "cross_entropy", "cross_entropy_dpred", "cross_entropy_dtrue",
-    "dense", "device_copy", "divide", "embedding", "embedding_dx",
-    "equal", "erf", "erf_dx", "exp", "expand_dims",
-    "floor", "floor_divide", "full", "full_like", "gather",
-    "gather_dx", "gather_nd", "gather_nd_dx", "gelu", "gelu_dx",
-    "get_kept_dims", "get_reduce_axis", "get_valid_counts", "greater", "greater_equal",
-    "layer_norm", "layer_norm_dx", "left_shift", "less", "less_equal",
-    "log", "log2", "log_softmax", "log_softmax_dx", "logical_and",
-    "logical_not", "matmul", "matmul_nt", "matmul_tn", "matmul_tt",
-    "max", "max_pool2d", "max_pool2d_dx", "maximum", "mean",
-    "mean_dx", "mesh_grid", "min", "minimum", "mod",
-    "multiply", "ndarray_size", "negative", "nll_loss", "nll_loss_dpred",
-    "nll_loss_dtrue", "non_max_suppression", "not_equal", "one_hot", "ones",
-    "ones_like", "pad", "power", "prod", "prod_dx",
-    "relu", "relu_dx", "repeat", "repeat_dx", "reshape",
-    "resize2d", "resize2d_dx", "reverse", "reverse_sequence", "right_shift",
-    "roi_align", "roi_align_dx", "round", "rsqrt", "scatter",
-    "scatter_dx", "sequence_mask", "set_stream", "sgd", "shape",
-    "sharding__get_slice_range", "sharding__reshard", "sigmoid", "sigmoid_dx", "sign",
+    "_get_slice_range", "_recv", "_reduce", "_reduce_scatter", "_reshard",
+    "_send", "abs", "adaptive_avg_pool2d", "adaptive_avg_pool2d_dx", "adaptive_max_pool2d",
+    "adaptive_max_pool2d_dx", "add", "add_event", "adv_index", "adv_index_dx",
+    "all", "any", "arange", "argmax", "argmin",
+    "argsort", "argwhere", "atan", "avg_pool2d", "avg_pool2d_dx",
+    "batch_flatten", "batch_matmul", "batch_matmul_nt", "batch_matmul_tn", "batch_matmul_tt",
+    "batch_norm_infer", "batch_norm_train", "batch_norm_train_dxwb", "bias_add", "broadcast_to",
+    "broadcast_to_like", "cast", "cast_like", "ceil", "clip",
+    "clip_dx", "collapse_sum_like", "compiler_begin", "compiler_end", "concatenate",
+    "concatenate_dx", "conv2d", "conv2d_dw", "conv2d_dx", "conv2d_transpose",
+    "conv2d_transpose_dw", "conv2d_transpose_dx", "copy", "cos", "cross_entropy",
+    "cross_entropy_dpred", "cross_entropy_dtrue", "dense", "device_copy", "divide",
+    "embedding", "embedding_dx", "equal", "erf", "erf_dx",
+    "exp", "expand_dims", "floor", "floor_divide", "full",
+    "full_like", "gather", "gather_dx", "gather_nd", "gather_nd_dx",
+    "gelu", "gelu_dx", "get_kept_dims", "get_reduce_axis", "get_valid_counts",
+    "greater", "greater_equal", "layer_norm", "layer_norm_dx", "left_shift",
+    "less", "less_equal", "log", "log2", "log_softmax",
+    "log_softmax_dx", "logical_and", "logical_not", "matmul", "matmul_nt",
+    "matmul_tn", "matmul_tt", "max", "max_pool2d", "max_pool2d_dx",
+    "maximum", "mean", "mean_dx", "mesh_grid", "min",
+    "minimum", "mod", "multiply", "ndarray_size", "negative",
+    "nll_loss", "nll_loss_dpred", "nll_loss_dtrue", "non_max_suppression", "not_equal",
+    "one_hot", "ones", "ones_like", "pad", "power",
+    "prod", "prod_dx", "relu", "relu_dx", "repeat",
+    "repeat_dx", "reshape", "resize2d", "resize2d_dx", "reverse",
+    "reverse_sequence", "right_shift", "roi_align", "roi_align_dx", "round",
+    "rsqrt", "scatter", "scatter_dx", "sequence_mask", "set_stream",
+    "sgd", "shape", "sigmoid", "sigmoid_dx", "sign",
     "sin", "smooth_l1_loss", "smooth_l1_loss_dpred", "smooth_l1_loss_dtrue", "softmax",
     "softmax_dx", "sort", "split", "sqrt", "sqrt_dx",
     "squeeze", "stack", "stream_barrier", "stream_sync", "strided_slice",
@@ -77,6 +77,10 @@ def _contrib_dropout_dx(dy, mask, reserve_space, p=0.5):
     p = sym_utils.to_double(p)
     return Symbol.from_expr(ffi._contrib_dropout_dx(dy, mask, reserve_space, p))
 
+def _get_slice_range(x):
+    x = sym_utils.to_any(x)
+    return Symbol.from_expr(ffi._get_slice_range(x))
+
 def _recv(peer, shape, dtype="float32", token=None):
     peer = sym_utils.to_int(peer)
     shape = sym_utils.to_int_tuple(shape)
@@ -93,6 +97,10 @@ def _reduce(x, root, computation="sum"):
 def _reduce_scatter(x):
     x = sym_utils.to_tensor_tuple(x)
     return Symbol.from_expr(ffi._reduce_scatter(x))
+
+def _reshard(x):
+    x = sym_utils.to_any(x)
+    return Symbol.from_expr(ffi._reshard(x))
 
 def _send(x, peer, token=None):
     x = sym_utils.to_tensor(x)
@@ -958,14 +966,6 @@ def sgd(x, dx, v, learning_rate, mu):
 def shape(x):
     x = sym_utils.to_any(x)
     return Symbol.from_expr(ffi.shape(x))
-
-def sharding__get_slice_range(x):
-    x = sym_utils.to_any(x)
-    return Symbol.from_expr(ffi.sharding._get_slice_range(x))
-
-def sharding__reshard(x):
-    x = sym_utils.to_any(x)
-    return Symbol.from_expr(ffi.sharding._reshard(x))
 
 def sigmoid(x):
     x = sym_utils.to_any(x)
