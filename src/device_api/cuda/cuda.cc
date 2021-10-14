@@ -3,9 +3,15 @@
  * \file src/device_api/cuda/cuda.cc
  * \brief CUDA device API
  */
+#include <tvm/runtime/device_api.h>
+#include "mnm/op.h"
 #include "mnm/device_api.h"
 #include "mnm/registry.h"
 #include "../../common/cuda_utils.h"
+
+#include "../../op/dialect/cudnn/cudnn_utils.h"
+#include "../../op/dialect/cublas/cublas_utils.h"
+#include "../../op/dialect/cutlass/cutlass_utils.h"
 
 namespace mnm {
 namespace device_api {
@@ -17,7 +23,7 @@ class CUDADeviceAPI final : public DeviceAPI {
 
   ~CUDADeviceAPI() = default;
 
-  int GetDeviceCount() {
+  int GetDeviceCount() override {
     int count = 0;
     CUDA_CALL(cudaGetDeviceCount(&count));
     return count;
@@ -112,6 +118,17 @@ class CUDADeviceAPI final : public DeviceAPI {
     CUDA_CALL(cudaStreamDestroy(static_cast<cudaStream_t>(stream)));
   }
 
+  void SetStream(const Device& dev, void* stream) override {
+    stream_ = stream;
+    tvm::runtime::DeviceAPI::Get(dev)->SetStream(dev, stream);
+    mnm::op::cudnn::SetStream(static_cast<cudaStream_t>(stream));
+    mnm::op::cublas::SetStream(static_cast<cudaStream_t>(stream));
+  }
+
+  void* GetStream() override {
+    return stream_;
+  }
+
   void* CreateEvent(const Device& dev, uint32_t flags) override {
     CHECK_EQ(dev.device_type(), DevType::kCUDA());
     cudaEvent_t event;
@@ -126,22 +143,23 @@ class CUDADeviceAPI final : public DeviceAPI {
     CUDA_CALL(cudaEventDestroy(static_cast<cudaEvent_t>(event)));
   }
 
+  float EventElapsedTimeInMilliSeconds(void* start_event, void* end_event) override {
+    float elapsed_time;
+    int dev_id;
+    CUDA_CALL(cudaGetDevice(&dev_id));
+    CUDA_CALL(cudaEventElapsedTime(&elapsed_time, static_cast<cudaEvent_t>(start_event),
+                                   static_cast<cudaEvent_t>(end_event)));
+    return elapsed_time;
+  }
+
   // Between event and stream
-  void EventRecordOnStream(const Device& dev, void* event, void* stream) override {
-    CHECK_EQ(dev.device_type(), DevType::kCUDA());
-    CUDA_CALL(cudaSetDevice(dev.device_id()));
+  void EventRecordOnStream(void* event, void* stream) override {
     CUDA_CALL(cudaEventRecord(static_cast<cudaEvent_t>(event), static_cast<cudaStream_t>(stream)));
   }
 
-  void StreamWaitEvent(const Device& dev, void* stream, void* event) override {
-    CHECK_EQ(dev.device_type(), DevType::kCUDA());
-    CUDA_CALL(cudaSetDevice(dev.device_id()));
+  void StreamWaitEvent(void* stream, void* event) override {
     CUDA_CALL(cudaStreamWaitEvent(static_cast<cudaStream_t>(stream),
                                   static_cast<cudaEvent_t>(event), 0 /*cudaEventWaitDefault*/));
-  }
-
-  void SyncStream(const Device& prev_dev, void* prev, void* next) override {
-    throw;
   }
 
   void WaitDevice(const Device& dev) override {
@@ -150,11 +168,13 @@ class CUDADeviceAPI final : public DeviceAPI {
     CUDA_CALL(cudaDeviceSynchronize());
   }
 
-  void WaitStream(const Device& dev, void* stream) override {
-    CHECK_EQ(dev.device_type(), DevType::kCUDA());
-    CHECK(stream != nullptr) << "Cannot sync a null stream";
-    CUDA_CALL(cudaSetDevice(dev.device_id()));
+  void WaitStream(void* stream) override {
     CUDA_CALL(cudaStreamSynchronize(static_cast<cudaStream_t>(stream)));
+  }
+
+  virtual void WaitEvent(void* event) override {
+    CHECK(event != nullptr) << "Cannot sync a null event";
+    CUDA_CALL(cudaEventSynchronize(static_cast<cudaEvent_t>(event)));
   }
 
   static void* make() {
@@ -163,6 +183,8 @@ class CUDADeviceAPI final : public DeviceAPI {
 
  private:
   int device_id_;
+  // using cuda default stream if stream is not set explicitly
+  void* stream_ = nullptr;
 };
 
 MNM_REGISTER_GLOBAL("mnm.device_api._make.cuda").set_body_typed(CUDADeviceAPI::make);

@@ -289,6 +289,12 @@ Pass ToBasicBlockNormalForm();
 Pass InlinePrimitives();
 
 /*!
+ * \brief Inline closures
+ * \return The created pass.
+ */
+Pass InlineClosure();
+
+/*!
  * \brief This pass marks the may_share in the variables for ops that have attr TMNMInplaceUpdate
  * indicating the inputs and outputs to share the memory.
  * \return The created pass.
@@ -335,12 +341,49 @@ Pass SetShardOpAttrs(const ir::Map<ir::Expr, ir::Attrs>& attrs_map);
 Pass ExpandShardOpCall();
 
 /*!
+ * \brief This pass transforms BBNF into ANF and schedules operators to improve overlapping
+ * between computation and communication.
+ * \return The created pass.
+ */
+Pass DataParallelSchedule();
+
+/*!
  * \brief This pass works in ANF and adds necessary synchronization ops (i.e., mnm.op.set_stream,
  * mnm.op.add_event, and mnm.op.wait_event) between communication ops and computation ops to
  * ensure correctness. This pass must be run if AutoDataParallel is enabled.
  * \return The created pass.
  */
 Pass AnnotateDistOps();
+
+/*!
+ * \brief This pass implements IOS (Inter-Operator-Scheduler) stream schedule policy. It transforms
+ * BBNF into ANF and injects stream-related operators (e.g., mnm.op.set_stream, mnm.op.add_event,
+ * and mnm.op.wait_event).
+ *
+ * This pass provides the following config parameters:
+ * mnm.stream_schedule.ios.block_max_size: tvm::Integer
+ *  The maximum block size to schedule.
+ * mnm.stream_schedule.ios.max_stream_num: tvm::Integer
+ *  The maximum number of streams to support.
+ * mnm.stream_schedule.ios.max_stage_ops: tvm::Integer;
+ *  The maximum number of operators in a stage.
+ * mnm.stream_schedule.ios.search_group_combination: tvm::Bool;
+ *  Whether to search the group combination.
+ * mnm.stream_schedule.ios.warmup: tvm::Integer;
+ *  The number of warmups in a measurement.
+ * mnm.stream_schedule.ios.number: tvm::Integer;
+ *  The number of execution times of a repeat.
+ * mnm.stream_schedule.ios.repeat: tvm::Integer;
+ *  The number of repeats in a measurement.
+ * mnm.stream_schedule.ios.verbose: tvm::Bool;
+ *  Whether to print verbose messages.
+ * mnm.stream_schedule.ios.schedule_units: Array<Array<Op>>;
+ *  The schedule units. Each schedule unit is a sequence of operators. IOS would schedule based on
+ *  these schedule units.
+ *
+ * \return The created pass.
+ */
+Pass IOSStreamSchedule();
 
 // Helper functions
 
@@ -359,6 +402,7 @@ ir::Expr BindParam(ir::Function func, ir::Array<ir::Expr> args);
  */
 
 ir::Expr InferType(ir::Expr expr);
+
 /*!
  * \brief Infer the type of a given expression and IR module.
  * \param expr The expression.
@@ -366,6 +410,13 @@ ir::Expr InferType(ir::Expr expr);
  * \return The expression with checked types.
  */
 ir::Expr InferTypeWithModule(const ir::Expr& expr, const ir::IRModule& module);
+
+/*!
+ * \brief Eliminate dead code in the give expression
+ * \param expr The expression.
+ * \return The expression with dead code eliminated
+ */
+ir::Expr DeadCodeElimination(const ir::Expr& expr);
 
 }  // namespace pass
 }  // namespace mnm

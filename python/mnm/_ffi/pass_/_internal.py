@@ -22,6 +22,8 @@ BindParam = _APIS.get("mnm.pass_.BindParam", None)
 CanonicalizeOps = _APIS.get("mnm.pass_.CanonicalizeOps", None)
 # Defined in ./src/pass/context_analysis.cc
 ContextAnalysis = _APIS.get("mnm.pass_.ContextAnalysis", None)
+# Defined in ./src/pass/data_parallel_schedule.cc
+DataParallelSchedule = _APIS.get("mnm.pass_.DataParallelSchedule", None)
 # Defined in ./src/pass/dead_code.cc
 DeadCodeElimination = _APIS.get("mnm.pass_.DeadCodeElimination", None)
 # Defined in ./src/pass/dispatch_dialect.cc
@@ -48,10 +50,14 @@ FuseDialect = _APIS.get("mnm.pass_.FuseDialect", None)
 FuseTVM = _APIS.get("mnm.pass_.FuseTVM", None)
 # Defined in ./src/pass/grad_arg_select.cc
 GradientInputSelection = _APIS.get("mnm.pass_.GradientInputSelection", None)
+# Defined in ./src/pass/stream_schedule_ios.cc
+IOSStreamSchedule = _APIS.get("mnm.pass_.IOSStreamSchedule", None)
 # Defined in ./src/pass/type_infer.cc
 InferType = _APIS.get("mnm.pass_.InferType", None)
 # Defined in ./src/pass/inline_backward.cc
 InlineBackward = _APIS.get("mnm.pass_.InlineBackward", None)
+# Defined in ./src/pass/inline_closure.cc
+InlineClosure = _APIS.get("mnm.pass_.InlineClosure", None)
 # Defined in ./src/pass/inline_let.cc
 InlineLet = _APIS.get("mnm.pass_.InlineLet", None)
 # Defined in ./src/pass/inline_primitives.cc
@@ -72,6 +78,8 @@ ManifestAlloc = _APIS.get("mnm.pass_.ManifestAlloc", None)
 MemoryPlan = _APIS.get("mnm.pass_.MemoryPlan", None)
 # Defined in ./src/pass/merge_compiler_regions.cc
 MergeCompilerRegions = _APIS.get("mnm.pass_.MergeCompilerRegions", None)
+# Defined in ./src/pass/partition_gradient.cc
+PartitionGradient = _APIS.get("mnm.pass_.PartitionGradient", None)
 # Defined in ./src/pass/partition_graph.cc
 PartitionGraph = _APIS.get("mnm.pass_.PartitionGraph", None)
 # Defined in ./src/pass/print_ir.cc

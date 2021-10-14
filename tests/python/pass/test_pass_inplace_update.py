@@ -3,11 +3,13 @@
 import pytest
 import numpy as np
 import mnm
+import tvm
 from mnm._ffi import pass_
 from mnm._core.ir_ext import ExtendedVar
+from mnm.ir import ScopeBuilder
 from mnm.model.nn import BatchNorm
 from mnm.model.trace import trace_mutate_attr
-from mnm.testing import get_device_list, compile_vm_model, run_vm_model, check
+from mnm.testing import get_device_list, compile_vm_model, run_vm_model, check, randn
 from tvm import relay
 
 
@@ -249,6 +251,112 @@ def test_chain():
 
     bytecode = compile_vm_model(model, device, [x])
     assert bytecode.count("alloc_tensor") == 1
+
+
+def test_reduce():
+    shape = (4, 4)
+    device = "cpu"
+    class Model(mnm.Model):
+        def build(self):
+            pass
+
+        @mnm.model.trace
+        def forward(self, x):
+            return mnm.reduce(x, 0)
+
+    model = Model()
+    x, _ = randn(shape, device=device)
+    bytecode = compile_vm_model(model, device, [x])
+    assert bytecode.count("alloc_tensor") == 0
+
+
+def test_reduce_with_list():
+    shape = (4, 4)
+    device = "cpu"
+    class Model(mnm.Model):
+        def build(self):
+            pass
+
+        @mnm.model.trace
+        def forward(self, x, y):
+            a = mnm.add(x, y)
+            b = mnm.subtract(x, y)
+            out = mnm.reduce((a, b), 0)
+            return out[0], out[1]
+
+    model = Model()
+    x, _ = randn(shape, device=device)
+    y, _ = randn(shape, device=device)
+    bytecode = compile_vm_model(model, device, [x, y])
+    assert bytecode.count("alloc_tensor") == 2
+
+
+def test_allreduce():
+    shape = (4, 4)
+    device = "cpu"
+    class Model(mnm.Model):
+        def build(self):
+            pass
+
+        @mnm.model.trace
+        def forward(self, x):
+            return mnm.allreduce(x)
+
+    model = Model()
+    x, _ = randn(shape, device=device)
+    bytecode = compile_vm_model(model, device, [x])
+    assert bytecode.count("alloc_tensor") == 0
+
+
+def test_allreduce_with_list():
+    shape = (4, 4)
+    device = "cpu"
+    class Model(mnm.Model):
+        def build(self):
+            pass
+
+        @mnm.model.trace
+        def forward(self, x, y):
+            a = mnm.add(x, y)
+            b = mnm.subtract(x, y)
+            out = mnm.allreduce((a, b))
+            return out[0], out[1]
+
+    model = Model()
+    x, _ = randn(shape, device=device)
+    y, _ = randn(shape, device=device)
+    bytecode = compile_vm_model(model, device, [x, y])
+    assert bytecode.count("alloc_tensor") == 2
+
+
+def test_simplify():
+    def get_mod():
+        add_op = mnm._ffi.op.GetOp("mnm.op.add")
+        relu_op = mnm._ffi.op.GetOp("mnm.op.relu")
+        zero = mnm.ir.const(0.0, dtype="float32")
+        null = mnm.ir.const(None)
+
+        data = mnm.ir.var("x", shape=(16, 16))
+        sb = ScopeBuilder()
+        out = sb.let("a1", relay.Call(relu_op, [data]))
+        out = sb.let("a2", relay.Call(add_op, [out, zero, data, null]))
+        sb.ret(out)
+        func = relay.Function([data], sb.get())
+        return tvm.IRModule.from_expr(func)
+
+    def expected():
+        relu_op = mnm._ffi.op.GetOp("mnm.op.relu")
+
+        data = mnm.ir.var("x", shape=(16, 16))
+        sb = ScopeBuilder()
+        out = sb.let("a1", relay.Call(relu_op, [data]), data)
+        sb.ret(out)
+        func = relay.Function([data], sb.get())
+        return pass_.InferType()(tvm.IRModule.from_expr(func))
+
+    mod = get_mod()
+    mod = optimize(mod)
+    assert tvm.ir.structural_equal(mod["main"], expected()["main"])
 
 
 if __name__ == "__main__":

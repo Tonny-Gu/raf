@@ -10,15 +10,11 @@
 #include "mnm/op.h"
 #include "mnm/dialect.h"
 #include "mnm/registry.h"
+#include "mnm/pass.h"
 #include "mnm/value.h"
 #include "mnm/device_api.h"
 #include "../requests.h"
 #include "../op/schema/list_args.h"
-
-#ifdef MNM_USE_CUDA
-#include "../op/dialect/cudnn/cudnn_utils.h"
-#include "../op/dialect/cublas/cublas_utils.h"
-#endif
 
 namespace dmlc {
 DMLC_REGISTRY_ENABLE(::mnm::op::OpEnvMaker);
@@ -91,9 +87,7 @@ std::shared_ptr<Requests> OpEnv::GetRequests() const {
 
 void OpEnv::SetStreamForAllBackends(Device device, void* stream) {
 #ifdef MNM_USE_CUDA
-  tvm::runtime::DeviceAPI::Get(device)->SetStream(device, stream);
-  mnm::op::cudnn::SetStream(static_cast<cudaStream_t>(stream));
-  mnm::op::cublas::SetStream(static_cast<cudaStream_t>(stream));
+  device_api::DeviceAPI::Get(DevType::kCUDA())->SetStream(device, stream);
 #endif
 }
 
@@ -180,6 +174,42 @@ std::shared_ptr<OpEnv> Dispatch(const CallValues& call) {
   }
   LOG(FATAL) << "call->op type " << call->callee->GetTypeKey() << " unsupported";
   return nullptr;
+}
+
+CallValues CreateDummyCallValues(Call call, Device device) {
+  auto call_node = call.as<CallNode>();
+  CHECK(call_node != nullptr);
+  std::vector<Value> inputs(call_node->args.size());
+  for (int i = 0; i < inputs.size(); i++) {
+    const Expr& arg_expr = call_node->args[i];
+    if (auto relay_const_node = arg_expr.as<RelayConstantNode>()) {
+      const auto* node = static_cast<const ConstantNode*>(relay_const_node);
+      CHECK(node != nullptr);
+      inputs[i] = Downcast<Value>(node->value);
+    } else {
+      inputs[i] = value::CreateDummyValueFromType(arg_expr->checked_type(), device);
+    }
+  }
+  Value output = value::CreateDummyValueFromType(call->checked_type(), device);
+  CallValues call_values = CallValues::make();
+  Expr callee = call_node->op;
+  if (auto fused_op_node = callee.as<FunctionNode>()) {
+    auto fused_op = GetRef<Function>(fused_op_node);
+    Array<Var> free_vars = pass::FreeVars(fused_op);
+    CHECK_EQ(free_vars.size(), 0)
+        << "Closure function call with captured vars has not been implemented.";
+    call_values->callee = ClosureValue::make({}, fused_op);
+    call_values->args = MakeListArgs(inputs);
+  } else {
+    auto op_node = callee.as<OpNode>();
+    auto op = GetRef<Op>(op_node);
+    CHECK_NOTNULL(op_node);
+    call_values->callee = OpValue::make(GetRef<Op>(op_node));
+    call_values->args = GetOpAttr<FMNMSchema>(op, "FMNMSchema")(inputs);
+  }
+  call_values->device = device;
+  call_values->out = output;
+  return call_values;
 }
 
 Attrs MakeListArgs(const Array<Value>& values) {

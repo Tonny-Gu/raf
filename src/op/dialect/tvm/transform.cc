@@ -1114,8 +1114,10 @@ HashKey WhereHasher(const std::vector<Type>& param_types, const Type& y_type,
   return key;
 }
 
+// FIXME: where should be kBroadcast, but it might be super slow when fused with other ops
+// such as sum. We should change it back to kBroadcast after resolving this issue.
 MNM_TVM(where, Where, WhereArgs, WhereSchema2Args, WhereSchemaArgNames, GenericAttrs, GenericHasher,
-        kBroadcast);
+        kOutEWiseFusable);
 
 std::vector<Value> SwapAxisSchema2Args(const SwapAxisArgs* args) {
   return {args->x};
@@ -1153,6 +1155,34 @@ std::vector<std::string> ArgwhereSchemaArgNames(const op::CallValues& call) {
 
 MNM_TVM(upper_bound.argwhere, Argwhere, ArgwhereArgs, ArgwhereSchema2Args, ArgwhereSchemaArgNames,
         GenericAttrs, GenericHasher, kOpaque);
+
+std::vector<Value> CumsumSchema2Args(const CumsumArgs* args) {
+  return {args->x};
+}
+
+std::vector<std::string> CumsumSchemaArgNames(const op::CallValues& call) {
+  return {"x"};
+}
+
+Attrs CumsumSchema2Attrs(const CumsumArgs* args) {
+  auto attrs = make_object<tvm::relay::ScanopAttrs>();
+  attrs->axis = Integer(args->axis);
+  attrs->dtype = DataType(ir::String2DLDataType(args->dtype));
+  attrs->exclusive = Bool(args->exclusive);
+  return Attrs(attrs);
+}
+
+HashKey CumsumHasher(const std::vector<Type>& param_types, const Type& ret_type,
+                     const CumsumArgs* args) {
+  HashKey key = GenericHasher<std::nullptr_t>(param_types, ret_type, nullptr);
+  key << args->axis;
+  key << args->dtype;
+  key << args->exclusive;
+  return key;
+}
+
+MNM_TVM(cumsum, Cumsum, CumsumArgs, CumsumSchema2Args, CumsumSchemaArgNames, CumsumSchema2Attrs,
+        CumsumHasher, kOpaque);
 
 }  // namespace tvm_dialect
 }  // namespace op

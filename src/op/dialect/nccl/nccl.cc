@@ -90,7 +90,7 @@ class NCCLAllReduce : public mnm::op::OpEnv {
     if (tv->fields.size() == 1) {
       DLTensor* x = tv->fields[0];
       DLTensor* out = output;
-      dtype_size = sizeof(x->dtype);
+      dtype_size = GetSizeInBytes(x->dtype);
       NCCL_CALL(ncclAllReduce(x->data, out->data, total_size / dtype_size, dtype, compute,
                               (ncclComm_t)nccl_comm, (cudaStream_t)stream));
 
@@ -102,7 +102,9 @@ class NCCLAllReduce : public mnm::op::OpEnv {
         cudaMemcpyAsync(buffer_data_at_offset, x->data, tuple_sizes[i], cudaMemcpyDeviceToDevice,
                         (cudaStream_t)stream);
         offset += tuple_sizes[i];
-        dtype_size = sizeof(x->dtype);
+        CHECK(dtype_size == 0 || dtype_size == GetSizeInBytes(x->dtype))
+            << "AllReduce requires tensors to be the same type.";
+        dtype_size = GetSizeInBytes(x->dtype);
       }
 
       // Allreduce
@@ -202,7 +204,7 @@ class NCCLReduceScatter : public mnm::op::OpEnv {
 
   void Execute(const CallValues& cv) {
     auto args = cv->args.as<mnm::op::schema::ReduceScatterArgs>();
-    Execute(std::vector<value::Value>(args->x.begin(), args->x.end()), cv->out);
+    Execute({TupleValue::make(ir::Array<Value>(args->x.begin(), args->x.end()))}, cv->out);
   }
 
   void Execute(const std::vector<value::Value>& inputs, value::Value output) {
@@ -210,8 +212,10 @@ class NCCLReduceScatter : public mnm::op::OpEnv {
     size_t offset = 0;
     DLTensor* out = output;
     DType dtype;
-    for (size_t i = 0; i < inputs.size(); ++i) {
-      const DLTensor* x = inputs[i];
+
+    auto tv = Downcast<value::TupleValue>(inputs[0]);
+    for (int i = 0; i < tv->fields.size(); ++i) {
+      DLTensor* x = tv->fields[i];
       void* buffer_data_at_offset = reinterpret_cast<uint8_t*>(in_buffer) + size_in_bytes * i;
       cudaMemcpyAsync(buffer_data_at_offset, x->data, size_in_bytes, cudaMemcpyDeviceToDevice,
                       (cudaStream_t)stream);
@@ -279,7 +283,7 @@ class NCCLBroadcast : public mnm::op::OpEnv {
     if (tv->fields.size() == 1) {
       DLTensor* x = tv->fields[0];
       DLTensor* out = output;
-      dtype_size = sizeof(x->dtype);
+      dtype_size = GetSizeInBytes(x->dtype);
       NCCL_CALL(ncclBroadcast(x->data, out->data, total_size / dtype_size, dtype, root,
                               (ncclComm_t)nccl_comm, (cudaStream_t)stream));
       return;
@@ -292,9 +296,9 @@ class NCCLBroadcast : public mnm::op::OpEnv {
       cudaMemcpyAsync(buffer_data_at_offset, x->data, tuple_sizes[i], cudaMemcpyDeviceToDevice,
                       (cudaStream_t)stream);
       offset += tuple_sizes[i];
-      CHECK(dtype_size == 0 || dtype_size == sizeof(x->dtype))
+      CHECK(dtype_size == 0 || dtype_size == GetSizeInBytes(x->dtype))
           << "Broadcast requires tensors to be the same type.";
-      dtype_size = sizeof(x->dtype);
+      dtype_size = GetSizeInBytes(x->dtype);
     }
 
     NCCL_CALL(ncclBroadcast(fused_data, fused_data, total_size / dtype_size, dtype, root,
@@ -472,9 +476,9 @@ class NCCLReduce : public mnm::op::OpEnv {
     if (input_x->fields.size() == 1) {
       DLTensor* x = input_x->fields[0];
       DLTensor* out = output;
-      dtype_size = sizeof(x->dtype);
+      dtype_size = GetSizeInBytes(x->dtype);
 
-      size_t dtype_size = sizeof(x->dtype);
+      size_t dtype_size = GetSizeInBytes(x->dtype);
       NCCL_CALL(ncclReduce(x->data, out->data, total_size / dtype_size, dtype, compute, root,
                            (ncclComm_t)nccl_comm, (cudaStream_t)stream));
     } else {
@@ -485,7 +489,7 @@ class NCCLReduce : public mnm::op::OpEnv {
         cudaMemcpyAsync(buffer_data_at_offset, x->data, tuple_sizes[i], cudaMemcpyDeviceToDevice,
                         (cudaStream_t)stream);
         offset += tuple_sizes[i];
-        dtype_size = sizeof(x->dtype);
+        dtype_size = GetSizeInBytes(x->dtype);
       }
 
       NCCL_CALL(ncclReduce(fused_data, fused_data, total_size / dtype_size, dtype, compute, root,

@@ -98,7 +98,7 @@ Array<Expr> BroadcastToGrad(const Expr& orig_call, const Array<Expr> orig_args, 
     static auto sum = Op::Get("mnm.op.sum");
     Call axes = Call(collapse_axis, {dy, x});
     Call keep = Call(collapse_keep, {dy, x});
-    return Call(sum, {dy, axes, keep});
+    return Call(sum, {dy, axes, keep, MakeConstant(value::BoolValue::make(false))});
   };
 
   return {f(x)};
@@ -379,7 +379,7 @@ Array<Expr> WhereGrad(const Expr& orig_call, const Array<Expr> orig_args, const 
     static auto sum = Op::Get("mnm.op.sum");
     Call axes = Call(collapse_axis, {dx, x});
     Call keep = Call(collapse_keep, {dx, x});
-    return Call(sum, {dx, axes, keep});
+    return Call(sum, {dx, axes, keep, MakeConstant(value::BoolValue::make(false))});
   };
   return {NullValue<Expr>(), f(dx1, x1), f(dx2, x2)};
 }
@@ -413,6 +413,14 @@ MNM_OP_GRAD("mnm.op.resize2d", Resize2dGrad);
 MNM_OP_GRAD("mnm.op.arange", NoGrads<0>);
 MNM_OP_GRAD("mnm.op.zeros", NoGrads<0>);
 MNM_OP_GRAD("mnm.op.ones", NoGrads<0>);
+
+Array<Expr> CumsumGrad(const Expr& orig_call, const Array<Expr> orig_args, const Var& y,
+                       const Expr& dy) {
+  // TODO: TBA
+  return {};
+}
+
+MNM_OP_GRAD("mnm.op.cumsum", CumsumGrad);
 
 }  // namespace grad
 }  // namespace op

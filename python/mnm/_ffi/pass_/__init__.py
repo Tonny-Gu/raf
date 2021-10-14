@@ -12,6 +12,7 @@ from ._internal import AutoDiff
 from ._internal import BindParam
 from ._internal import CanonicalizeOps
 from ._internal import ContextAnalysis
+from ._internal import DataParallelSchedule
 from ._internal import DeadCodeElimination
 from ._internal import DispatchDialect
 from ._internal import EraseType
@@ -25,8 +26,10 @@ from ._internal import FromRelay
 from ._internal import FuseDialect
 from ._internal import FuseTVM
 from ._internal import GradientInputSelection
+from ._internal import IOSStreamSchedule
 from ._internal import InferType
 from ._internal import InlineBackward
+from ._internal import InlineClosure
 from ._internal import InlineLet
 from ._internal import InlinePrimitives
 from ._internal import InplaceUpdate
@@ -37,6 +40,7 @@ from ._internal import MNMSequential
 from ._internal import ManifestAlloc
 from ._internal import MemoryPlan
 from ._internal import MergeCompilerRegions
+from ._internal import PartitionGradient
 from ._internal import PartitionGraph
 from ._internal import PrintIR
 from ._internal import Rematerialization

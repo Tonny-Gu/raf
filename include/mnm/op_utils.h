@@ -281,5 +281,16 @@ inline bool IsReshapeOp(const Op& op) {
   return reshape_ops.find(op_) != reshape_ops.end();
 }
 
+inline bool IsCollectiveOp(const Expr& op) {
+  if (auto op_node = op.as<OpNode>()) {
+    return op::GetOpAttrOrDefault<TMNMCollective>(GetRef<Op>(op_node), "TMNMCollective", false);
+  }
+  return false;
+}
+
+inline size_t GetSizeInBytes(const DLDataType& dtype) {
+  return (dtype.bits + 7) / 8;
+}
+
 }  // namespace op
 }  // namespace mnm

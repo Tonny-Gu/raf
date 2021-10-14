@@ -3,6 +3,7 @@
  * \file src/device_api/cpu/cpu.cc
  * \brief CPU device API
  */
+#include <thread>
 #include "mnm/device_api.h"
 #include "mnm/registry.h"
 
@@ -14,6 +15,11 @@ class CPUDeviceAPI final : public DeviceAPI {
  public:
   CPUDeviceAPI() = default;
   ~CPUDeviceAPI() = default;
+
+  int GetDeviceCount() override {
+    const unsigned int processor_count = std::thread::hardware_concurrency();
+    return static_cast<int>(processor_count);
+  }
 
   void* AllocMemory(int64_t nbytes, int64_t alignment) override {
     void* ptr = nullptr;
@@ -58,6 +64,14 @@ class CPUDeviceAPI final : public DeviceAPI {
     throw;
   }
 
+  void SetStream(const Device&, void* stream) override {
+    throw;
+  }
+
+  void* GetStream() override {
+    throw;
+  }
+
   void* CreateEvent(const Device& dev, uint32_t flags) override {
     throw;
   }
@@ -66,15 +80,15 @@ class CPUDeviceAPI final : public DeviceAPI {
     throw;
   }
 
-  void EventRecordOnStream(const Device& dev, void* event, void* stream) {
+  float EventElapsedTimeInMilliSeconds(void* start_event, void* end_event) override {
     throw;
   }
 
-  void StreamWaitEvent(const Device& dev, void* stream, void* event) {
+  void EventRecordOnStream(void* event, void* stream) override {
     throw;
   }
 
-  void SyncStream(const Device& prev_dev, void* prev, void* next) override {
+  void StreamWaitEvent(void* stream, void* event) override {
     throw;
   }
 
@@ -82,7 +96,11 @@ class CPUDeviceAPI final : public DeviceAPI {
     // Do nothing
   }
 
-  void WaitStream(const Device&, void* stream) override {
+  void WaitStream(void* stream) override {
+    throw;
+  }
+
+  void WaitEvent(void* event) {
     throw;
   }
 

@@ -1,5 +1,6 @@
 # pylint: disable=too-many-locals, no-self-use, no-member, not-callable, too-many-arguments
 # pylint: disable=protected-access,attribute-defined-outside-init,invalid-name
+# pylint: disable=too-many-lines
 from functools import reduce
 import operator
 
@@ -25,7 +26,6 @@ class TestModel(mnm.Model):
 @pytest.mark.parametrize("device", get_device_list())
 @pytest.mark.parametrize("shape", [
     [(5, 4, 3), (1, 2)],
-    [(1, 1), (2, 2, 2)],
     [(6, 5), ()],
 ])
 @pytest.mark.parametrize("axis", [0, 1, -1])
@@ -34,7 +34,7 @@ class TestModel(mnm.Model):
 def test_take(shape, axis, device, mode, dtype):
     # Skip float16 tests on CPU since it may not be supported and not much performance benefit.
     if dtype == "float16" and device == "cpu":
-        return
+        pytest.skip("float16 is not supported on CPU")
 
     size = reduce(operator.mul, shape[0], 1) if axis is None else shape[0][axis]
     size = size + 10
@@ -52,7 +52,7 @@ def test_take(shape, axis, device, mode, dtype):
 
     # take_dx does not support float16 due to accuracy.
     if dtype == "float16":
-        return
+        pytest.skip("float16 is not supported")
 
     # check backward
     m_dy, n_dy = randn(n_y.shape, device=device, dtype=dtype)
@@ -79,7 +79,7 @@ def test_sequence_mask(max_length, batch_size, other_feature_dims,
                        axis, device, dtype):
     # Skip float16 tests on CPU since it may not be supported and not much performance benefit.
     if dtype == "float16" and device == "cpu":
-        return
+        pytest.skip("float16 is not supported on CPU")
 
     model = TestModel(mnm._op.sym.sequence_mask, axis=axis, mask_value=-10)
     x_shape = [max_length, batch_size] if axis == 0 else [batch_size, max_length]
@@ -96,13 +96,12 @@ def test_sequence_mask(max_length, batch_size, other_feature_dims,
 @pytest.mark.parametrize("device", get_device_list())
 @pytest.mark.parametrize("shape", [
     [[1, 4, 1], [1, 2, 4, 1]],
-    [[4, 1, 1], [3, 4, 2, 2]]
 ])
 @pytest.mark.parametrize("dtype", ["float16", "float32"])
 def test_broadcast_to(shape, device, dtype):
     # Skip float16 tests on CPU since it may not be supported and not much performance benefit.
     if dtype == "float16" and device == "cpu":
-        return
+        pytest.skip("float16 is not supported on CPU")
 
     model = TestModel(mnm._op.sym.broadcast_to, shape=shape[1])
     m_x, n_x = randn(shape[0], device=device, dtype=dtype, requires_grad=True)
@@ -131,34 +130,29 @@ def test_broadcast_to(shape, device, dtype):
 @pytest.mark.parametrize("shape", [
     (1, 2, 4, 1)
 ])
-def test_repeat(shape, device):
-    ndim = len(shape)
-    for axis in range(0, ndim):
-        m_x, t_x = randn_torch(shape, device=device, requires_grad=True)
-        model = TestModel(mnm._op.sym.repeat, repeats=2, axis=axis)
-        #forward
-        m_y = model(m_x)
-        v_y = run_vm_model(model, device, [m_x])
-        t_y = torch.repeat_interleave(t_x, 2, dim=axis)
-        check(m_y, t_y)
-        check(v_y, t_y)
+@pytest.mark.parametrize("axis", [0, 1, 2])
+def test_repeat(shape, device, axis):
+    m_x, t_x = randn_torch(shape, device=device, requires_grad=True)
+    model = TestModel(mnm._op.sym.repeat, repeats=2, axis=axis)
+    #forward
+    m_y = model(m_x)
+    v_y = run_vm_model(model, device, [m_x])
+    t_y = torch.repeat_interleave(t_x, 2, dim=axis)
+    check(m_y, t_y)
+    check(v_y, t_y)
 
-        #backward
-        y_shape = t_y.shape
-        m_dy, n_dy = randn_torch(y_shape, device=device, requires_grad=True)
-        m_y.backward(m_dy)
-        t_y.backward(n_dy)
-        check(m_x.grad, t_x.grad)
+    #backward
+    y_shape = t_y.shape
+    m_dy, n_dy = randn_torch(y_shape, device=device, requires_grad=True)
+    m_y.backward(m_dy)
+    t_y.backward(n_dy)
+    check(m_x.grad, t_x.grad)
 
 
 @pytest.mark.parametrize("device", get_device_list())
 @pytest.mark.parametrize("shape", [
     [(2, 2), (1, 0)],
     [(2, 2), None],
-    [(2, 2, 2), (1, 2, 0)],
-    [(2, 2, 2), (2, 1, 0)],
-    [(2, 2, 2), None],
-    [(4, 4, 4, 4), (3, 2, 1, 0)],
     [(4, 4, 4, 4), (1, 2, 3, 0)]
 ])  # pylint: disable-msg=too-many-locals
 def test_transpose(shape, device):
@@ -190,7 +184,6 @@ def test_transpose(shape, device):
 @pytest.mark.parametrize("axis", [0, 1])
 @pytest.mark.parametrize("shape", [
     [(3, 5), (2, 4), (2, 4)],
-    [(3, 5), (3, 5), (3, 5)],
 ])
 def test_scatter(shape, axis, device):
     m_x, t_x = randn_torch(shape[0], device=device, requires_grad=True)
@@ -225,23 +218,19 @@ def test_scatter(shape, axis, device):
 
 
 @pytest.mark.parametrize("shape", [
-    (5, 2),
     (1, 2),
     (5, 2, 2),
-    (1, 2, 3, 4),
 ])
 @pytest.mark.parametrize("axis", [
-    (0, 1),
     (0, 2),
     (2, 1),
-    (1, 3),
 ])
-@pytest.mark.parametrize("dtype", ["float16", "float32", "float64"])
+@pytest.mark.parametrize("dtype", ["float16", "float32"])
 @pytest.mark.parametrize("device", get_device_list())
 def test_swap_axis(shape, dtype, axis, device):# pylint: disable=unused-argument
     # Skip float16 tests on CPU since it may not be supported and not much performance benefit.
     if dtype == "float16" and device == "cpu":
-        return
+        pytest.skip("float16 is not supported on CPU")
 
     if max(axis) < len(shape):
         model = TestModel(mnm._op.sym.swap_axis, axis1=axis[0], axis2=axis[1])
@@ -264,7 +253,6 @@ def test_swap_axis(shape, dtype, axis, device):# pylint: disable=unused-argument
 @pytest.mark.parametrize("device", get_device_list())
 @pytest.mark.parametrize("shape", [
     [[1, 4, 1], [1, 4, 1]],
-    [[1, 4, 1], [1, 2, 4, 1]],
     [[4, 1, 1], [3, 4, 2, 2]]
 ])
 def test_broadcast_to_like(shape, device):
@@ -283,12 +271,11 @@ def test_broadcast_to_like(shape, device):
 
 
 @pytest.mark.parametrize("device", get_device_list())
-@pytest.mark.parametrize("shape", [[10, 20, 30], [6, 8, 10, 3]])
-@pytest.mark.parametrize("axis", [0, 1, 2])
+@pytest.mark.parametrize("shape", [[10, 20, 30]])
+@pytest.mark.parametrize("axis", [0, 1])
 @pytest.mark.parametrize("indices_or_sections", [
     [2, 2], [(2,), (2, (2,))],
     [(2, 4), (4, (2, 2))],
-    [(1, 4), (4, (1, 3))]
 ])
 def test_split(shape, axis, indices_or_sections, device):
     m_x, n_x = randn(shape, device=device)
@@ -331,7 +318,6 @@ def test_split(shape, axis, indices_or_sections, device):
 @pytest.mark.parametrize("inputs", [
     {"shape": (3, 3, 3), "seq_length": [1, 2, 3]},
     {"shape": (5, 5, 5), "seq_length": [1, 2, 3, 4, 5]},
-    {"shape": (5, 5, 5), "seq_length": [2, 2, 3, 3, 4]}
 ])
 @pytest.mark.parametrize("axes", [[0, 1]])
 def test_reverse_sequence(inputs, axes, device):
@@ -363,7 +349,7 @@ def test_reverse_sequence(inputs, axes, device):
 
 @pytest.mark.parametrize("device", get_device_list())
 @pytest.mark.parametrize("shape", [[10, 10, 10], [6, 8, 9, 10]])
-@pytest.mark.parametrize("axis", [0, 1, 2])
+@pytest.mark.parametrize("axis", [0, 2])
 def test_reverse(shape, axis, device):
     m_x, n_x = randn(shape, dtype='float32', device=device)
     m_dy, n_dy = randn(shape, dtype='float32', device=device)
@@ -385,7 +371,6 @@ def test_reverse(shape, axis, device):
 @pytest.mark.parametrize("params", [
     {"shapes": [[1, 4, 1], [2, 4, 1]], "axis": 0},
     {"shapes": [[2, 2, 2], [2, 3, 2], [2, 4, 2]], "axis": -2},
-    {"shapes": [[2, 1, 1], [2, 2, 1], [2, 3, 1], [2, 4, 1]], "axis": 1},
 ])
 def test_concatenate(params, device):
     class Concatenate1(mnm.Model):
@@ -444,10 +429,8 @@ def test_concatenate(params, device):
 
 @pytest.mark.parametrize("device", get_device_list())
 @pytest.mark.parametrize("shapes", [
-    [7, 2, 6, 3],
     [1, 5, 2],
     [6, 3],
-    [2, 3, 2, 9],
 ])
 def test_mesh_grid(shapes, device):
     class MeshGrid2(mnm.Model):
@@ -509,7 +492,6 @@ def test_mesh_grid(shapes, device):
 @pytest.mark.parametrize("params", [
     {"shapes": [[1, 4, 1], [1, 4, 1]], "axis": 0},
     {"shapes": [[2, 2, 2], [2, 2, 2], [2, 2, 2]], "axis": -1},
-    {"shapes": [[2, 1, 1], [2, 1, 1], [2, 1, 1], [2, 1, 1]], "axis": 1},
 ])
 def test_stack(params, device):
     class Stack1(mnm.Model):
@@ -575,7 +557,7 @@ def test_stack(params, device):
 
 
 @pytest.mark.parametrize("device", get_device_list())
-@pytest.mark.parametrize("shape", [(1, 3), (1, 2), (1, 2, 3), (1, 2, 3, 4)])
+@pytest.mark.parametrize("shape", [(1, 3), (1, 2, 3, 4)])
 @pytest.mark.parametrize("a_min", [0.1, 0.3, 0.5])
 @pytest.mark.parametrize("a_max", [0.7, 0.8, 1.0])
 @pytest.mark.parametrize("dtype", ["float16", "float32"])
@@ -586,7 +568,7 @@ def test_clip(shape, a_min, a_max, device, dtype):
 
     # Skip float16 tests on CPU since it may not be supported and not much performance benefit.
     if dtype == "float16" and device == "cpu":
-        return
+        pytest.skip("float16 is not supported on CPU")
 
     m_x, n_x = randn(shape, dtype=dtype, device=device)
     m_dy, n_dy = randn(shape, dtype=dtype, device=device)
@@ -611,7 +593,6 @@ def test_clip(shape, a_min, a_max, device, dtype):
 @pytest.mark.parametrize("params", [
     {"orig_shape": (8, 8, 8, 8), "to_shape": (2, 2048)},
     {"orig_shape": (8, 1000), "to_shape": (2, 2, 2, 1000)},
-    {"orig_shape": (3, 3, 3, 3), "to_shape": (81, 1)},
 ])
 def test_reshape(params, device):
     orig_shape, to_shape = params["orig_shape"], params["to_shape"]
@@ -633,11 +614,10 @@ def test_reshape(params, device):
 
 @pytest.mark.parametrize("device", get_device_list())
 @pytest.mark.parametrize("shape", [
-    [10, 3, 2, 5],
     [1, 4, 5, 2],
     [9, 12, 18, 2, 1]])
-@pytest.mark.parametrize("axis", [0, 1, 2, 3])
-@pytest.mark.parametrize("num_newaxis", [0, 1, 2, 5])
+@pytest.mark.parametrize("axis", [0, 1, 3])
+@pytest.mark.parametrize("num_newaxis", [0, 2, 5])
 def test_expand_dims(device, shape, axis, num_newaxis):
     m_x, n_x = randn(shape, device=device)
     m_x.requires_grad = True
@@ -663,8 +643,8 @@ def test_expand_dims(device, shape, axis, num_newaxis):
 
 @pytest.mark.parametrize("device", get_device_list())
 @pytest.mark.parametrize("shape", [(1, 2), (3, 4, 2), (1, 5, 3), (2, 0)])
-@pytest.mark.parametrize("itype", ["float16", "float32", "float64", "int32", "int64", "bool"])
-@pytest.mark.parametrize("otype", ["float16", "float32", "float64", "int32", "int64", "bool"])
+@pytest.mark.parametrize("itype", ["float16", "float32", "int32", "int64", "bool"])
+@pytest.mark.parametrize("otype", ["float16", "float32", "int32", "int64", "bool"])
 def test_cast(shape, device, itype, otype):
     # TODO(hgt312): The TVM JIT cast kernel in LLVM crashed for float16. See:
     # https://discuss.tvm.apache.org/t/cast-from-float64-to-float16-cause-segmentation-fault
@@ -675,7 +655,8 @@ def test_cast(shape, device, itype, otype):
     # See: https://github.com/apache/tvm/issues/3879
     if (device == "cuda" and "float16" in [itype, otype] and
             (itype.startswith("int") or otype.startswith("int"))):
-        return
+        pytest.skip("CUDA rounds up when casting to int, "
+                    "which does not match Numpy's behavior (round down)")
 
     m_x, n_x = randn(shape, device=device, dtype=itype)
     m_x.requires_grad = True
@@ -697,7 +678,7 @@ def test_cast(shape, device, itype, otype):
 
 
 @pytest.mark.parametrize("device", get_device_list())
-@pytest.mark.parametrize("dshape", [[2, 2, 2], [2, 3], [10, 11, 12, 13]])
+@pytest.mark.parametrize("dshape", [[2, 2, 2], [2, 3]])
 @pytest.mark.parametrize("axis", [0, 1])
 @pytest.mark.parametrize("dtype", ["float16", "float32"])
 def test_gather(dshape, axis, device, dtype):
@@ -710,7 +691,7 @@ def test_gather(dshape, axis, device, dtype):
 
     # Skip float16 tests on CPU since it may not be supported and not much performance benefit.
     if dtype == "float16" and device == "cpu":
-        return
+        pytest.skip("float16 is not supported on CPU")
 
     # pylint: disable=no-self-use
     m_x, n_x = randn(dshape, device=device, dtype=dtype)
@@ -784,9 +765,9 @@ def test_squeeze(shape, axis, device):
 
 
 @pytest.mark.parametrize("device", get_device_list())
-@pytest.mark.parametrize("dtype", ["float32", "float64", "int64"])
+@pytest.mark.parametrize("dtype", ["float32", "int64"])
 @pytest.mark.parametrize("fill_value", [0, 2, 0.3])
-@pytest.mark.parametrize("shape", [(1, 3, 1), (5, 5, 5, 5, 5, 5), (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)])
+@pytest.mark.parametrize("shape", [(1, 3, 1), (5, 5, 5, 5, 5, 5)])
 def test_full(shape, dtype, fill_value, device):
     model = TestModel(mnm._op.sym.full, shape=shape, dtype=dtype,
                       fill_value=fill_value, device=device)
@@ -799,9 +780,9 @@ def test_full(shape, dtype, fill_value, device):
 
 
 @pytest.mark.parametrize("device", get_device_list())
-@pytest.mark.parametrize("dtype", ["float32", "float64", "int64"])
+@pytest.mark.parametrize("dtype", ["float32", "int64"])
 @pytest.mark.parametrize("fill_value", [0, 2, 0.3])
-@pytest.mark.parametrize("shape", [(1, 3, 1), (5, 5, 5, 5, 5, 5), (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)])
+@pytest.mark.parametrize("shape", [(1, 3, 1), (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)])
 def test_full_like(shape, dtype, fill_value, device):
     model = TestModel(mnm._op.sym.full_like, fill_value=fill_value)
     n_x = np.empty(shape, dtype=dtype)
@@ -818,21 +799,17 @@ def test_full_like(shape, dtype, fill_value, device):
 @pytest.mark.parametrize("params", [
     ((3, 4, 3), [0, 0, 0], [4, -5, 4], [1, -1, 2]),
     ((3, 4, 3), [1, 1, 0], [4, 4, 3], [2, 1, 1]),
-    ((3, 4, 3), [1, -1, 0], [4, -5, 3], [2, -1, 1]),
-    ((3, 4, 3), [1, 0, 0], [2, 2, 3], [1, 1, 2]),
     ((3, 4, 3), [1, -1, 0], [2, -3, 3], [1, -1, 1]),
-    ((3, 4, 3), [1, 1, 0], [4, 4, 3], [1, 1, 1]),
-    ((3, 4, 3), [0, 2, 0], [1, 3, 3], [1, 1, 1])
 ])
 @pytest.mark.parametrize("dtype", ["float16", "float32"])
 def test_strided_slice(device, params, dtype):
     # FIXME: this case failed at CUDA codegen: "only support even lane for half type"
     if params == ((3, 4, 3), [0, 2, 0], [1, 3, 3], [1, 1, 1]) and dtype == "float16":
-        return
+        pytest.skip("CUDA codegen does not support odd lanes for half type")
 
     # Skip float16 tests on CPU since it may not be supported and not much performance benefit.
     if dtype == "float16" and device == "cpu":
-        return
+        pytest.skip("float16 is not supported on CPU")
 
     shape, begin, end, strides = params
     m_x, n_x = randn(shape, device=device, dtype=dtype)
@@ -847,8 +824,6 @@ def test_strided_slice(device, params, dtype):
 @pytest.mark.parametrize("device", get_device_list())
 @pytest.mark.parametrize("shape", [
     (1, 4, 1),
-    (3, 4, 2, 2),
-    (4, 1, 1),
     (1, 2, 4, 1)
 ])
 @pytest.mark.parametrize("broadcast", [True, False])
@@ -933,7 +908,6 @@ def test_adv_index(data_shape, index_shapes, dtype):
     (2, 2),
     (3, 4, 2, 2),
     (4,),
-    (1, 2, 4, 1, 6)
 ])
 @pytest.mark.parametrize("dtype", ["float16", "float32"])
 def test_argwhere(shape, device, dtype):
@@ -947,7 +921,7 @@ def test_argwhere(shape, device, dtype):
 
     # Skip float16 tests on CPU since it may not be supported and not much performance benefit.
     if dtype == "float16" and device == "cpu":
-        return
+        pytest.skip("float16 is not supported on CPU")
 
     m_model = ArgWhereModel()
     m_x, t_x = randn_torch(shape, device=device, dtype=dtype)
@@ -966,7 +940,7 @@ def test_argwhere(shape, device, dtype):
 def test_embedding(device, num_weight, hiddend_state, seq_length, dtype):
     # Skip float16 tests on CPU since it may not be supported and not much performance benefit.
     if dtype == "float16" and device == "cpu":
-        return
+        pytest.skip("float16 is not supported on CPU")
 
     model = TestModel(mnm._op.sym.embedding)
     ind, ind_n = randint((seq_length,), low=0, high=num_weight, device=device, dtype="int64")
@@ -982,13 +956,48 @@ def test_embedding(device, num_weight, hiddend_state, seq_length, dtype):
 
     # embedding_dx in float16 have accuracy issues
     if dtype == "float16":
-        return
+        pytest.skip("float16 has accuracy issues")
 
     m_dy, n_dy = randn(m_y.shape, device=device, dtype=dtype)
     mx_dy = mx.nd.array(n_dy)
     mx_y.backward(mx_dy)
     m_y.backward(m_dy)
     check(m_x.grad, mx_x.grad)
+
+
+@pytest.mark.parametrize("device", get_device_list())
+@pytest.mark.parametrize("shape", [(3, 5)])
+@pytest.mark.parametrize("axis", [0, 1])
+@pytest.mark.parametrize("dtype", ["float16", "float32"])
+@pytest.mark.parametrize("exclusive", [False, True])
+def test_cumsum(device, shape, axis, dtype, exclusive):
+    # Skip float16 tests on CPU since it is not supported.
+    if dtype == "float16" and device == "cpu":
+        pytest.skip("float16 is not supported on CPU")
+
+    class CumsumModel(mnm.Model):
+        def build(self):
+            pass
+
+        @mnm.model.trace
+        def forward(self, x):
+            return mnm.cumsum(x, axis, dtype, exclusive)
+
+    m_model = CumsumModel()
+
+    m_x, t_x = randn_torch(shape, device=device, dtype=dtype)
+    m_res = m_model(m_x)
+    v_res = run_vm_model(m_model, device, [m_x])
+    check(v_res, m_res)
+
+    t_res = torch.cumsum(t_x, axis, dtype=getattr(torch, dtype))
+    if exclusive: # PyTorch does not support exclusive.
+        t_res -= t_x
+
+    tol = 1e-5 if dtype == "float32" else 1e-2
+    check(m_res, t_res, rtol=tol, atol=tol)
+
+    # TODO: Test backward when available.
 
 
 if __name__ == "__main__":
