@@ -7,6 +7,7 @@ from mnm._core.ndarray import ndarray
 from mnm._core.value import (BoolValue, FloatValue, IntValue, StringValue,
                              TensorValue, Value)
 from mnm._lib import Array, relay
+from mnm.distributed.sharding.shardspec import BaseShardSpec
 
 
 def to_any(a):
@@ -16,7 +17,7 @@ def to_any(a):
         return None
     if isinstance(a, (list, tuple)):
         return to_int_tuple(a)
-    if isinstance(a, (Number, str)):
+    if isinstance(a, (Number, str, BaseShardSpec)):
         return a
     return to_tensor(a)
 

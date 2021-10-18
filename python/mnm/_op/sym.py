@@ -9,7 +9,7 @@ from . import sym_utils
 
 __all__ = [
     "_allgather", "_allreduce", "_broadcast", "_contrib_dropout", "_contrib_dropout_dx",
-    "_get_slice_range", "_recv", "_reduce", "_reduce_scatter", "_reshard",
+    "_recv", "_reduce", "_reduce_scatter", "_reshard", "_reshard_r2s",
     "_send", "abs", "adaptive_avg_pool2d", "adaptive_avg_pool2d_dx", "adaptive_max_pool2d",
     "adaptive_max_pool2d_dx", "add", "add_event", "adv_index", "adv_index_dx",
     "all", "any", "arange", "argmax", "argmin",
@@ -77,10 +77,6 @@ def _contrib_dropout_dx(dy, mask, reserve_space, p=0.5):
     p = sym_utils.to_double(p)
     return Symbol.from_expr(ffi._contrib_dropout_dx(dy, mask, reserve_space, p))
 
-def _get_slice_range(x):
-    x = sym_utils.to_any(x)
-    return Symbol.from_expr(ffi._get_slice_range(x))
-
 def _recv(peer, shape, dtype="float32", token=None):
     peer = sym_utils.to_int(peer)
     shape = sym_utils.to_int_tuple(shape)
@@ -98,9 +94,15 @@ def _reduce_scatter(x):
     x = sym_utils.to_tensor_tuple(x)
     return Symbol.from_expr(ffi._reduce_scatter(x))
 
-def _reshard(x):
-    x = sym_utils.to_any(x)
-    return Symbol.from_expr(ffi._reshard(x))
+def _reshard(x, spec):
+    x = sym_utils.to_tensor(x)
+    spec = sym_utils.to_any(spec)
+    return Symbol.from_expr(ffi._reshard(x, spec))
+
+def _reshard_r2s(x, spec):
+    x = sym_utils.to_tensor(x)
+    spec = sym_utils.to_any(spec)
+    return Symbol.from_expr(ffi._reshard_r2s(x, spec))
 
 def _send(x, peer, token=None):
     x = sym_utils.to_tensor(x)

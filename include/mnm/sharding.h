@@ -14,7 +14,7 @@ using namespace mnm::ir;
 using namespace mnm::value;
 
 /* BaseShardSpec */
-class BaseShardSpecObj : public Object {
+class BaseShardSpecObj : public ValueObj {
  public:
   bool immutable;
   void VisitAttrs(tvm::AttrVisitor* v) {
@@ -22,12 +22,12 @@ class BaseShardSpecObj : public Object {
   }
   static constexpr const uint32_t _type_index = ir::TypeIndex::kDynamic;
   static constexpr const char* _type_key = "mnm.sharding.BaseShardSpec";
-  MNM_BASE_OBJECT(BaseShardSpecObj, Object);
+  MNM_BASE_OBJECT(BaseShardSpecObj, ValueObj);
 };
 
-class BaseShardSpec : public ObjectRef {
+class BaseShardSpec : public Value {
  public:
-  MNM_OBJECT_REF(BaseShardSpec, ObjectRef, BaseShardSpecObj);
+  MNM_OBJECT_REF(BaseShardSpec, Value, BaseShardSpecObj);
 };
 
 /* ReplicatedSpec */

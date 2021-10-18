@@ -94,14 +94,14 @@ def expand_shardOpCall(call: relay.Call):
 
 @expand_when(lambda call: isinstance(call.attrs.shard_in, ReplicatedSpec) and \
                           isinstance(call.attrs.shard_out, ShardSpec), priority=1)
-@register_expansion_pattern("mnm.op.sharding._reshard")
+@register_expansion_pattern("mnm.op._reshard")
 def reshard_to_strided_slice(call: relay.Call):
     """_reshard -> strided_slice"""
     # GetOp("mnm.op.strided_slice")
     return call
 
 @expand_when(always_apply, priority=0)
-@register_expansion_pattern("mnm.op.sharding._reshard")
+@register_expansion_pattern("mnm.op._reshard")
 def reshard_mismatch(call: relay.Call):
     """_reshard -> <error>"""
     raise NotImplementedError("Unable to process the given sharding specifications")
@@ -112,7 +112,7 @@ def add_or_sub(call: relay.Call):
     """add/sub -> (reshard) add/sub"""
     op, args, sin, sout = extract_shardOpCall(call)
     if not sin[0] == sin[1] == sout:
-        args = [relay.Call(GetOp("mnm.op.sharding._reshard"),
+        args = [relay.Call(GetOp("mnm.op._reshard"),
                            [args[i]],
                            ShardOpAttrs(sin[i], sout)) for i in (0, 1)] + args[2:]
     return relay.Call(op, args)
@@ -127,7 +127,7 @@ def fallback_reshard_to_replicated(call: relay.Call):
             isinstance(attrs.shard_out, TupleShardSpec):
         raise NotImplementedError("Currently coverting multiple args is not supported")
     new_attrs = ShardOpAttrs(attrs.shard_in, ReplicatedSpec())
-    new_args = [relay.Call(GetOp("mnm.op.sharding._reshard"), args, new_attrs)]
+    new_args = [relay.Call(GetOp("mnm.op._reshard"), args, new_attrs)]
     return relay.Call(op, new_args)
 
 @_register_func("mnm.sharding._py_print")

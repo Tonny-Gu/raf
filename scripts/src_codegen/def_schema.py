@@ -847,6 +847,10 @@ SCHEMAS = {
         Arg(name="dtype", cxx_type="std::string", cxx_default="\"int\"", py_default="\"int32\""),
         Arg(name="device", cxx_type="std::string", cxx_default="\"cpu\"", py_default="\"cpu\"",),
     ],
+    "sharding.h::reshard": [
+        Arg(name="x", cxx_type="value::BaseTensorValue"),
+        Arg(name="spec", cxx_type="value::Value"),
+    ],
     "vm.h::alloc_storage": [
         Arg(name="size", cxx_type="value::Value"),
         Arg(name="alignment", cxx_type="value::Value"),

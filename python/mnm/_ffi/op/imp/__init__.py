@@ -7,11 +7,11 @@ from ._internal import _allreduce
 from ._internal import _broadcast
 from ._internal import _contrib_dropout
 from ._internal import _contrib_dropout_dx
-from ._internal import _get_slice_range
 from ._internal import _recv
 from ._internal import _reduce
 from ._internal import _reduce_scatter
 from ._internal import _reshard
+from ._internal import _reshard_r2s
 from ._internal import _send
 from ._internal import abs
 from ._internal import adaptive_avg_pool2d

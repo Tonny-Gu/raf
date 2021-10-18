@@ -77,19 +77,19 @@ Attrs ShardOpAttrs::make(BaseShardSpec shard_in, BaseShardSpec shard_out) {
   return Attrs(attrs);
 }
 
-MNM_OP_DECLARE("mnm.op._get_slice_range", [](const CallValues& call) {
+void GetSliceRange(const CallValues& call) {
   const auto* args = call->args.as<GetSliceRangeArgs>();
   CHECK(args != nullptr);
   const DLTensor* x = args->x;
-  auto shard_spec = args->shard_spec;
+  auto spec = Downcast<ShardSpec>(args->spec);
   auto ndim = x->ndim;
-  CHECK_EQ(x->ndim, shard_spec->grid_shape.size());
+  CHECK_EQ(x->ndim, spec->grid_shape.size());
   std::vector<Value> begin(ndim);
   std::vector<Value> end(ndim);
-  if (shard_spec->subgroup_idx.defined()) {
+  if (spec->subgroup_idx.defined()) {
     for (int i = 0; i < ndim; ++i) {
-      auto idx = shard_spec->subgroup_idx[i]->value;
-      auto num = shard_spec->grid_shape[i]->value;
+      auto idx = spec->subgroup_idx[i]->value;
+      auto num = spec->grid_shape[i]->value;
       CHECK_EQ(x->shape[i] % num, 0) << "Currently automaic padding is unsupported.";
       begin[i] = ScalarValue::make((x->shape[i] / num) * idx);
       end[i] = ScalarValue::make((x->shape[i] / num) * (idx + 1) - 1);
@@ -102,7 +102,9 @@ MNM_OP_DECLARE("mnm.op._get_slice_range", [](const CallValues& call) {
     call->out = ir::NullValue<Value>();
   }
   call->callee = ir::NullValue<OpValue>();
-});
+}
+
+MNM_OP_DECLARE("mnm.op._get_slice_range", GetSliceRange);
 
 MNM_REGISTER_GLOBAL("mnm.sharding._make.ReplicatedSpec").set_body_typed(ReplicatedSpec::make);
 MNM_REGISTER_GLOBAL("mnm.sharding._make.ShardSpec").set_body_typed(ShardSpec::make);
@@ -163,7 +165,7 @@ TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
         auto subgroup_num = r->grid_shape[i]->value;
         auto subgroup_size = r->subgroup_sizes[i]->value;
         p->stream << (subgroup_num == 1 ? ":" : std::to_string(subgroup_num))
-                  << (subgroup_size == 1 ? "" : "(" + std::to_string(subgroup_size) + ")")
+                  << (subgroup_size == 1 ? "" : "(x" + std::to_string(subgroup_size) + ")")
                   << (i != ndim - 1 ? ", " : "");
       }
       p->stream << "])";

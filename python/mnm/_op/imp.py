@@ -9,7 +9,7 @@ from . import imp_utils
 
 __all__ = [
     "_allgather", "_allreduce", "_broadcast", "_contrib_dropout", "_contrib_dropout_dx",
-    "_get_slice_range", "_recv", "_reduce", "_reduce_scatter", "_reshard",
+    "_recv", "_reduce", "_reduce_scatter", "_reshard", "_reshard_r2s",
     "_send", "abs", "adaptive_avg_pool2d", "adaptive_avg_pool2d_dx", "adaptive_max_pool2d",
     "adaptive_max_pool2d_dx", "add", "add_event", "adv_index", "adv_index_dx",
     "all", "any", "arange", "argmax", "argmin",
@@ -83,11 +83,6 @@ def _contrib_dropout_dx(dy, mask, reserve_space, p=0.5):
     return imp_utils.ret(ffi._contrib_dropout_dx(dy, mask, reserve_space, p))
 
 @set_module("mnm")
-def _get_slice_range(x):
-    x = imp_utils.to_any(x)
-    return imp_utils.ret(ffi._get_slice_range(x))
-
-@set_module("mnm")
 def _recv(peer, shape, dtype="float32", token=None):
     peer = imp_utils.to_int(peer)
     shape = imp_utils.to_int_tuple(shape)
@@ -108,9 +103,16 @@ def _reduce_scatter(x):
     return imp_utils.ret(ffi._reduce_scatter(x))
 
 @set_module("mnm")
-def _reshard(x):
-    x = imp_utils.to_any(x)
-    return imp_utils.ret(ffi._reshard(x))
+def _reshard(x, spec):
+    x = imp_utils.to_tensor(x)
+    spec = imp_utils.to_any(spec)
+    return imp_utils.ret(ffi._reshard(x, spec))
+
+@set_module("mnm")
+def _reshard_r2s(x, spec):
+    x = imp_utils.to_tensor(x)
+    spec = imp_utils.to_any(spec)
+    return imp_utils.ret(ffi._reshard_r2s(x, spec))
 
 @set_module("mnm")
 def _send(x, peer, token=None):

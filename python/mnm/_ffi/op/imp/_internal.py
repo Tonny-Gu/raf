@@ -13,8 +13,6 @@ _contrib_dropout = _APIS.get("mnm.op.imp._contrib_dropout", None)
 # Defined in ./src/op/regs/regs.cc
 _contrib_dropout_dx = _APIS.get("mnm.op.imp._contrib_dropout_dx", None)
 # Defined in ./src/op/regs/regs.cc
-_get_slice_range = _APIS.get("mnm.op.imp._get_slice_range", None)
-# Defined in ./src/op/regs/regs.cc
 _recv = _APIS.get("mnm.op.imp._recv", None)
 # Defined in ./src/op/regs/regs.cc
 _reduce = _APIS.get("mnm.op.imp._reduce", None)
@@ -22,6 +20,8 @@ _reduce = _APIS.get("mnm.op.imp._reduce", None)
 _reduce_scatter = _APIS.get("mnm.op.imp._reduce_scatter", None)
 # Defined in ./src/op/regs/regs.cc
 _reshard = _APIS.get("mnm.op.imp._reshard", None)
+# Defined in ./src/op/regs/regs.cc
+_reshard_r2s = _APIS.get("mnm.op.imp._reshard_r2s", None)
 # Defined in ./src/op/regs/regs.cc
 _send = _APIS.get("mnm.op.imp._send", None)
 # Defined in ./src/op/regs/regs.cc

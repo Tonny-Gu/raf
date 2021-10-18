@@ -22,6 +22,7 @@
 #include "../schema/optimizer.h"
 #include "../schema/random.h"
 #include "../schema/reduce.h"
+#include "../schema/sharding.h"
 #include "../schema/stream.h"
 #include "../schema/transform.h"
 #include "../schema/ufunc.h"
@@ -46,11 +47,11 @@ static const char _allreduce[] = "mnm.op._allreduce";
 static const char _broadcast[] = "mnm.op._broadcast";
 static const char _contrib_dropout[] = "mnm.op._contrib_dropout";
 static const char _contrib_dropout_dx[] = "mnm.op._contrib_dropout_dx";
-static const char _get_slice_range[] = "mnm.op._get_slice_range";
 static const char _recv[] = "mnm.op._recv";
 static const char _reduce[] = "mnm.op._reduce";
 static const char _reduce_scatter[] = "mnm.op._reduce_scatter";
 static const char _reshard[] = "mnm.op._reshard";
+static const char _reshard_r2s[] = "mnm.op._reshard_r2s";
 static const char _send[] = "mnm.op._send";
 static const char abs[] = "mnm.op.abs";
 static const char adaptive_avg_pool2d[] = "mnm.op.adaptive_avg_pool2d";
@@ -875,6 +876,13 @@ Attrs Reshape(const TVMArgs& values, GradTape* tapes) {
   return Attrs(attrs);
 }
 
+Attrs Reshard(const TVMArgs& values, GradTape* tapes) {
+  MNM_PRELUDE(schema::ReshardArgs, 2);  // NOLINT(whitespace/line_length)
+  MNM_TAPE(0, ffi2schema::Tensor, x);
+  MNM_TAPE(1, ffi2schema::ArrayLike, spec);
+  return Attrs(attrs);
+}
+
 Attrs Resize2D(const TVMArgs& values, GradTape* tapes) {
   MNM_PRELUDE(schema::Resize2DArgs, 9);  // NOLINT(whitespace/line_length)
   MNM_TAPE(0, ffi2schema::Tensor, x);
@@ -1352,14 +1360,6 @@ MNM_REGISTER_GLOBAL("mnm.op.imp._contrib_dropout_dx").set_body([](TVMArgs args, 
   *ret = MNM_RET();
 });
 
-MNM_REGISTER_GLOBAL("mnm.op.imp._get_slice_range").set_body([](TVMArgs args, TVMRetValue* ret) {
-  MNM_PRELUDE(_get_slice_range, 1, ffi2schema::Unary,
-              schema::UnaryArgs);  // NOLINT(whitespace/line_length)
-  MNM_SET_ENV(vpack->x[0], schema2value::ArrayLike(schema->x));
-  MNM_SET_ENV(vpack->y, value);
-  *ret = MNM_RET();
-});
-
 MNM_REGISTER_GLOBAL("mnm.op.imp._recv").set_body([](TVMArgs args, TVMRetValue* ret) {
   MNM_PRELUDE(_recv, 4, ffi2schema::Recv, schema::RecvArgs);  // NOLINT(whitespace/line_length)
   MNM_SET_ENV(vpack->x[0], schema2value::Int(schema->peer));
@@ -1389,8 +1389,19 @@ MNM_REGISTER_GLOBAL("mnm.op.imp._reduce_scatter").set_body([](TVMArgs args, TVMR
 });
 
 MNM_REGISTER_GLOBAL("mnm.op.imp._reshard").set_body([](TVMArgs args, TVMRetValue* ret) {
-  MNM_PRELUDE(_reshard, 1, ffi2schema::Unary, schema::UnaryArgs);  // NOLINT(whitespace/line_length)
-  MNM_SET_ENV(vpack->x[0], schema2value::ArrayLike(schema->x));
+  MNM_PRELUDE(_reshard, 2, ffi2schema::Reshard,
+              schema::ReshardArgs);  // NOLINT(whitespace/line_length)
+  MNM_SET_ENV(vpack->x[0], schema2value::Tensor(schema->x));
+  MNM_SET_ENV(vpack->x[1], schema2value::ArrayLike(schema->spec));
+  MNM_SET_ENV(vpack->y, value);
+  *ret = MNM_RET();
+});
+
+MNM_REGISTER_GLOBAL("mnm.op.imp._reshard_r2s").set_body([](TVMArgs args, TVMRetValue* ret) {
+  MNM_PRELUDE(_reshard_r2s, 2, ffi2schema::Reshard,
+              schema::ReshardArgs);  // NOLINT(whitespace/line_length)
+  MNM_SET_ENV(vpack->x[0], schema2value::Tensor(schema->x));
+  MNM_SET_ENV(vpack->x[1], schema2value::ArrayLike(schema->spec));
   MNM_SET_ENV(vpack->y, value);
   *ret = MNM_RET();
 });
@@ -3845,6 +3856,13 @@ Array<Expr> Reshape(const TVMArgs& values) {
   MNM_RET();
 }
 
+Array<Expr> Reshard(const TVMArgs& values) {
+  MNM_PRELUDE(2);
+  MNM_ARG(0, ffi2expr::Tensor, x);
+  MNM_ARG(1, ffi2expr::ArrayLike, spec);
+  MNM_RET();
+}
+
 Array<Expr> Resize2D(const TVMArgs& values) {
   MNM_PRELUDE(9);
   MNM_ARG(0, ffi2expr::Tensor, x);
@@ -4247,13 +4265,12 @@ MNM_REGISTER_GLOBAL("mnm.op.sym._contrib_dropout")
     .set_body(MNM_SYMBOLIC_API(_contrib_dropout, 3, Dropout));
 MNM_REGISTER_GLOBAL("mnm.op.sym._contrib_dropout_dx")
     .set_body(MNM_SYMBOLIC_API(_contrib_dropout_dx, 4, DropoutDx));
-MNM_REGISTER_GLOBAL("mnm.op.sym._get_slice_range")
-    .set_body(MNM_SYMBOLIC_API(_get_slice_range, 1, Unary));
 MNM_REGISTER_GLOBAL("mnm.op.sym._recv").set_body(MNM_SYMBOLIC_API(_recv, 4, Recv));
 MNM_REGISTER_GLOBAL("mnm.op.sym._reduce").set_body(MNM_SYMBOLIC_API(_reduce, 3, CommReduce));
 MNM_REGISTER_GLOBAL("mnm.op.sym._reduce_scatter")
     .set_body(MNM_SYMBOLIC_API(_reduce_scatter, 1, ReduceScatter));
-MNM_REGISTER_GLOBAL("mnm.op.sym._reshard").set_body(MNM_SYMBOLIC_API(_reshard, 1, Unary));
+MNM_REGISTER_GLOBAL("mnm.op.sym._reshard").set_body(MNM_SYMBOLIC_API(_reshard, 2, Reshard));
+MNM_REGISTER_GLOBAL("mnm.op.sym._reshard_r2s").set_body(MNM_SYMBOLIC_API(_reshard_r2s, 2, Reshard));
 MNM_REGISTER_GLOBAL("mnm.op.sym._send").set_body(MNM_SYMBOLIC_API(_send, 3, Send));
 MNM_REGISTER_GLOBAL("mnm.op.sym.abs").set_body(MNM_SYMBOLIC_API(abs, 1, Unary));
 MNM_REGISTER_GLOBAL("mnm.op.sym.adaptive_avg_pool2d")
@@ -5216,6 +5233,14 @@ Attrs Reshape(const Array<Value>& values) {
   MNM_REQUIRED(0, value2schema::Tensor, x);
   MNM_REQUIRED(1, value2schema::IntOrTupleInt, shape);
   MNM_OPTIONAL(2, value2schema::Bool, reverse);
+  return Attrs(attrs);
+}
+
+template <const char* op_name>
+Attrs Reshard(const Array<Value>& values) {
+  MNM_PRELUDE(2, 2, schema::ReshardArgs);
+  MNM_REQUIRED(0, value2schema::Tensor, x);
+  MNM_REQUIRED(1, value2schema::ArrayLike, spec);
   return Attrs(attrs);
 }
 
@@ -6853,6 +6878,18 @@ int Reshape(const std::string& field) {
 }
 
 template <const char* op_name>
+int Reshard(const std::string& field) {
+  if (field == "x") {
+    return 0;
+  }
+  if (field == "spec") {
+    return 1;
+  }
+  LOG(WARNING) << "Cannot find " << field << " in the schema of op " << op_name;
+  return -1;
+}
+
+template <const char* op_name>
 int Resize2D(const std::string& field) {
   if (field == "x") {
     return 0;
@@ -7618,10 +7655,6 @@ MNM_BIND_SCHEMA("mnm.op._contrib_dropout_dx", names::_contrib_dropout_dx,
                 value2schema::DropoutDx);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op._contrib_dropout_dx", names::_contrib_dropout_dx,
                             schema_field_idx::DropoutDx);  // NOLINT(whitespace/line_length)
-MNM_BIND_SCHEMA("mnm.op._get_slice_range", names::_get_slice_range,
-                value2schema::Unary);  // NOLINT(whitespace/line_length)
-MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op._get_slice_range", names::_get_slice_range,
-                            schema_field_idx::Unary);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA("mnm.op._recv", names::_recv,
                 value2schema::Recv);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op._recv", names::_recv,
@@ -7635,9 +7668,13 @@ MNM_BIND_SCHEMA("mnm.op._reduce_scatter", names::_reduce_scatter,
 MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op._reduce_scatter", names::_reduce_scatter,
                             schema_field_idx::ReduceScatter);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA("mnm.op._reshard", names::_reshard,
-                value2schema::Unary);  // NOLINT(whitespace/line_length)
+                value2schema::Reshard);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op._reshard", names::_reshard,
-                            schema_field_idx::Unary);  // NOLINT(whitespace/line_length)
+                            schema_field_idx::Reshard);  // NOLINT(whitespace/line_length)
+MNM_BIND_SCHEMA("mnm.op._reshard_r2s", names::_reshard_r2s,
+                value2schema::Reshard);  // NOLINT(whitespace/line_length)
+MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op._reshard_r2s", names::_reshard_r2s,
+                            schema_field_idx::Reshard);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA("mnm.op._send", names::_send,
                 value2schema::Send);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op._send", names::_send,
@@ -8430,6 +8467,7 @@ MNM_REGISTER_OBJECT_REFLECT(ReduceScatterArgs);
 MNM_REGISTER_OBJECT_REFLECT(RepeatArgs);
 MNM_REGISTER_OBJECT_REFLECT(RepeatDxArgs);
 MNM_REGISTER_OBJECT_REFLECT(ReshapeArgs);
+MNM_REGISTER_OBJECT_REFLECT(ReshardArgs);
 MNM_REGISTER_OBJECT_REFLECT(Resize2DArgs);
 MNM_REGISTER_OBJECT_REFLECT(Resize2DDxArgs);
 MNM_REGISTER_OBJECT_REFLECT(ReverseArgs);

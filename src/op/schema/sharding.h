@@ -12,11 +12,11 @@
 namespace mnm {
 namespace op {
 namespace schema {
-class GetSliceRangeArgs : public ir::AttrsNode<GetSliceRangeArgs> {
+class ReshardArgs : public ir::AttrsNode<ReshardArgs> {
  public:
   value::BaseTensorValue x;
-  sharding::ShardSpec shard_spec;
-  MNM_OP_SCHEMA(GetSliceRangeArgs, "mnm.args.get_slice_range");
+  value::Value spec;
+  MNM_OP_SCHEMA(ReshardArgs, "mnm.args.reshard");
 };
 }  // namespace schema
 }  // namespace op

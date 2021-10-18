@@ -8,7 +8,7 @@ from . import op_utils
 
 __all__ = [
     "_allgather", "_allreduce", "_broadcast", "_contrib_dropout", "_contrib_dropout_dx",
-    "_get_slice_range", "_recv", "_reduce", "_reduce_scatter", "_reshard",
+    "_recv", "_reduce", "_reduce_scatter", "_reshard", "_reshard_r2s",
     "_send", "abs", "adaptive_avg_pool2d", "adaptive_avg_pool2d_dx", "adaptive_max_pool2d",
     "adaptive_max_pool2d_dx", "add", "add_event", "adv_index", "adv_index_dx",
     "all", "any", "arange", "argmax", "argmin",
@@ -81,11 +81,6 @@ def _contrib_dropout_dx(dy, mask, reserve_space, p=0.5, attrs=None):
     p = op_utils.to_double(p)
     return relay.Call(op, [dy, mask, reserve_space, p], attrs)
 
-def _get_slice_range(x, attrs=None):
-    op = GetOp("mnm.op._get_slice_range")
-    x = op_utils.to_any(x)
-    return relay.Call(op, [x], attrs)
-
 def _recv(peer, shape, dtype="float32", token=None, attrs=None):
     op = GetOp("mnm.op._recv")
     peer = op_utils.to_int(peer)
@@ -106,10 +101,17 @@ def _reduce_scatter(x, attrs=None):
     x = op_utils.to_tensor_tuple(x)
     return relay.Call(op, [x], attrs)
 
-def _reshard(x, attrs=None):
+def _reshard(x, spec, attrs=None):
     op = GetOp("mnm.op._reshard")
-    x = op_utils.to_any(x)
-    return relay.Call(op, [x], attrs)
+    x = op_utils.to_tensor(x)
+    spec = op_utils.to_any(spec)
+    return relay.Call(op, [x, spec], attrs)
+
+def _reshard_r2s(x, spec, attrs=None):
+    op = GetOp("mnm.op._reshard_r2s")
+    x = op_utils.to_tensor(x)
+    spec = op_utils.to_any(spec)
+    return relay.Call(op, [x, spec], attrs)
 
 def _send(x, peer, token=None, attrs=None):
     op = GetOp("mnm.op._send")
