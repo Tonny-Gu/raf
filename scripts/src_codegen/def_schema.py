@@ -847,7 +847,7 @@ SCHEMAS = {
         Arg(name="dtype", cxx_type="std::string", cxx_default="\"int\"", py_default="\"int32\""),
         Arg(name="device", cxx_type="std::string", cxx_default="\"cpu\"", py_default="\"cpu\"",),
     ],
-    "sharding.h::reshard": [
+    "sharding.h::shard_unary": [
         Arg(name="x", cxx_type="value::BaseTensorValue"),
         Arg(name="spec", cxx_type="value::Value"),
     ],

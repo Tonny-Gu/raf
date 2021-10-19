@@ -49,17 +49,17 @@ class ReplicatedSpec final : public BaseShardSpec {
 /* ShardSpec */
 class ShardSpecObj final : public BaseShardSpecObj {
  public:
-  Array<Device> devices_in_grid;
+  Array<Device> assigned_devices;
   Array<Integer> grid_shape;
   Array<Integer> subgroup_sizes;
-  Array<Integer> subgroup_idx;
+  Array<Integer> _subgroup_idx; // consider put it in ShardLocalContext
   
   void VisitAttrs(tvm::AttrVisitor* v) {
     v->Visit("immutable", &immutable);
-    v->Visit("devices_in_grid", &devices_in_grid);
+    v->Visit("assigned_devices", &assigned_devices);
     v->Visit("grid_shape", &grid_shape);
     v->Visit("subgroup_sizes", &subgroup_sizes);
-    v->Visit("subgroup_idx", &subgroup_idx);
+    v->Visit("_subgroup_idx", &_subgroup_idx);
   }
 
   static constexpr const char* _type_key = "mnm.sharding.ShardSpec";
@@ -69,7 +69,7 @@ class ShardSpecObj final : public BaseShardSpecObj {
 class ShardSpec final : public BaseShardSpec {
  public:
   static ShardSpec make(bool immutable,
-                        Array<Device> devices_in_grid,
+                        Array<Device> assigned_devices,
                         Array<Integer> partition_shape,
                         Array<Integer> subgroup_sizes);
   MNM_OBJECT_REF(ShardSpec, BaseShardSpec, ShardSpecObj);
@@ -102,6 +102,15 @@ struct ShardOpAttrs : public tvm::AttrsNode<ShardOpAttrs> {
                              .describe("Sharding Specifications of inputs");
     TVM_ATTR_FIELD(shard_out).set_default(NullValue<BaseShardSpec>())
                              .describe("Sharding Specifications of outputs");
+  }
+};
+
+
+struct ShardUnaryAttrs : public tvm::AttrsNode<ShardUnaryAttrs> {
+  BaseShardSpec spec;
+  TVM_DECLARE_ATTRS(ShardUnaryAttrs, "mnm.attrs.ShardUnaryAttrs") {
+    TVM_ATTR_FIELD(spec).set_default(NullValue<BaseShardSpec>())
+                        .describe("Sharding Specifications of x");
   }
 };
 

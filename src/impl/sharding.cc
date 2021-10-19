@@ -7,11 +7,14 @@
 #include "mnm/ir.h"
 #include "mnm/op.h"
 #include "mnm/op_utils.h"
+#include "mnm/type.h"
 #include "mnm/registry.h"
 #include "mnm/sharding.h"
 #include "mnm/dist_context.h"
+#include "../op/ty/utils.h"
 #include "../op/schema/ufunc.h"
 #include "../op/schema/sharding.h"
+#include "../op/dialect/tvm/tvm_utils.h"
 #include <string>
 
 namespace mnm {
@@ -30,18 +33,18 @@ ReplicatedSpec ReplicatedSpec::make(bool immutable) {
 }
 
 ShardSpec ShardSpec::make(bool immutable,
-                          Array<Device> devices_in_grid,
+                          Array<Device> assigned_devices,
                           Array<Integer> partition_shape,
                           Array<Integer> subgroup_sizes) {
   auto ndim = partition_shape.size();
   CHECK_EQ(ndim, subgroup_sizes.size());
   auto n = make_object<ShardSpecObj>();
-  auto subgroup_idx = std::vector<Integer>(ndim);
+  auto _subgroup_idx = std::vector<Integer>(ndim);
   auto grid_shape = std::vector<Integer>(ndim);
 
   int64_t device_rank = -1;
-  for (int64_t i = 0; i < devices_in_grid.size(); ++i) {
-    if (DistContext::Global()->local_device.same_as(devices_in_grid[i])) {
+  for (int64_t i = 0; i < assigned_devices.size(); ++i) {
+    if (DistContext::Global()->local_device.same_as(assigned_devices[i])) {
       device_rank = i;
       break;
     }
@@ -49,15 +52,15 @@ ShardSpec ShardSpec::make(bool immutable,
 
   for (int64_t i = ndim - 1; i >= 0; --i) {
     grid_shape[i] = partition_shape[i]->value / subgroup_sizes[i]->value;
-    subgroup_idx[i] = device_rank % grid_shape[i]->value;
+    _subgroup_idx[i] = device_rank % grid_shape[i]->value;
     device_rank /= grid_shape[i]->value;
   }
 
   n->immutable = immutable;
-  n->devices_in_grid = std::move(devices_in_grid);
+  n->assigned_devices = std::move(assigned_devices);
   n->grid_shape = Array<Integer>(grid_shape.begin(), grid_shape.end());
   n->subgroup_sizes = std::move(subgroup_sizes);
-  n->subgroup_idx = (device_rank != -1) ? Array<Integer>(subgroup_idx.begin(), subgroup_idx.end()) : 
+  n->_subgroup_idx = (device_rank != -1) ? Array<Integer>(_subgroup_idx.begin(), _subgroup_idx.end()) : 
                                           NullValue<Array<Integer>>();
   return ShardSpec(n);
 }
@@ -78,7 +81,7 @@ Attrs ShardOpAttrs::make(BaseShardSpec shard_in, BaseShardSpec shard_out) {
 }
 
 void GetSliceRange(const CallValues& call) {
-  const auto* args = call->args.as<GetSliceRangeArgs>();
+  const auto* args = call->args.as<ShardUnaryArgs>();
   CHECK(args != nullptr);
   const DLTensor* x = args->x;
   auto spec = Downcast<ShardSpec>(args->spec);
@@ -86,9 +89,9 @@ void GetSliceRange(const CallValues& call) {
   CHECK_EQ(x->ndim, spec->grid_shape.size());
   std::vector<Value> begin(ndim);
   std::vector<Value> end(ndim);
-  if (spec->subgroup_idx.defined()) {
+  if (spec->_subgroup_idx.defined()) {
     for (int i = 0; i < ndim; ++i) {
-      auto idx = spec->subgroup_idx[i]->value;
+      auto idx = spec->_subgroup_idx[i]->value;
       auto num = spec->grid_shape[i]->value;
       CHECK_EQ(x->shape[i] % num, 0) << "Currently automaic padding is unsupported.";
       begin[i] = ScalarValue::make((x->shape[i] / num) * idx);
@@ -104,7 +107,50 @@ void GetSliceRange(const CallValues& call) {
   call->callee = ir::NullValue<OpValue>();
 }
 
-MNM_OP_DECLARE("mnm.op._get_slice_range", GetSliceRange);
+void Reshard_R2S(const CallValues& call) {
+  const auto* args = call->args.as<ShardUnaryArgs>();
+  CHECK(args != nullptr);
+  const DLTensor* x = args->x;
+  std::vector<int64_t> shape(x->shape, x->shape + x->ndim);
+  auto spec = Downcast<ShardSpec>(args->spec);
+  if (spec->_subgroup_idx.defined()) {
+    for (int64_t i = 0; i < x->ndim; ++i) {
+      auto num_subgroup = spec->grid_shape[i]->value;
+      CHECK_EQ(x->shape[i] % num_subgroup , 0) << "Currently automaic padding is unsupported.";
+      shape[i] /= num_subgroup;
+    }
+    call->out = TensorValue::Assemble(/*dev=*/x->device,
+                                      /*dtype=*/x->dtype,
+                                      /*shape=*/shape);
+  } else {
+    // idle when this local machine doesn't involve
+    call->out = ir::NullValue<Value>();
+    call->callee = ir::NullValue<OpValue>();
+  }
+  call->device = x->device;
+}
+
+MNM_OP_DECLARE("mnm.op._reshard_r2s", Reshard_R2S);
+
+Type Reshard_R2S_Infer(const CallValues& call) {
+  const auto* args = call->args.as<ShardUnaryArgs>();
+  CHECK(args != nullptr);
+  auto spec = Downcast<ShardSpec>(args->spec);
+  auto data = Downcast<TensorType>(GetType(args->x));
+  Array<PrimExpr> dshape = data->shape;
+  size_t ndim = dshape.size();
+  std::vector<PrimExpr> oshape(ndim);
+  CHECK(spec->_subgroup_idx.defined());
+  for (int64_t i = 0; i < ndim; ++i) {
+    auto num_subgroup = spec->grid_shape[i]->value;
+    auto dim_size = Downcast<IntImm>(dshape[i])->value;
+    CHECK_EQ(dim_size % num_subgroup, 0) << "Currently automaic padding is unsupported.";
+    oshape[i] = Integer(dim_size / num_subgroup);
+  }
+  return TensorType(oshape, data->dtype);
+}
+
+MNM_OP_TYPE("mnm.op._reshard_r2s", "Reshard_R2S", Reshard_R2S_Infer);
 
 MNM_REGISTER_GLOBAL("mnm.sharding._make.ReplicatedSpec").set_body_typed(ReplicatedSpec::make);
 MNM_REGISTER_GLOBAL("mnm.sharding._make.ShardSpec").set_body_typed(ShardSpec::make);
@@ -134,7 +180,7 @@ void PrintAllocTable(const ObjectRef& ref, ReprPrinter* p) {
         p->stream << (num_devices == 1 ? ":" : index)
                   << (i != num_dim - 1 ? ", " : "");
       }
-      auto dev_info = obj->devices_in_grid[dev_idx++].c_str();
+      auto dev_info = obj->assigned_devices[dev_idx++].c_str();
       p->stream << "]@" << dev_info;
     } else {
       auto subgroup_num = obj->grid_shape[depth]->value;
@@ -188,6 +234,56 @@ TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
     });
 
 TVM_REGISTER_NODE_TYPE(ShardOpAttrs);
+TVM_REGISTER_NODE_TYPE(ShardUnaryAttrs);
+
 
 }  // namespace sharding
+}  // namespace mnm
+
+namespace mnm {
+namespace op {
+namespace tvm_dialect {
+
+using namespace mnm::ir;
+using namespace mnm::value;
+using namespace mnm::op::schema;
+using namespace mnm::sharding;
+
+std::vector<Value> ReshardSchema2Args(const ShardUnaryArgs* args) {
+  return {args->x};
+}
+
+std::vector<std::string> ReshardSchemaArgNames(const op::CallValues& call) {
+  return {"x"};
+}
+
+Attrs ReshardSchema2Attrs(const ShardUnaryArgs* args) {
+  auto attrs = make_object<ShardUnaryAttrs>();
+  attrs->spec = Downcast<ShardSpec>(args->spec);
+  return Attrs(attrs);
+}
+
+HashKey ReshardHasher(const std::vector<Type>& param_types, const Type& y_type,
+                      const ShardUnaryArgs* args) {
+  HashKey key = GenericHasher<nullptr_t>(param_types, y_type, nullptr);
+  auto spec = Downcast<ShardSpec>(args->spec);
+  for (auto i : spec->assigned_devices) {
+    key << i->device_id
+        << i->device_type.operator int();
+  }
+  for (auto i : spec->grid_shape) {
+    key << i->value;
+  }
+  for (auto i : spec->subgroup_sizes) {
+    key << i->value;
+  }
+
+  return key;
+}
+
+MNM_TVM(_reshard_r2s, Reshard_R2S, ShardUnaryArgs, ReshardSchema2Args, ReshardSchemaArgNames,
+        ReshardSchema2Attrs, ReshardHasher, kInjective);
+
+}  // namespace tvm_dialect
+}  // namespace op
 }  // namespace mnm

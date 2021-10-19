@@ -12,11 +12,11 @@
 namespace mnm {
 namespace op {
 namespace schema {
-class ReshardArgs : public ir::AttrsNode<ReshardArgs> {
+class ShardUnaryArgs : public ir::AttrsNode<ShardUnaryArgs> {
  public:
   value::BaseTensorValue x;
   value::Value spec;
-  MNM_OP_SCHEMA(ReshardArgs, "mnm.args.reshard");
+  MNM_OP_SCHEMA(ShardUnaryArgs, "mnm.args.shard_unary");
 };
 }  // namespace schema
 }  // namespace op

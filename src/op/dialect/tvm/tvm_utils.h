@@ -154,7 +154,7 @@ using FMNMArgIndices =
     } catch (const dmlc::Error& e) {                                                               \
       /* Invalid implementation. Return nullptr to let dispatcher select the next one */           \
       if (!AllowJitFailure()) {                                                                    \
-        DLOG(ERROR) << "Failed to JIT " << env->env_name << ": " << e.what();                      \
+        LOG_INFO << "Failed to JIT " << env->env_name << ": " << e.what();                      \
         return nullptr;                                                                            \
       }                                                                                            \
     }                                                                                              \

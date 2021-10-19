@@ -5,7 +5,6 @@ from mnm._core.core_utils import str2dev
 from mnm.distributed.sharding import ShardSpec, ReplicatedSpec, TupleShardSpec, BaseShardSpec, ShardOpAttrs
 from mnm._ffi.pass_ import SetShardOpAttrs, ToGraphNormalForm, ExpandShardOpCall, InferType
 from mnm._ffi.device import Device
-from mnm._ffi.sharding import TogglePrintMode
 from mnm._lib import relay
 from mnm.testing import randn
 from mnm import distributed as dist
@@ -40,7 +39,7 @@ def test_shardOpAttrs():
     devices = get_global_device_list()
     attrs = ShardOpAttrs(TupleShardSpec([ReplicatedSpec(), ReplicatedSpec()]),
                          ShardSpec(devices, [4, 4], [2, 2]))
-    print(attrs)
+    mnm._reshard_r2s(m_x, ShardSpec(devices, [4, 4], [2, 2]))
     return
     call_list = []
     post_order_visit(mod_before["main"].body,
