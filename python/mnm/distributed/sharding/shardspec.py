@@ -3,9 +3,10 @@
 from mnm._core.core_utils import register_node
 from mnm._ffi.sharding import _make
 from mnm._lib import Object
+from mnm._core.value import Value
 
 @register_node("mnm.sharding.BaseShardSpec")
-class BaseShardSpec(Object):
+class BaseShardSpec(Value):
     """Base type of Sharding Specifications"""
 
 @register_node("mnm.sharding.ReplicatedSpec")

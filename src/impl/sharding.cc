@@ -15,6 +15,7 @@
 #include "../op/schema/ufunc.h"
 #include "../op/schema/sharding.h"
 #include "../op/dialect/tvm/tvm_utils.h"
+#include "../op/dialect/tvm/tvm_attrs.h"
 #include <string>
 
 namespace mnm {
@@ -80,6 +81,7 @@ Attrs ShardOpAttrs::make(BaseShardSpec shard_in, BaseShardSpec shard_out) {
   return Attrs(attrs);
 }
 
+/*
 void GetSliceRange(const CallValues& call) {
   const auto* args = call->args.as<ShardUnaryArgs>();
   CHECK(args != nullptr);
@@ -105,7 +107,7 @@ void GetSliceRange(const CallValues& call) {
     call->out = ir::NullValue<Value>();
   }
   call->callee = ir::NullValue<OpValue>();
-}
+}*/
 
 void Reshard_R2S(const CallValues& call) {
   const auto* args = call->args.as<ShardUnaryArgs>();
@@ -115,9 +117,9 @@ void Reshard_R2S(const CallValues& call) {
   auto spec = Downcast<ShardSpec>(args->spec);
   if (spec->_subgroup_idx.defined()) {
     for (int64_t i = 0; i < x->ndim; ++i) {
-      auto num_subgroup = spec->grid_shape[i]->value;
-      CHECK_EQ(x->shape[i] % num_subgroup , 0) << "Currently automaic padding is unsupported.";
-      shape[i] /= num_subgroup;
+      auto grid_dim_size = spec->grid_shape[i]->value;
+      CHECK_EQ(x->shape[i] % grid_dim_size , 0) << "Currently automaic padding is unsupported.";
+      shape[i] /= grid_dim_size;
     }
     call->out = TensorValue::Assemble(/*dev=*/x->device,
                                       /*dtype=*/x->dtype,
@@ -142,10 +144,10 @@ Type Reshard_R2S_Infer(const CallValues& call) {
   std::vector<PrimExpr> oshape(ndim);
   CHECK(spec->_subgroup_idx.defined());
   for (int64_t i = 0; i < ndim; ++i) {
-    auto num_subgroup = spec->grid_shape[i]->value;
+    auto grid_dim_size = spec->grid_shape[i]->value;
     auto dim_size = Downcast<IntImm>(dshape[i])->value;
-    CHECK_EQ(dim_size % num_subgroup, 0) << "Currently automaic padding is unsupported.";
-    oshape[i] = Integer(dim_size / num_subgroup);
+    CHECK_EQ(dim_size % grid_dim_size, 0) << "Currently automaic padding is unsupported.";
+    oshape[i] = Integer(dim_size / grid_dim_size);
   }
   return TensorType(oshape, data->dtype);
 }
@@ -258,8 +260,20 @@ std::vector<std::string> ReshardSchemaArgNames(const op::CallValues& call) {
 }
 
 Attrs ReshardSchema2Attrs(const ShardUnaryArgs* args) {
-  auto attrs = make_object<ShardUnaryAttrs>();
-  attrs->spec = Downcast<ShardSpec>(args->spec);
+  auto attrs = make_object<StridedSliceAttrs>();
+  auto spec = Downcast<ShardSpec>(args->spec);
+  const DLTensor* x = args->x;
+  std::vector<Integer> begin(x->ndim);
+  std::vector<Integer> end(x->ndim);
+  CHECK(spec->_subgroup_idx.defined());
+  for (int i = 0; i < x->ndim; ++i) {
+    auto idx = spec->_subgroup_idx[i]->value;
+    auto size = spec->grid_shape[i]->value;
+    begin[i] = Integer((x->shape[i] / size) * idx);
+    end[i] = Integer((x->shape[i] / size) * (idx + 1));
+  }
+  attrs->begin = Array<Integer>(begin);
+  attrs->end = Array<Integer>(end);
   return Attrs(attrs);
 }
 

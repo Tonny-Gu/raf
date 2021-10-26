@@ -103,10 +103,9 @@ def _reduce_scatter(x):
     return imp_utils.ret(ffi._reduce_scatter(x))
 
 @set_module("mnm")
-def _reshard(x, spec):
-    x = imp_utils.to_tensor(x)
-    spec = imp_utils.to_any(spec)
-    return imp_utils.ret(ffi._reshard(x, spec))
+def _reshard(x):
+    x = imp_utils.to_any(x)
+    return imp_utils.ret(ffi._reshard(x))
 
 @set_module("mnm")
 def _reshard_r2s(x, spec):

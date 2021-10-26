@@ -39,8 +39,8 @@ def test_shardOpAttrs():
     devices = get_global_device_list()
     attrs = ShardOpAttrs(TupleShardSpec([ReplicatedSpec(), ReplicatedSpec()]),
                          ShardSpec(devices, [4, 4], [2, 2]))
-    mnm._reshard_r2s(m_x, ShardSpec(devices, [4, 4], [2, 2]))
-    return
+    #a = mnm._reshard_r2s(m_x, ShardSpec(devices, [4, 4], [1, 2]))
+    #print(a)
     call_list = []
     post_order_visit(mod_before["main"].body,
                      lambda op: call_list.append(op) if isinstance(op, relay.Call) else None)

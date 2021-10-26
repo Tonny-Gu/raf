@@ -19,6 +19,6 @@ _topi = _tvm.topi  # pylint: disable=invalid-name,no-member
 def compute_reshard_r2s(attr, inputs, output_type):
     # pylint: disable=unused-argument
     x = inputs[0]
-    return [_topi.strided_slice(x, [0, 0], [1, 1])]
+    return [_topi.strided_slice(x, attr.begin, attr.end)]
 
 _reg.register_injective_schedule("mnm.op.tvm._reshard_r2s")

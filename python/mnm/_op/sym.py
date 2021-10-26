@@ -94,10 +94,9 @@ def _reduce_scatter(x):
     x = sym_utils.to_tensor_tuple(x)
     return Symbol.from_expr(ffi._reduce_scatter(x))
 
-def _reshard(x, spec):
-    x = sym_utils.to_tensor(x)
-    spec = sym_utils.to_any(spec)
-    return Symbol.from_expr(ffi._reshard(x, spec))
+def _reshard(x):
+    x = sym_utils.to_any(x)
+    return Symbol.from_expr(ffi._reshard(x))
 
 def _reshard_r2s(x, spec):
     x = sym_utils.to_tensor(x)

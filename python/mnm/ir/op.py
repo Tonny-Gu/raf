@@ -101,11 +101,10 @@ def _reduce_scatter(x, attrs=None):
     x = op_utils.to_tensor_tuple(x)
     return relay.Call(op, [x], attrs)
 
-def _reshard(x, spec, attrs=None):
+def _reshard(x, attrs=None):
     op = GetOp("mnm.op._reshard")
-    x = op_utils.to_tensor(x)
-    spec = op_utils.to_any(spec)
-    return relay.Call(op, [x, spec], attrs)
+    x = op_utils.to_any(x)
+    return relay.Call(op, [x], attrs)
 
 def _reshard_r2s(x, spec, attrs=None):
     op = GetOp("mnm.op._reshard_r2s")
