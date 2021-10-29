@@ -2,11 +2,14 @@
 import pytest
 import mnm
 from mnm._core.core_utils import str2dev
+from mnm._core.executor import interpret
 from mnm.distributed.sharding import ShardSpec, ReplicatedSpec, TupleShardSpec, BaseShardSpec, ShardOpAttrs
 from mnm._ffi.pass_ import SetShardOpAttrs, ToGraphNormalForm, ExpandShardOpCall, InferType
 from mnm._ffi.device import Device
 from mnm._lib import relay
+from mnm.distributed.sharding.utils import get_dist_devices
 from mnm.testing import randn
+from mnm.hybrid.hybrid import _make_argument, _unwrap
 from mnm import distributed as dist
 from tvm.relay.analysis.analysis import post_order_visit
 
@@ -22,8 +25,10 @@ def test_shardOpAttrs():
             return z
 
     model = Model()
-    m_x, _ = randn((128, 128))
-    m_y, _ = randn((128, 128))
+    # m_x, _ = randn((128, 128))
+    # m_y, _ = randn((128, 128))
+    m_x = mnm.array([1, 2, 3, 4])
+    m_y = mnm.array([4, 3, 2, 1])
     record = model._internal(m_x, m_y)
     mod_before = record.mod
     mod_before = InferType()(mod_before)
@@ -36,9 +41,10 @@ def test_shardOpAttrs():
         dev_array = [Device(dev_type_id, i) for i in range(1, local_id)] + \
                     [dctx.local_device] + [Device(dev_type_id, i) for i in range(local_id, 16)]
         return dev_array
-    devices = get_global_device_list()
+    # devices = get_global_device_list()
+    devices = get_dist_devices()
     attrs = ShardOpAttrs(TupleShardSpec([ReplicatedSpec(), ReplicatedSpec()]),
-                         ShardSpec(devices, [4, 4], [2, 2]))
+                         ShardSpec(devices, [4, 1], [1, 1]))
     #a = mnm._reshard_r2s(m_x, ShardSpec(devices, [4, 4], [1, 2]))
     #print(a)
     call_list = []
@@ -48,9 +54,12 @@ def test_shardOpAttrs():
 
     mod = SetShardOpAttrs(attrs_map)(mod_before)
     mod = ToGraphNormalForm()(mod)
-    print(mnm._ffi.ir.AsText(mod))
+    # print(mnm._ffi.ir.AsText(mod))
     mod1 = ExpandShardOpCall()(mod)
-    print(mnm._ffi.ir.AsText(mod1))
+    # print(mnm._ffi.ir.AsText(mod1))
+    call = relay.Call(op=mod1["main"], args=[_make_argument(x) for x in (m_x, m_y)])
+    result = _unwrap(interpret(call, mod1))
+    print(result)
 
 if __name__ == "__main__":
     # pytest.main([__file__])

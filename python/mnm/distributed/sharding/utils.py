@@ -56,7 +56,6 @@ def expand_when(cond, priority=1):
             op = GetOp(op_name) if op_name != "_fallback" else "_fallback"
             if op not in expand_when.patterns:
                 expand_when.patterns[op] = PriorityQueue()
-            print((-priority, expand_when.counter, cond, pyfunc))
             expand_when.patterns[op].put((-priority, expand_when.counter, cond, pyfunc))
             expand_when.counter += 1
         return pyfunc
@@ -89,11 +88,9 @@ def extract_shardOpCall(call):
 @_register_func("mnm.sharding._match_expansion_pattern")
 def expand_shardOpCall(call: relay.Call):
     """Match an eligible expansion pattern and return expanded IR expr"""
-    print("expand: ", call, call.attrs)
     patterns = expand_when.patterns[call.op if call.op in expand_when.patterns else "_fallback"]
     for pattern in patterns.queue:
         _, _, cond, irgen = pattern
-        print(cond(call))
         if cond(call):
             break
     return irgen(call)
@@ -143,8 +140,3 @@ def fallback_reshard_to_replicated(call: relay.Call):
     new_attrs = ShardOpAttrs(attrs.shard_in, ReplicatedSpec())
     new_args = [relay.Call(GetOp("mnm.op._reshard"), args, new_attrs)]
     return relay.Call(op, new_args)
-
-@_register_func("mnm.sharding._py_print")
-def _py_print(obj):
-    """Only for debugging"""
-    print(obj)
