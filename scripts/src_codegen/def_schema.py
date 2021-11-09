@@ -466,6 +466,9 @@ SCHEMAS = {
         Arg(name="keepdims", cxx_type="bool", cxx_default=False),
         Arg(name="exclude", cxx_type="bool", cxx_default=False),
     ],
+    "reduce.h::l2norm": [
+        Arg(name="x", cxx_type="value::BaseTensorValue"),
+    ],
     "reduce.h::prod_dx": [
         Arg(name="x", cxx_type="value::BaseTensorValue"),
         Arg(name="dy", cxx_type="value::BaseTensorValue"),
@@ -748,6 +751,10 @@ SCHEMAS = {
         Arg(name="x",
             cxx_type="std::vector<value::BaseTensorValue>",
             cxx_normalizer="TensorTuple"),
+        Arg(name="computation",
+            cxx_type="std::string",
+            cxx_default="\"sum\"",
+            py_default="\"sum\""),
     ],
     "communication.h::broadcast": [
         Arg(name="x",
@@ -902,6 +909,10 @@ SCHEMAS = {
     ],
     "stream.h::stream_barrier": [
         # empty arg list
+    ],
+    "transform.h::size": [
+        Arg(name="x", cxx_type="value::BaseTensorValue"),
+        Arg(name="axis", cxx_type="value::Value", cxx_default="nullptr"),
     ],
 }
 

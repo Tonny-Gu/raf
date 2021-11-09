@@ -83,7 +83,6 @@ set_property(
   MNM_CUDNN_VERSION="${MNM_CUDNN_VERSION}"
   MNM_CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
   MNM_USE_MPI="${MNM_USE_MPI}"
-  MNM_USE_NCCL="${MNM_USE_NCCL}"
   MNM_USE_CUTLASS="${MNM_USE_CUTLASS}"
 )
 
@@ -97,6 +96,7 @@ file(GLOB_RECURSE MNM_CXX_SOURCE_FILES
   ${CMAKE_CURRENT_LIST_DIR}/src/op/regs/*.cc
   ${CMAKE_CURRENT_LIST_DIR}/src/op/grad/*.cc
   ${CMAKE_CURRENT_LIST_DIR}/src/op/dialect/tvm/*.cc
+  ${CMAKE_CURRENT_LIST_DIR}/src/op/base_ops.cc
   ${CMAKE_CURRENT_LIST_DIR}/src/op/from_relay/*.cc
   ${CMAKE_CURRENT_LIST_DIR}/src/op/ty/*.cc
   ${CMAKE_CURRENT_LIST_DIR}/src/pass/*.cc
@@ -156,6 +156,7 @@ endif()
 if (${MNM_USE_NCCL} STREQUAL "OFF")
   set(MNM_DISTRIBUTED_SOURCE_FILES "")
 else ()
+  set(MNM_CXX_FLAGS ${MNM_CXX_FLAGS} -DMNM_USE_NCCL)
   file(GLOB_RECURSE MNM_DISTRIBUTED_SOURCE_FILES
     ${CMAKE_CURRENT_LIST_DIR}/src/distributed/cuda/*.cc
     ${CMAKE_CURRENT_LIST_DIR}/src/op/dialect/nccl/*.cc

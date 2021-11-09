@@ -110,6 +110,7 @@ OPS = [
     Op(name="min", schema_name="reduce"),
     Op(name="mean", schema_name="reduce"),
     Op(name="mean_dx", schema_name="mean_dx"),
+    Op(name="l2norm", schema_name="l2norm"),
     Op(name="get_reduce_axis", schema_name="binary"),
     Op(name="get_kept_dims", schema_name="binary"),
     Op(name="sgd", schema_name="sgd"),
@@ -203,6 +204,10 @@ OPS = [
     Op(name="vm.invoke_op", schema_name="invoke_op"),
     Op(name="vm.infer_type", schema_name="infer_type"),
     Op(name="vm.set_shape", schema_name="set_shape"),
+    # no_compute ops
+    Op(name="size", schema_name="size"),
+    Op(name="numel", schema_name="unary"),
+    Op(name="shape_as_tensor", schema_name="unary"),
 ]
 
 def by_name():

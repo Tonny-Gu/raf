@@ -181,6 +181,8 @@ greater = _APIS.get("mnm.op.imp.greater", None)
 # Defined in ./src/op/regs/regs.cc
 greater_equal = _APIS.get("mnm.op.imp.greater_equal", None)
 # Defined in ./src/op/regs/regs.cc
+l2norm = _APIS.get("mnm.op.imp.l2norm", None)
+# Defined in ./src/op/regs/regs.cc
 layer_norm = _APIS.get("mnm.op.imp.layer_norm", None)
 # Defined in ./src/op/regs/regs.cc
 layer_norm_dx = _APIS.get("mnm.op.imp.layer_norm_dx", None)
@@ -247,6 +249,8 @@ non_max_suppression = _APIS.get("mnm.op.imp.non_max_suppression", None)
 # Defined in ./src/op/regs/regs.cc
 not_equal = _APIS.get("mnm.op.imp.not_equal", None)
 # Defined in ./src/op/regs/regs.cc
+numel = _APIS.get("mnm.op.imp.numel", None)
+# Defined in ./src/op/regs/regs.cc
 one_hot = _APIS.get("mnm.op.imp.one_hot", None)
 # Defined in ./src/op/regs/regs.cc
 ones = _APIS.get("mnm.op.imp.ones", None)
@@ -301,6 +305,8 @@ sgd = _APIS.get("mnm.op.imp.sgd", None)
 # Defined in ./src/op/regs/regs.cc
 shape = _APIS.get("mnm.op.imp.shape", None)
 # Defined in ./src/op/regs/regs.cc
+shape_as_tensor = _APIS.get("mnm.op.imp.shape_as_tensor", None)
+# Defined in ./src/op/regs/regs.cc
 sigmoid = _APIS.get("mnm.op.imp.sigmoid", None)
 # Defined in ./src/op/regs/regs.cc
 sigmoid_dx = _APIS.get("mnm.op.imp.sigmoid_dx", None)
@@ -308,6 +314,8 @@ sigmoid_dx = _APIS.get("mnm.op.imp.sigmoid_dx", None)
 sign = _APIS.get("mnm.op.imp.sign", None)
 # Defined in ./src/op/regs/regs.cc
 sin = _APIS.get("mnm.op.imp.sin", None)
+# Defined in ./src/op/regs/regs.cc
+size = _APIS.get("mnm.op.imp.size", None)
 # Defined in ./src/op/regs/regs.cc
 smooth_l1_loss = _APIS.get("mnm.op.imp.smooth_l1_loss", None)
 # Defined in ./src/op/regs/regs.cc
