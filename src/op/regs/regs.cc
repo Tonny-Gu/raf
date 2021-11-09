@@ -1019,6 +1019,13 @@ Attrs Sgd(const TVMArgs& values, GradTape* tapes) {
   return Attrs(attrs);
 }
 
+Attrs ShardUnary(const TVMArgs& values, GradTape* tapes) {
+  MNM_PRELUDE(schema::ShardUnaryArgs, 2);  // NOLINT(whitespace/line_length)
+  MNM_TAPE(0, ffi2schema::Tensor, x);
+  MNM_TAPE(1, ffi2schema::ArrayLike, spec);
+  return Attrs(attrs);
+}
+
 Attrs Size(const TVMArgs& values, GradTape* tapes) {
   MNM_PRELUDE(schema::SizeArgs, 2);  // NOLINT(whitespace/line_length)
   MNM_TAPE(0, ffi2schema::Tensor, x);
@@ -4044,6 +4051,13 @@ Array<Expr> Sgd(const TVMArgs& values) {
   MNM_RET();
 }
 
+Array<Expr> ShardUnary(const TVMArgs& values) {
+  MNM_PRELUDE(2);
+  MNM_ARG(0, ffi2expr::Tensor, x);
+  MNM_ARG(1, ffi2expr::ArrayLike, spec);
+  MNM_RET();
+}
+
 Array<Expr> Size(const TVMArgs& values) {
   MNM_PRELUDE(2);
   MNM_ARG(0, ffi2expr::Tensor, x);
@@ -4326,6 +4340,11 @@ MNM_REGISTER_GLOBAL("mnm.op.sym._recv").set_body(MNM_SYMBOLIC_API(_recv, 4, Recv
 MNM_REGISTER_GLOBAL("mnm.op.sym._reduce").set_body(MNM_SYMBOLIC_API(_reduce, 3, CommReduce));
 MNM_REGISTER_GLOBAL("mnm.op.sym._reduce_scatter")
     .set_body(MNM_SYMBOLIC_API(_reduce_scatter, 2, ReduceScatter));
+MNM_REGISTER_GLOBAL("mnm.op.sym._reshard").set_body(MNM_SYMBOLIC_API(_reshard, 1, Unary));
+MNM_REGISTER_GLOBAL("mnm.op.sym._reshard_r2s")
+    .set_body(MNM_SYMBOLIC_API(_reshard_r2s, 2, ShardUnary));
+MNM_REGISTER_GLOBAL("mnm.op.sym._reshard_s2r")
+    .set_body(MNM_SYMBOLIC_API(_reshard_s2r, 2, ShardUnary));
 MNM_REGISTER_GLOBAL("mnm.op.sym._send").set_body(MNM_SYMBOLIC_API(_send, 3, Send));
 MNM_REGISTER_GLOBAL("mnm.op.sym.abs").set_body(MNM_SYMBOLIC_API(abs, 1, Unary));
 MNM_REGISTER_GLOBAL("mnm.op.sym.adaptive_avg_pool2d")
@@ -5445,6 +5464,14 @@ Attrs Sgd(const Array<Value>& values) {
   MNM_REQUIRED(2, value2schema::Tensor, v);
   MNM_REQUIRED(3, value2schema::Double, learning_rate);
   MNM_REQUIRED(4, value2schema::Double, mu);
+  return Attrs(attrs);
+}
+
+template <const char* op_name>
+Attrs ShardUnary(const Array<Value>& values) {
+  MNM_PRELUDE(2, 2, schema::ShardUnaryArgs);
+  MNM_REQUIRED(0, value2schema::Tensor, x);
+  MNM_REQUIRED(1, value2schema::ArrayLike, spec);
   return Attrs(attrs);
 }
 
@@ -7234,6 +7261,18 @@ int Sgd(const std::string& field) {
 }
 
 template <const char* op_name>
+int ShardUnary(const std::string& field) {
+  if (field == "x") {
+    return 0;
+  }
+  if (field == "spec") {
+    return 1;
+  }
+  LOG(WARNING) << "Cannot find " << field << " in the schema of op " << op_name;
+  return -1;
+}
+
+template <const char* op_name>
 int Size(const std::string& field) {
   if (field == "x") {
     return 0;
@@ -8580,6 +8619,7 @@ MNM_REGISTER_OBJECT_REFLECT(SequenceMaskArgs);
 MNM_REGISTER_OBJECT_REFLECT(SetShapeArgs);
 MNM_REGISTER_OBJECT_REFLECT(SetStreamArgs);
 MNM_REGISTER_OBJECT_REFLECT(SgdArgs);
+MNM_REGISTER_OBJECT_REFLECT(ShardUnaryArgs);
 MNM_REGISTER_OBJECT_REFLECT(SizeArgs);
 MNM_REGISTER_OBJECT_REFLECT(SoftmaxArgs);
 MNM_REGISTER_OBJECT_REFLECT(SoftmaxDxArgs);
