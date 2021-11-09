@@ -45,7 +45,7 @@ from ._internal import PartitionGraph
 from ._internal import PrintIR
 from ._internal import Rematerialization
 from ._internal import RenameVars
-from ._internal import SetShardOpAttrs
+from ._internal import SetShardOpCallAttrs
 from ._internal import SimplifyExpr
 from ._internal import Substitute
 from ._internal import ToANormalForm

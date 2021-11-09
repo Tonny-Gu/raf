@@ -326,14 +326,14 @@ Pass WavefrontStreamSchedule();
 Pass ASAPStreamSchedule();
 
 /*!
- * \brief Set ShardOpAttrs for annotated Relay Op Call
+ * \brief Set ShardOpCallAttrs for annotated Relay Op Call
  *
  * \return The created pass.
  */
-Pass SetShardOpAttrs(const ir::Map<ir::Expr, ir::Attrs>& attrs_map);
+Pass SetShardOpCallAttrs(const ir::Map<ir::Expr, ir::Attrs>& attrs_map);
 
 /*!
- * \brief Expand Op Call with ShardOpAttrs to a series of expressions
+ * \brief Expand Op Call with ShardOpCallAttrs to a series of expressions
  * according to the corresponding expansion pattern
  *
  * \return The created pass.

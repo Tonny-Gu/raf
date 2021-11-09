@@ -12,6 +12,7 @@ from ._internal import _reduce
 from ._internal import _reduce_scatter
 from ._internal import _reshard
 from ._internal import _reshard_r2s
+from ._internal import _reshard_s2r
 from ._internal import _send
 from ._internal import abs
 from ._internal import adaptive_avg_pool2d

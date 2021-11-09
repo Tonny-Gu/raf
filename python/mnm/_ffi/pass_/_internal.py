@@ -89,7 +89,7 @@ Rematerialization = _APIS.get("mnm.pass_.Rematerialization", None)
 # Defined in ./src/pass/rename_vars.cc
 RenameVars = _APIS.get("mnm.pass_.RenameVars", None)
 # Defined in ./src/pass/sharding.cc
-SetShardOpAttrs = _APIS.get("mnm.pass_.SetShardOpAttrs", None)
+SetShardOpCallAttrs = _APIS.get("mnm.pass_.SetShardOpCallAttrs", None)
 # Defined in ./src/pass/simplify_expr.cc
 SimplifyExpr = _APIS.get("mnm.pass_.SimplifyExpr", None)
 # Defined in ./src/pass/substitute.cc

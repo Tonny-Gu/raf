@@ -21,15 +21,15 @@ using namespace mnm::sharding;
 
 namespace shard_pass {
 
-class ShardOpAttrsSetter : public ExprMutator {
+class ShardOpCallAttrsSetter : public ExprMutator {
  public:
-  explicit ShardOpAttrsSetter(const Map<Expr, Attrs>& attrs_map) :
+  explicit ShardOpCallAttrsSetter(const Map<Expr, Attrs>& attrs_map) :
     _attrs_map(attrs_map) {}
   
   Expr VisitExpr_(const CallNode* node) override {
     const Expr& callee = node->op;
     static auto default_spec = ReplicatedSpec::make(false);
-    static auto default_attrs = ShardOpAttrs::make(BaseShardSpec(default_spec),
+    static auto default_attrs = ShardOpCallAttrs::make(BaseShardSpec(default_spec),
                                                    BaseShardSpec(default_spec));
     if (callee->IsInstance<OpNode>()) {
       auto ref = GetRef<Expr>(node);
@@ -48,7 +48,7 @@ class ShardOpCallExpander : public ExprMutator {
     const Expr& op = node->op;
     const Attrs& attrs = node->attrs;
     const auto *f = tvm::runtime::Registry::Get("mnm.sharding._match_expansion_pattern");
-    if (attrs.defined() && op->IsInstance<OpNode>() && attrs->IsInstance<ShardOpAttrs>()) {
+    if (attrs.defined() && op->IsInstance<OpNode>() && attrs->IsInstance<ShardOpCallAttrs>()) {
       auto call = GetRef<Call>(node);
       Expr new_expr = (*f)(call);
       return call.same_as(new_expr) ?
@@ -60,14 +60,14 @@ class ShardOpCallExpander : public ExprMutator {
 
 }  // namespace sharding
 
-Pass SetShardOpAttrs(const Map<Expr, Attrs>& attrs_map) {
+Pass SetShardOpCallAttrs(const Map<Expr, Attrs>& attrs_map) {
   return CreateModulePass(
       [=](IRModule mod, const PassContext& pass_ctx) {
-        DLOG(INFO) << "pass::SetShardOpAttrs";
+        DLOG(INFO) << "pass::SetShardOpCallAttrs";
         IRModule updated_mod = IRModule(mod->functions);
         for (auto kv : updated_mod->functions) {
           if (kv.second.as<FunctionNode>()) {
-            auto setter = shard_pass::ShardOpAttrsSetter(attrs_map);
+            auto setter = shard_pass::ShardOpCallAttrsSetter(attrs_map);
             auto func =
                 tvm::runtime::Downcast<Function>(setter.VisitExpr(kv.second));
             updated_mod->Add(kv.first, func, true);
@@ -75,10 +75,10 @@ Pass SetShardOpAttrs(const Map<Expr, Attrs>& attrs_map) {
         }
         return updated_mod;
       },
-      0, "SetShardOpAttrs", {});
+      0, "SetShardOpCallAttrs", {});
 }
 
-MNM_REGISTER_GLOBAL("mnm.pass_.SetShardOpAttrs").set_body_typed(SetShardOpAttrs);
+MNM_REGISTER_GLOBAL("mnm.pass_.SetShardOpCallAttrs").set_body_typed(SetShardOpCallAttrs);
 
 Pass ExpandShardOpCall() {
   return CreateModulePass(

@@ -74,40 +74,12 @@ TupleShardSpec TupleShardSpec::make(bool immutable,
   return TupleShardSpec(n);
 }
 
-Attrs ShardOpAttrs::make(BaseShardSpec shard_in, BaseShardSpec shard_out) {
-  auto attrs = make_object<ShardOpAttrs>();
+Attrs ShardOpCallAttrs::make(BaseShardSpec shard_in, BaseShardSpec shard_out) {
+  auto attrs = make_object<ShardOpCallAttrs>();
   attrs->shard_in = std::move(shard_in);
   attrs->shard_out = std::move(shard_out);
   return Attrs(attrs);
 }
-
-/*
-void GetSliceRange(const CallValues& call) {
-  const auto* args = call->args.as<ShardUnaryArgs>();
-  CHECK(args != nullptr);
-  const DLTensor* x = args->x;
-  auto spec = Downcast<ShardSpec>(args->spec);
-  auto ndim = x->ndim;
-  CHECK_EQ(x->ndim, spec->grid_shape.size());
-  std::vector<Value> begin(ndim);
-  std::vector<Value> end(ndim);
-  if (spec->_subgroup_idx.defined()) {
-    for (int i = 0; i < ndim; ++i) {
-      auto idx = spec->_subgroup_idx[i]->value;
-      auto num = spec->grid_shape[i]->value;
-      CHECK_EQ(x->shape[i] % num, 0) << "Currently automaic padding is unsupported.";
-      begin[i] = ScalarValue::make((x->shape[i] / num) * idx);
-      end[i] = ScalarValue::make((x->shape[i] / num) * (idx + 1) - 1);
-    }
-    call->out = TupleValue::make({
-      TupleValue::make(begin),
-      TupleValue::make(end)
-    });
-  } else {
-    call->out = ir::NullValue<Value>();
-  }
-  call->callee = ir::NullValue<OpValue>();
-}*/
 
 void Reshard_R2S(const CallValues& call) {
   const auto* args = call->args.as<ShardUnaryArgs>();
@@ -157,7 +129,7 @@ MNM_OP_TYPE("mnm.op._reshard_r2s", "Reshard_R2S", Reshard_R2S_Infer);
 MNM_REGISTER_GLOBAL("mnm.sharding._make.ReplicatedSpec").set_body_typed(ReplicatedSpec::make);
 MNM_REGISTER_GLOBAL("mnm.sharding._make.ShardSpec").set_body_typed(ShardSpec::make);
 MNM_REGISTER_GLOBAL("mnm.sharding._make.TupleShardSpec").set_body_typed(TupleShardSpec::make);
-MNM_REGISTER_GLOBAL("mnm.sharding._make.ShardOpAttrs").set_body_typed(ShardOpAttrs::make);
+MNM_REGISTER_GLOBAL("mnm.sharding._make.ShardOpCallAttrs").set_body_typed(ShardOpCallAttrs::make);
 
 MNM_REGISTER_OBJECT_NO_REFLECT(BaseShardSpecObj);
 MNM_REGISTER_OBJECT_REFLECT(ReplicatedSpecObj);
@@ -210,9 +182,9 @@ TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
                 << (r->immutable ? "Immut " : "")
                 << "[";
       for (size_t i = 0; i < ndim; ++i) {
-        auto subgroup_num = r->grid_shape[i]->value;
+        auto grid_dim_size = r->grid_shape[i]->value;
         auto subgroup_size = r->subgroup_sizes[i]->value;
-        p->stream << (subgroup_num == 1 ? ":" : std::to_string(subgroup_num))
+        p->stream << (grid_dim_size == 1 ? ":" : std::to_string(grid_dim_size))
                   << (subgroup_size == 1 ? "" : "(x" + std::to_string(subgroup_size) + ")")
                   << (i != ndim - 1 ? ", " : "");
       }
@@ -227,17 +199,15 @@ TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
     });
 
 TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
-    .set_dispatch<ShardOpAttrs>([](const ObjectRef& ref, ReprPrinter* p) {
-      const auto* n = static_cast<const ShardOpAttrs*>(ref.get());
-      p->stream << "ShardOpAttrs("
+    .set_dispatch<ShardOpCallAttrs>([](const ObjectRef& ref, ReprPrinter* p) {
+      const auto* n = static_cast<const ShardOpCallAttrs*>(ref.get());
+      p->stream << "ShardOpCallAttrs("
                 << "in=" << n->shard_in
                 << " out=" << n->shard_out
                 << ")";
     });
 
-TVM_REGISTER_NODE_TYPE(ShardOpAttrs);
-TVM_REGISTER_NODE_TYPE(ShardUnaryAttrs);
-
+TVM_REGISTER_NODE_TYPE(ShardOpCallAttrs);
 
 }  // namespace sharding
 }  // namespace mnm

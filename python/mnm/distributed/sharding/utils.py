@@ -2,7 +2,7 @@
 """MNM sharding system utilities"""
 import functools
 from queue import PriorityQueue
-from mnm._ffi.sharding._make import ShardOpAttrs
+from mnm._ffi.sharding._make import ShardOpCallAttrs
 from mnm._ffi.op import GetOp
 from mnm._lib import _register_func, relay
 from mnm.distributed.sharding.shardspec import ReplicatedSpec, ShardSpec, TupleShardSpec
@@ -124,7 +124,7 @@ def add_or_sub(call: relay.Call):
     """add/sub -> (reshard) add/sub"""
     op, args, sin, sout = extract_shardOpCall(call)
     if not sin[0] == sin[1] == sout:
-        args = [relay.Call(GetOp("mnm.op._reshard"), [args[i]], ShardOpAttrs(sin[i], sout))
+        args = [relay.Call(GetOp("mnm.op._reshard"), [args[i]], ShardOpCallAttrs(sin[i], sout))
                 for i in (0, 1)] + args[2:]
     return relay.Call(op, args)
 
@@ -137,6 +137,6 @@ def fallback_reshard_to_replicated(call: relay.Call):
             isinstance(attrs.shard_in, TupleShardSpec) or \
             isinstance(attrs.shard_out, TupleShardSpec):
         raise NotImplementedError("Currently coverting multiple args is not supported")
-    new_attrs = ShardOpAttrs(attrs.shard_in, ReplicatedSpec())
+    new_attrs = ShardOpCallAttrs(attrs.shard_in, ReplicatedSpec())
     new_args = [relay.Call(GetOp("mnm.op._reshard"), args, new_attrs)]
     return relay.Call(op, new_args)

@@ -23,6 +23,8 @@ _reshard = _APIS.get("mnm.op.sym._reshard", None)
 # Defined in ./src/op/regs/regs.cc
 _reshard_r2s = _APIS.get("mnm.op.sym._reshard_r2s", None)
 # Defined in ./src/op/regs/regs.cc
+_reshard_s2r = _APIS.get("mnm.op.sym._reshard_s2r", None)
+# Defined in ./src/op/regs/regs.cc
 _send = _APIS.get("mnm.op.sym._send", None)
 # Defined in ./src/op/regs/regs.cc
 abs = _APIS.get("mnm.op.sym.abs", None)

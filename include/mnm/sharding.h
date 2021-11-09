@@ -94,23 +94,14 @@ class TupleShardSpec final : public BaseShardSpec {
   MNM_OBJECT_REF(TupleShardSpec, BaseShardSpec, TupleShardSpecObj);
 };
 
-struct ShardOpAttrs : public tvm::AttrsNode<ShardOpAttrs> {
+struct ShardOpCallAttrs : public tvm::AttrsNode<ShardOpCallAttrs> {
   static Attrs make(BaseShardSpec shard_in, BaseShardSpec shard_out);
   BaseShardSpec shard_in, shard_out;
-  TVM_DECLARE_ATTRS(ShardOpAttrs, "mnm.attrs.ShardOpAttrs") {
+  TVM_DECLARE_ATTRS(ShardOpCallAttrs, "mnm.attrs.ShardOpCallAttrs") {
     TVM_ATTR_FIELD(shard_in).set_default(NullValue<BaseShardSpec>())
                              .describe("Sharding Specifications of inputs");
     TVM_ATTR_FIELD(shard_out).set_default(NullValue<BaseShardSpec>())
                              .describe("Sharding Specifications of outputs");
-  }
-};
-
-
-struct ShardUnaryAttrs : public tvm::AttrsNode<ShardUnaryAttrs> {
-  BaseShardSpec spec;
-  TVM_DECLARE_ATTRS(ShardUnaryAttrs, "mnm.attrs.ShardUnaryAttrs") {
-    TVM_ATTR_FIELD(spec).set_default(NullValue<BaseShardSpec>())
-                        .describe("Sharding Specifications of x");
   }
 };
 

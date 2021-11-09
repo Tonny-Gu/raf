@@ -52,6 +52,7 @@ static const char _reduce[] = "mnm.op._reduce";
 static const char _reduce_scatter[] = "mnm.op._reduce_scatter";
 static const char _reshard[] = "mnm.op._reshard";
 static const char _reshard_r2s[] = "mnm.op._reshard_r2s";
+static const char _reshard_s2r[] = "mnm.op._reshard_s2r";
 static const char _send[] = "mnm.op._send";
 static const char abs[] = "mnm.op.abs";
 static const char adaptive_avg_pool2d[] = "mnm.op.adaptive_avg_pool2d";
@@ -1397,6 +1398,15 @@ MNM_REGISTER_GLOBAL("mnm.op.imp._reshard").set_body([](TVMArgs args, TVMRetValue
 
 MNM_REGISTER_GLOBAL("mnm.op.imp._reshard_r2s").set_body([](TVMArgs args, TVMRetValue* ret) {
   MNM_PRELUDE(_reshard_r2s, 2, ffi2schema::ShardUnary,
+              schema::ShardUnaryArgs);  // NOLINT(whitespace/line_length)
+  MNM_SET_ENV(vpack->x[0], schema2value::Tensor(schema->x));
+  MNM_SET_ENV(vpack->x[1], schema2value::ArrayLike(schema->spec));
+  MNM_SET_ENV(vpack->y, value);
+  *ret = MNM_RET();
+});
+
+MNM_REGISTER_GLOBAL("mnm.op.imp._reshard_s2r").set_body([](TVMArgs args, TVMRetValue* ret) {
+  MNM_PRELUDE(_reshard_s2r, 2, ffi2schema::ShardUnary,
               schema::ShardUnaryArgs);  // NOLINT(whitespace/line_length)
   MNM_SET_ENV(vpack->x[0], schema2value::Tensor(schema->x));
   MNM_SET_ENV(vpack->x[1], schema2value::ArrayLike(schema->spec));
@@ -4270,6 +4280,8 @@ MNM_REGISTER_GLOBAL("mnm.op.sym._reduce_scatter")
 MNM_REGISTER_GLOBAL("mnm.op.sym._reshard").set_body(MNM_SYMBOLIC_API(_reshard, 1, Unary));
 MNM_REGISTER_GLOBAL("mnm.op.sym._reshard_r2s")
     .set_body(MNM_SYMBOLIC_API(_reshard_r2s, 2, ShardUnary));
+MNM_REGISTER_GLOBAL("mnm.op.sym._reshard_s2r")
+    .set_body(MNM_SYMBOLIC_API(_reshard_s2r, 2, ShardUnary));
 MNM_REGISTER_GLOBAL("mnm.op.sym._send").set_body(MNM_SYMBOLIC_API(_send, 3, Send));
 MNM_REGISTER_GLOBAL("mnm.op.sym.abs").set_body(MNM_SYMBOLIC_API(abs, 1, Unary));
 MNM_REGISTER_GLOBAL("mnm.op.sym.adaptive_avg_pool2d")
@@ -7673,6 +7685,10 @@ MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op._reshard", names::_reshard,
 MNM_BIND_SCHEMA("mnm.op._reshard_r2s", names::_reshard_r2s,
                 value2schema::ShardUnary);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op._reshard_r2s", names::_reshard_r2s,
+                            schema_field_idx::ShardUnary);  // NOLINT(whitespace/line_length)
+MNM_BIND_SCHEMA("mnm.op._reshard_s2r", names::_reshard_s2r,
+                value2schema::ShardUnary);  // NOLINT(whitespace/line_length)
+MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op._reshard_s2r", names::_reshard_s2r,
                             schema_field_idx::ShardUnary);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA("mnm.op._send", names::_send,
                 value2schema::Send);  // NOLINT(whitespace/line_length)

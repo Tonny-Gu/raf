@@ -5,7 +5,7 @@ from mnm._lib import _APIS
 # Defined in ./src/impl/sharding.cc
 ReplicatedSpec = _APIS.get("mnm.sharding._make.ReplicatedSpec", None)
 # Defined in ./src/impl/sharding.cc
-ShardOpAttrs = _APIS.get("mnm.sharding._make.ShardOpAttrs", None)
+ShardOpCallAttrs = _APIS.get("mnm.sharding._make.ShardOpCallAttrs", None)
 # Defined in ./src/impl/sharding.cc
 ShardSpec = _APIS.get("mnm.sharding._make.ShardSpec", None)
 # Defined in ./src/impl/sharding.cc
