@@ -1,5 +1,23 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 """Meta executor."""
 # pylint: disable=no-else-return,unidiomatic-typecheck,undefined-variable,invalid-name
+# pylint: disable=protected-access
 import os
 import tvm
 from tvm import auto_scheduler, autotvm
@@ -7,6 +25,7 @@ from tvm.auto_scheduler.dispatcher import ApplyHistoryBest
 from .. import _ffi
 from . import vm
 from .device import Device
+
 
 def interpret(expr, module=None):
     """use interpreter to execute the program.
@@ -42,17 +61,17 @@ class MetaFallbackContext(ApplyHistoryBest):
 
     def __init__(self, verbose=2):
         # Load the builtin schedules
-        fallback_sch_log = ""
+        fallback_sch_log = None
         if "MNM_SCH_FILE" in os.environ and os.path.exists(os.environ["MNM_SCH_FILE"]):
             fallback_sch_log = os.environ["MNM_SCH_FILE"]
 
         if verbose > 0:
-            if fallback_sch_log:
+            if fallback_sch_log is not None:
                 print(f"MNM schedule file is pointed to {fallback_sch_log}")
             else:
                 print('No pretuned schedules because "MNM_SCH_FILE" is not set or does not exist')
 
-        super(MetaFallbackContext, self).__init__(fallback_sch_log, include_compatible=True)
+        super().__init__(fallback_sch_log, include_compatible=True)
 
         self.verbose = verbose
 
@@ -72,9 +91,7 @@ class MetaFallbackContext(ApplyHistoryBest):
 
         # Print the message due to no valid schedule.
         if has_complex_op and self.verbose >= 2:
-            msg = (
-                f"Cannot find tuned schdule for op={func_name}, target={target}"
-            )
+            msg = f"Cannot find tuned schdule for op={func_name}, target={target}"
             if self.verbose == 3:
                 msg += (
                     f", workload_key={workload_key}\n"
@@ -89,6 +106,15 @@ class MetaFallbackContext(ApplyHistoryBest):
         return None
 
 
+def init_auto_scheduler_dispatch_context():
+    """Initialize auto scheduler dispatch context."""
+    verbose = int(os.environ["MNM_SCH_VERBOSE"]) if "MNM_SCH_VERBOSE" in os.environ else 2
+    env = MetaFallbackContext(verbose=verbose)
+    env.__enter__()
+
+
+init_auto_scheduler_dispatch_context()
+
 # pylint: disable=too-few-public-methods
 class VMExecutor:
     """
@@ -101,22 +127,27 @@ class VMExecutor:
 
     device : str
         The runtime context to run the code on.
+
     enable_cuda_graph : bool
         Whether to use CUDA graph.
+
+    dryrun: bool
+        Whether to create a dryrun VM that skips the op execution.
     """
 
-    def __init__(self, mod, device, enable_cuda_graph=False):
+    def __init__(self, mod, device, enable_cuda_graph=False, dryrun=False):
         if mod is None:
             raise RuntimeError("Must provide module to get VM executor.")
         if "gpu" not in device and "cuda" not in device:
             enable_cuda_graph = False
         self.device = Device(device)
         self.executable = vm.compile(mod, self.device)
-        self.vm = vm.VirtualMachine(self.executable, self.device,
-                                    enable_cuda_graph=enable_cuda_graph)
-        self.auto_scheduler_fallback_context = None
+        self.vm = vm.VirtualMachine(
+            self.executable, self.device, enable_cuda_graph=enable_cuda_graph, dryrun=dryrun
+        )
 
-    def _make_vm_helper(self, maker, sch_file=None):
+    @staticmethod
+    def _make_vm_helper(maker, sch_file=None):
         """
         Get a wrapper that runs given maker function. The wrapper would configure the relay auto
         scheduler to use the tuning records in given schedule file.
@@ -134,31 +165,26 @@ class VMExecutor:
         result: Callable
             The wrapped function.
         """
-        if self.auto_scheduler_fallback_context is None:
-            verbose = int(os.environ["MNM_SCH_VERBOSE"]) if "MNM_SCH_VERBOSE" in os.environ else 2
-            self.auto_scheduler_fallback_context = MetaFallbackContext(verbose=verbose)
-        auto_scheduler_dispatch_context = \
-            auto_scheduler.ApplyHistoryBest(sch_file, include_compatible=True)
+        auto_scheduler_dispatch_context = auto_scheduler.ApplyHistoryBest(
+            sch_file, include_compatible=True
+        )
 
         def _vm_wrapper(*args, **kwargs):
             # Backup current configurations
-            old_auto_scheduler_fallback_context = auto_scheduler.DispatchContext.current
             old_autotvm_silent = autotvm.GLOBAL_SCOPE.silent
-
-            auto_scheduler.DispatchContext.current = self.auto_scheduler_fallback_context
             autotvm.GLOBAL_SCOPE.silent = True
 
             with auto_scheduler_dispatch_context:
                 with tvm.transform.PassContext(
-                        config={"relay.backend.use_auto_scheduler": True},
-                        disabled_pass={"AutoSchedulerLayoutRewrite"},
+                    config={"relay.backend.use_auto_scheduler": True},
+                    disabled_pass={"AutoSchedulerLayoutRewrite"},
                 ):
                     ret = maker(*args, **kwargs)
 
             # Recover the configurations
             autotvm.GLOBAL_SCOPE.silent = old_autotvm_silent
-            auto_scheduler.DispatchContext.current = old_auto_scheduler_fallback_context
             return ret
+
         return _vm_wrapper
 
     def make_profiler(self, warmup=5, number=10, repeat=10, sch_file=None):
@@ -207,8 +233,10 @@ class VMExecutor:
         result : List[float]
             The list of latency for each repeat in milliseconds, where len(result) == repeat.
         """
+
         def _maker(*args, **kwargs):
             return self.vm.profile(*args, **kwargs, warmup=warmup, number=number, repeat=repeat)
+
         return self._make_vm_helper(_maker, sch_file)
 
     def make_executor(self, sch_file=None):
@@ -224,6 +252,8 @@ class VMExecutor:
         executor: Callable
             The VM executor
         """
+
         def _maker(*args, **kwargs):
             return self.vm.run(*args, **kwargs)
+
         return self._make_vm_helper(_maker, sch_file)

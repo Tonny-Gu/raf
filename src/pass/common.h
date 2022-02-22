@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2020 by Contributors
  * \file common.h
  * \brief common utilities
  */
@@ -9,6 +27,9 @@
 #include <tvm/ir/type_functor.h>
 #include "mnm/ir.h"
 #include "mnm/value.h"
+#include "../op/schema/init.h"
+#include "../op/schema/memory.h"
+#include "../op/schema/transform.h"
 
 using tvm::kType;
 using tvm::TypeFunctor;
@@ -33,6 +54,11 @@ struct ExplicitLetList {
       body = Let(vars[i], exprs[i], body);
     }
     return body;
+  }
+
+  void Push(Var var, Expr expr) {
+    vars.push_back(var);
+    exprs.push_back(expr);
   }
 
   static std::unique_ptr<ExplicitLetList> make(const Expr& node) {
@@ -186,6 +212,27 @@ class VarSubstitutor : public MixedModeMutator {
     }
     return var;
   }
+
+  Expr VisitExpr_(const LetNode* op) override {
+    auto pre_visit = [this](const LetNode* op) {
+      this->Mutate(op->var);
+      this->Mutate(op->value);
+    };
+    auto post_visit = [this](const LetNode* op) {
+      Var var = Downcast<Var>(this->VisitExpr(op->var));
+      Expr value = this->Mutate(op->value);
+      Expr body = this->Mutate(op->body);
+
+      if (var.same_as(op->var) && value.same_as(op->value) && body.same_as(op->body)) {
+        this->memo_[GetRef<Expr>(op)] = GetRef<Expr>(op);
+      } else {
+        this->memo_[GetRef<Expr>(op)] = Let(var, value, body, op->span);
+      }
+    };
+    ExpandANormalForm(op, pre_visit, post_visit);
+    return memo_[GetRef<Expr>(op)];
+  }
+
   Expr Substitute(const Expr& expr) {
     return this->Mutate(expr);
   }
@@ -257,6 +304,14 @@ class ValueGetter : public ExprFunctor<Value(const Expr&)> {
     return node->value.defined() ? Downcast<Value>(node->value) : NullValue<Value>();
   }
 
+  Value VisitExpr_(const TupleNode* op) {
+    Array<Value> values;
+    for (auto field : op->fields) {
+      values.push_back(VisitExpr(field));
+    }
+    return TupleValue::make(values);
+  }
+
   Value VisitExpr_(const OpNode* op) {
     return OpValue::make(GetRef<Op>(op));
   }
@@ -277,6 +332,45 @@ inline Value GetValue(Type type) {
 
 inline Value GetValue(Expr expr) {
   return ValueGetter()(expr);
+}
+
+/*!
+ * \brief Return the device that the given call node should be on.
+ * Note that if the op is *_like(t) (e.g., zeros_like) and t.device != current_device,
+ * then this function will return a wrong device (i.e., current_device).
+ * However, it should be fine for now as we do not support heterogeneous execution.
+ */
+inline Device GetOutputDevice(const Call& call) {
+#define GET_DEVICE_FROM_SCHEMA(BASE_OP, OP, ARGS, ARG_NAME, DEVICE_ATTR_NAME) \
+  {                                                                           \
+    static auto target_op = Op::Get(OP);                                      \
+    if (BASE_OP == target_op) {                                               \
+      Array<Value> arg_values;                                                \
+      for (const auto& arg : ARGS) {                                          \
+        arg_values.push_back(GetValue(arg));                                  \
+      }                                                                       \
+      auto schema_args = fschema[BASE_OP](arg_values).as<ARG_NAME>();         \
+      CHECK(schema_args != nullptr);                                          \
+      return Device((tvm::Device)(*str2dev)(schema_args->DEVICE_ATTR_NAME));  \
+    }                                                                         \
+  }
+
+  Device device = Device::Current();
+  if (auto op_node = call->op.as<OpNode>()) {
+    static auto fschema = Op::GetAttrMap<op::FMNMSchema>("FMNMSchema");
+    static auto* str2dev = tvm::runtime::Registry::Get("mnm._core.core_utils.str2dev");
+
+    Op op = GetRef<Op>(op_node);
+    Op base_op = op::IsDialectOp(op) ? op::GetBaseOp(op) : op;
+    GET_DEVICE_FROM_SCHEMA(base_op, "mnm.op.zeros", call->args, op::schema::InitOpArgs, device);
+    GET_DEVICE_FROM_SCHEMA(base_op, "mnm.op.ones", call->args, op::schema::InitOpArgs, device);
+    GET_DEVICE_FROM_SCHEMA(base_op, "mnm.op.full", call->args, op::schema::FullArgs, device);
+    GET_DEVICE_FROM_SCHEMA(base_op, "mnm.op.arange", call->args, op::schema::ArangeArgs, device);
+    GET_DEVICE_FROM_SCHEMA(base_op, "mnm.op.one_hot", call->args, op::schema::OneHotArgs, device);
+    GET_DEVICE_FROM_SCHEMA(base_op, "mnm.op.device_copy", call->args, op::schema::DeviceCopyArgs,
+                           dst_device);
+  }
+  return device;
 }
 
 };  // namespace pass

@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2019 by Contributors
  * \file src/impl/value.cc
  * \brief MNM value underlying implementation
  */
@@ -13,6 +31,12 @@
 #include "mnm/tensor.h"
 #include "mnm/value.h"
 #include "../common/shape_utils.h"
+
+#ifdef MNM_USE_CUDA
+#include "../../src/common/cuda_utils.h"
+#include "../../src/op/dialect/cudnn/cudnn_utils.h"
+#include "../../src/op/dialect/cublas/cublas_utils.h"
+#endif
 
 namespace mnm {
 namespace value {
@@ -117,10 +141,11 @@ TupleValue TupleValue::make(Array<Value> fields) {
   return TupleValue(n);
 }
 
-ClosureValue ClosureValue::make(Map<Var, Value> env, Function func) {
+ClosureValue ClosureValue::make(Map<Var, Value> env, Function func, Optional<Var> bind) {
   ObjectPtr<ClosureValueObj> n = make_object<ClosureValueObj>();
   n->env = std::move(env);
   n->func = std::move(func);
+  n->bind = std::move(bind);
   return ClosureValue(n);
 }
 
@@ -228,6 +253,25 @@ Value::operator DLTensor*() const {
   if (const auto* tensor_value = this->as<TensorValueObj>()) {
     const DLTensor* dl_tensor_ref = tensor_value->tensor.operator->();
     return const_cast<DLTensor*>(dl_tensor_ref);
+  } else if (const auto* tensor_t_value = this->as<TensorTypeValueObj>()) {
+    // In this case, create a TensorValueObject out of it
+    TensorType ty = tensor_t_value->type;
+    auto ty_node = ty.as<TensorTypeNode>();
+    CHECK(ty_node);
+    std::vector<int64_t> shape;
+    for (auto i : ty_node->shape) {
+      if (auto dim_shape = i.as<ir::IntImmNode>())
+        shape.push_back(dim_shape->value);
+      else
+        LOG(FATAL) << "Cannot convert to TensorValue due to dynamic shape!";
+    }
+    DLDataType dtype = ty_node->dtype;
+    // In this case we create a tensor based on the given type, so the target device
+    // must be available.
+    Tensor t = Tensor::make(Device::Current(), dtype, shape);
+    TensorValue tv = TensorValue::make(t);
+    const DLTensor* dl_tensor_ref = tv->tensor.operator->();
+    return const_cast<DLTensor*>(dl_tensor_ref);
   }
   LOG(FATAL) << "InternalError: cannot convert to TensorValue";
   throw;
@@ -307,43 +351,6 @@ ObjectRef DeTuple(Value value) {
   throw;
 }
 
-template <>
-bool GetScalarValueData<bool>(const Value& value) {
-  using namespace tvm::runtime;
-  if (const auto* bvo = value.as<BoolValueObj>()) {
-    return bvo->value;
-  } else if (const auto* tvo = value.as<TensorValueObj>()) {
-    tensor::Tensor tensor = tvo->tensor;
-    DLDevice cpu_ctx;
-    cpu_ctx.device_type = kDLCPU;
-    cpu_ctx.device_id = 0;
-    NDArray cpu_array = tensor.CopyTo(cpu_ctx);
-    CHECK_EQ(DataType(cpu_array->dtype), DataType::Bool());
-    CHECK_EQ(cpu_array->ndim, 0);
-    return reinterpret_cast<uint8_t*>(cpu_array->data)[0];
-  }
-  LOG(FATAL) << "Cannot convert " << value->GetTypeKey() << " to scalar bool.";
-}
-
-template <>
-float GetScalarValueData<float>(const Value& value) {
-  using namespace tvm::runtime;
-  if (const auto* fvo = value.as<FloatValueObj>()) {
-    return fvo->value;
-  } else if (const auto* tvo = value.as<TensorValueObj>()) {
-    tensor::Tensor tensor = tvo->tensor;
-    DLDevice cpu_ctx;
-    cpu_ctx.device_type = kDLCPU;
-    cpu_ctx.device_id = 0;
-    NDArray cpu_array = tensor.CopyTo(cpu_ctx);
-    CHECK(DataType(cpu_array->dtype) == DataType::Float(32) ||
-          DataType(cpu_array->dtype) == DataType::Float(16));
-    CHECK_EQ(cpu_array->ndim, 0);
-    return reinterpret_cast<float*>(cpu_array->data)[0];
-  }
-  LOG(FATAL) << "Cannot convert " << value->GetTypeKey() << " to scalar float.";
-}
-
 Value CopyTo(Value src, const Device& dev) {
   if (!src.defined()) {
     return src;
@@ -366,6 +373,29 @@ Value CopyTo(Value src, const Device& dev) {
   return src;
 }
 
+void CopyTo(Value src, Value dst) {
+  if (!src.defined()) {
+    return;
+  }
+
+  if (src.as<TensorValueObj>()) {
+    CHECK(dst.as<TensorValueObj>());
+    auto in_tensor = Downcast<TensorValue>(src)->tensor;
+    auto out_tensor = Downcast<TensorValue>(dst)->tensor;
+    in_tensor.CopyTo(out_tensor);
+  } else if (src.as<TupleValueObj>()) {
+    CHECK(dst.as<TupleValueObj>());
+    std::vector<Value> ret;
+    TupleValue in_tuple = Downcast<TupleValue>(src);
+    TupleValue out_tuple = Downcast<TupleValue>(dst);
+    for (size_t i = 0; i < in_tuple->fields.size(); ++i) {
+      CopyTo(in_tuple->fields[i], out_tuple->fields[i]);
+    }
+  } else {
+    LOG(FATAL) << "Unrecognized value: " << src->GetTypeKey();
+  }
+}
+
 Value CreateDummyValueFromType(const tvm::Type& type, Device device) {
   if (auto tensor_type = type.as<tvm::TensorTypeNode>()) {
     std::vector<int64_t> shape;
@@ -380,6 +410,18 @@ Value CreateDummyValueFromType(const tvm::Type& type, Device device) {
     }
     std::shared_ptr<memory_pool::Memory> memory = memory_pool::Memory::Alloc(device, nbytes);
     DLDataType data_type = tensor_type->dtype;
+
+    // Set integer values to zeros to avoid memory errors in certain ops
+    // E.g., mnm.op.tvm.nll_loss would have CUDA memory errors because the class
+    // index is out of range
+    if ((data_type.code == kDLInt) || (data_type.code == kDLUInt)) {
+#ifdef MNM_USE_CUDA
+      if (device.device_type() == DevType::kCUDA())
+        CUDA_CALL(cudaMemset(memory->data, 0, nbytes));
+      else
+#endif
+        memset(memory->data, 0, nbytes);
+    }
     return TensorValue::Assemble(device, data_type, shape, {}, memory->data, memory);
   } else if (auto tuple_type = type.as<tvm::TupleTypeNode>()) {
     tvm::Array<Value> fields;

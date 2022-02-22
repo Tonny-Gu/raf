@@ -1,5 +1,23 @@
-ci_cpu = "metaprojdev/meta:ci_cpu-v0.16"
-ci_gpu = "metaprojdev/meta:ci_gpu-v0.17"
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+import org.jenkinsci.plugins.pipeline.modeldefinition.Utils
+
+ci_cpu = "metaprojdev/meta:ci_cpu-v0.18"
+ci_gpu = "metaprojdev/meta:ci_gpu-v0.20"
 
 docker_run = 'docker/bash.sh'
 max_time = 120
@@ -53,18 +71,47 @@ def unpack_lib(name, libs) {
      """
 }
 
+def cancel_previous_build() {
+  // cancel previous build if it is not on main.
+  if (env.BRANCH_NAME != "main") {
+    def buildNumber = env.BUILD_NUMBER as int
+    // Milestone API allows us to cancel previous build
+    // with the same milestone number
+    if (buildNumber > 1) milestone(buildNumber - 1)
+    milestone(buildNumber)
+  }
+}
+
+def run_node_if_not_skipped(node_type, node_name, is_skipped, Closure closure) {
+  if (is_skipped == 0) {
+    node(node_type) {
+      closure.call()
+    }
+  } else {
+    Utils.markStageSkippedForConditional(node_name)
+  }
+}
+
+cancel_previous_build()
+
 stage("Lint") {
   timeout(time: max_time, unit: 'MINUTES') {
     node('linux-cpu') {
       init_git_unix()
+      skip_test = sh (
+        returnStatus: true,
+        script: "${docker_run} ${ci_cpu} ./scripts/lint/git-skip-testing.sh",
+        label: "Check if only the docs are changed",
+      )
       sh "${docker_run} ${ci_cpu} ./ci/task_lint.sh"
+      sh "${docker_run} ${ci_cpu} ./ci/task_check_autogen.sh"
     }
   }
 }
 
 stage('Build') {
   parallel 'BUILD: GPU': {
-    node('linux-gpu') {
+    run_node_if_not_skipped('linux-gpu', 'BUILD: GPU', skip_test) {
       init_git_unix()
       sh """
          mkdir -p build
@@ -86,7 +133,7 @@ stage('Build') {
     }
   },
   'BUILD: CPU': {
-    node('linux-cpu') {
+    run_node_if_not_skipped('linux-cpu', 'BUILD: CPU', skip_test) {
       init_git_unix()
       sh """
          mkdir -p build
@@ -107,17 +154,17 @@ stage('Build') {
 
 stage('Unit Test') {
   parallel 'python3: GPU': {
-    node('linux-gpu') {
+    run_node_if_not_skipped('linux-gpu', 'python3: GPU', skip_test) {
       init_git_unix()
       unpack_lib('gpu', mnm_multilib_cutlass)
       timeout(time: max_time, unit: 'MINUTES') {
         sh "${docker_run} ${ci_gpu} nvidia-smi -L"
-        sh "${docker_run} ${ci_gpu} ./ci/task_python_unittest.sh"
+        sh "${docker_run} ${ci_gpu} MNM_DISABLE_CPU_TEST=1 ./ci/task_python_unittest.sh"
       }
     }
   },
   'python3: CPU': {
-    node('linux-cpu') {
+    run_node_if_not_skipped('linux-cpu', 'python3: CPU', skip_test) {
       init_git_unix()
       unpack_lib('cpu', mnm_multilib)
       timeout(time: max_time, unit: 'MINUTES') {
@@ -126,7 +173,7 @@ stage('Unit Test') {
     }
   },
   'python3: multi-GPU': {
-    node('linux-gpu-4x') {
+    run_node_if_not_skipped('linux-gpu-4x', 'python3: multi-GPU', skip_test) {
       init_git_unix()
       unpack_lib('gpu', mnm_multilib_cutlass)
       timeout(time: max_time, unit: 'MINUTES') {

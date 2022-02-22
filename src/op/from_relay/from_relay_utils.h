@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2019 by Contributors
  * \file ./src/op/from_relay/from_relay_utils.h
  * \brief Utility methods for Relay to Meta op conversion.
  */
@@ -7,7 +25,6 @@
 #include "mnm/op.h"
 #include "mnm/ir.h"
 #include "mnm/tensor.h"
-#include "../3rdparty/tvm/src/relay/transforms/pattern_utils.h"
 
 namespace mnm {
 namespace op {
@@ -42,23 +59,7 @@ using VarValueMap = Map<Var, Expr>;
 
 template <typename T>
 ScalarValue Constant2ScalarValue(const ConstantNode* op) {
-  Tensor tensor = Downcast<TensorValue>(op->value)->tensor;
-  DataType dtype = DataType(tensor->dtype);
-  void* raw_data = tensor->data;
-  ICHECK_EQ(tensor->ndim, 0);
-  ICHECK_EQ(dtype.lanes(), 1);
-
-  T data;
-  TVM_DTYPE_DISPATCH(dtype, DType, {
-    if (dtype == DataType::Float(16)) {
-      // convert to float32
-      // storage is uint16_t
-      data = __extendXfYf2__<uint16_t, uint16_t, 10, float, uint32_t, 23>(
-          reinterpret_cast<uint16_t*>(raw_data)[0]);
-    } else {
-      data = static_cast<DType*>(raw_data)[0];
-    }
-  });
+  T data = GetScalarValueData<T>(Downcast<TensorValue>(op->value));
   return ScalarValue::make(data);
 }
 

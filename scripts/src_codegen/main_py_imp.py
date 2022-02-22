@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 from numbers import Number
 
 from . import def_op
@@ -7,6 +24,23 @@ from .codegen_utils import split_chunks, write_to_file
 
 def gen_file():
     FILE = """
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # pylint: disable=invalid-name,line-too-long,too-many-lines
 # pylint: disable=too-many-arguments,redefined-builtin,redefined-outer-name
 # pylint: disable=missing-class-docstring,missing-function-docstring
@@ -23,10 +57,13 @@ __all__ = [
 {METHODS}
 """.strip()
     ops = def_op.by_name()
-    methods = "\n\n".join(gen_method(ops[name])
-                        for name in sorted(ops.keys()))
-    op_names = "\n".join(map(lambda x: '    "' + '", "'.join([i.replace(".", "_") for i in x]) + '",',
-                             split_chunks(sorted(ops.keys()), chunk_size=5)))
+    methods = "\n\n".join(gen_method(ops[name]) for name in sorted(ops.keys()))
+    op_names = "\n".join(
+        map(
+            lambda x: '    "' + '", "'.join([i.replace(".", "_") for i in x]) + '",',
+            split_chunks(sorted(ops.keys()), chunk_size=5),
+        )
+    )
     return FILE.format(METHODS=methods, OP_NAMES=op_names)
 
 
@@ -40,17 +77,22 @@ def {FUNC_NAME}({PARAMS_W_DEFAULT}):
     norms = "\n".join(map(gen_norm, op.schema))
     param_w = gen_param_w_default(op.schema)
     param_wo = gen_param_wo_default(op.schema)
-    return METHOD.format(FUNC_NAME=op.name.replace(".", "_"),
-                         OP_NAME=op.name,
-                         NORMS=norms,
-                         PARAMS_W_DEFAULT=param_w,
-                         PARAMS_WO_DEFAULT=param_wo)
+    return METHOD.format(
+        FUNC_NAME=op.name.replace(".", "_"),
+        OP_NAME=op.name,
+        NORMS=norms,
+        PARAMS_W_DEFAULT=param_w,
+        PARAMS_WO_DEFAULT=param_wo,
+    )
 
 
 def gen_norm(entry):
-    NORM = " " * 4 + """
+    NORM = (
+        " " * 4
+        + """
     {NAME} = imp_utils.{NORM}({NAME})
 """.strip()
+    )
     name = entry.name
     norm = NORM_MAP[entry.py_normalizer or (entry.cxx_normalizer or entry.cxx_type)]
     return NORM.format(NAME=name, NORM=norm)
@@ -75,7 +117,7 @@ def gen_param_w_default(schema):
         else:
             raise NotImplementedError(entry)
         result.append(f"{name}={default}")
-    return ", " .join(result)
+    return ", ".join(result)
 
 
 def gen_param_wo_default(schema):

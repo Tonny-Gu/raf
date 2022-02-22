@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2019 by Contributors
  * \file src/impl/op.cc
  * \brief MNM operator interface underlying implementation
  */
@@ -27,6 +45,8 @@ using namespace mnm::ir;
 using namespace mnm::value;
 using executor::Executor;
 using requests::Requests;
+
+std::vector<std::string> dispatch_error_msgs;
 
 CallValues CallValues::make(value::Value callee, ir::Attrs args) {
   ObjectPtr<CallValuesNode> n = make_object<CallValuesNode>();
@@ -121,6 +141,7 @@ std::shared_ptr<OpEnv> OpEnvMaker::Make(const std::string& op_name, const CallVa
 // Implementation : helper functions
 
 std::shared_ptr<OpEnv> DispatchSingleOp(const CallValues& call) {
+  dispatch_error_msgs.clear();
   Op op = Downcast<OpValue>(call->callee)->op;
   std::string skip_dialect = "";
   // Try dispatch directly
@@ -151,7 +172,14 @@ std::shared_ptr<OpEnv> DispatchSingleOp(const CallValues& call) {
       return env;
     }
   }
-  LOG(FATAL) << "Cannot find a valid dispatch for op " << op->name;
+
+  std::stringstream ss;
+  ss << "Cannot find a valid dispatch for op " << op->name << ":";
+  for (auto msg : dispatch_error_msgs) {
+    ss << "\n" << msg;
+  }
+  LOG(FATAL) << ss.str();
+  dispatch_error_msgs.clear();
   return nullptr;
 }
 

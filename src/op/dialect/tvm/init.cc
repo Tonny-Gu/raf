@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2021 by Contributors
  * \file ./src/op/dialect/tvm/init.cc
  * \brief Init operators bridged from TVM.
  */
@@ -27,12 +45,12 @@ std::vector<std::string> InitOpSchemaArgNames(const op::CallValues& call) {
 
 Attrs InitOpSchema2Attrs(const InitOpArgs* args) {
   auto attrs = make_object<InitOpAttrs>();
-  std::vector<IndexExpr> shape;
-  shape.reserve(args->shape.size());
-  for (size_t i = 0; i < args->shape.size(); ++i) {
-    shape.emplace_back(IntImm(ir::DataType::Int(32), args->shape[i]));
+  std::vector<int64_t> shape_vec = GetShapeVecFromValue(args->shape);
+  Array<Integer> shape;
+  for (size_t i = 0; i < shape_vec.size(); ++i) {
+    shape.push_back(shape_vec[i]);
   }
-  attrs->shape = Array<Integer>(shape.begin(), shape.end());
+  attrs->shape = shape;
   attrs->dtype = DataType(ir::String2DLDataType(args->dtype));
   return Attrs(attrs);
 }
@@ -40,7 +58,8 @@ Attrs InitOpSchema2Attrs(const InitOpArgs* args) {
 HashKey InitOpHasher(const std::vector<Type>& param_types, const Type& y_type,
                      const InitOpArgs* args) {
   HashKey key = GenericHasher<nullptr_t>(param_types, y_type, nullptr);
-  key << args->shape;
+  std::vector<int64_t> shape = GetShapeVecFromValue(args->shape);
+  key << shape;
   key << ir::String2DLDataType(args->dtype);
   key << args->device;
   return key;

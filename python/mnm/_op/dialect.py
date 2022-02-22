@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 """Dialect related functions"""
 import threading
 
@@ -5,6 +22,7 @@ from .. import build as _build
 from .._ffi import op as _ffi
 from .._lib import Object
 from .._core.core_utils import register_node
+
 
 def enabled(dialect, device):
     """Check if a dialect is enabled on a device.
@@ -54,13 +72,16 @@ class DialectPreference(Object):
     dialects : List[str]
         The list of preferred dialects, with descending priority
     """
+
     valid_dialects = _ffi.GetAllDialects()
     storage = threading.local()
 
     def __init__(self, dialects):
         if not set(DialectPreference.valid_dialects).issuperset(set(dialects)):
-            raise ValueError(f"{set(dialects).difference(set(DialectPreference.valid_dialects))} "
-                             "are not valid backends")
+            raise ValueError(
+                f"{set(dialects).difference(set(DialectPreference.valid_dialects))} "
+                "are not valid backends"
+            )
         self.__init_handle_by_constructor__(_ffi.DialectPreference, dialects)
 
     def __enter__(self):

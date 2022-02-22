@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # pylint: disable=attribute-defined-outside-init,invalid-name,protected-access,too-many-locals,too-many-statements,no-self-use
 from typing import Dict, List
 import pytest
@@ -9,6 +26,7 @@ from mnm._ffi.pass_ import DataParallelSchedule, ToGraphNormalForm
 from mnm.testing import randn
 from mnm._core.ir_ext import extended_var
 from mnm.ir import ScopeBuilder
+
 
 class ANFBuilder:
     def __init__(self):
@@ -24,17 +42,18 @@ class ANFBuilder:
         return mnm.ir.const(value)
 
     def make_tuple(self, fields):
-        return self.scope_builder.let('', tvm.relay.Tuple(fields))
+        return self.scope_builder.let("", tvm.relay.Tuple(fields))
 
     def get_tuple_item(self, tup, index):
-        return self.scope_builder.let('', tvm.relay.TupleGetItem(tup, index))
+        return self.scope_builder.let("", tvm.relay.TupleGetItem(tup, index))
 
     def call(self, op_name: str, args: List[tvm.relay.Expr]) -> tvm.relay.Var:
-        return self.scope_builder.let('', tvm.relay.Call(self.get_operator(op_name), args))
+        return self.scope_builder.let("", tvm.relay.Call(self.get_operator(op_name), args))
 
     def ret(self, body: tvm.relay.Expr) -> tvm.relay.Expr:
         self.scope_builder.ret(body)
         return self.scope_builder.get()
+
 
 class TwoBranchModel(mnm.Model):
     #        /-> atan -> allreduce -> mul -\
@@ -98,6 +117,7 @@ class TwoBranchModel(mnm.Model):
         x_6 = builder.call("concatenate", [x_5, x_5_1])
         return [tvm.relay.Function([x, c], builder.ret(x_6))]
 
+
 class UnbalancedModel(mnm.Model):
     #        /-> atan -> atan -> atan -> atan -> allreduce -> mul -\
     #  -> mul                                                       concat ->
@@ -124,7 +144,7 @@ class UnbalancedModel(mnm.Model):
         return a4
 
     def fifo_expected(self):
-        """ (version 1)
+        """(version 1)
         fn (%x: Tensor[(64, 128), float32], %c: Tensor[(64, 128), float32]) {
             let %v = mnm.op.multiply(%x, %c);
             let %v1 = mnm.op.atan(%v);
@@ -143,6 +163,7 @@ class UnbalancedModel(mnm.Model):
             %v13
         }
         """
+
         def version1():
             builder = ANFBuilder()
             x = extended_var("x", shape=self.shape)
@@ -186,7 +207,7 @@ class UnbalancedModel(mnm.Model):
             x_1b = builder.call("atan", [x_0])
             x_1a = builder.call("atan", [x_0])
 
-            x_2b = builder.make_tuple((x_1b, ))
+            x_2b = builder.make_tuple((x_1b,))
             x_2a = builder.call("atan", [x_1a])
 
             x_2b1 = builder.const("sum")
@@ -210,6 +231,7 @@ class UnbalancedModel(mnm.Model):
             return tvm.relay.Function([x, c], builder.ret(x9))
 
         return [version1(), version2()]
+
 
 class ExampleModel(mnm.Model):
     # the example model where ToANF can generate bad schedule:
@@ -243,6 +265,7 @@ class ExampleModel(mnm.Model):
             %v6
         }
         """
+
         def version1():
             builder = ANFBuilder()
             x = extended_var("x", shape=self.shape)
@@ -280,6 +303,7 @@ class ExampleModel(mnm.Model):
             return tvm.relay.Function([x], builder.ret(a3))
 
         return [version1(), version2()]
+
 
 class DelayedSuccessorModel(mnm.Model):
     #         /-> allreduce -> relu -> relu -----------------\
@@ -320,6 +344,7 @@ class DelayedSuccessorModel(mnm.Model):
             %x_10
         }
         """
+
         def version1():
             builder = ANFBuilder()
             x = extended_var("x", shape=self.shape)
@@ -367,6 +392,7 @@ class DelayedSuccessorModel(mnm.Model):
             return tvm.relay.Function([x], builder.ret(a6))
 
         return [version1(), version2()]
+
 
 class NestedBranchModel(mnm.Model):
     #                           /-> atan -\
@@ -396,7 +422,7 @@ class NestedBranchModel(mnm.Model):
         return a6
 
     def fifo_expected(self):
-        """ (version 1)
+        """(version 1)
         fn (%x: Tensor[(64, 128), float32], %c: Tensor[(64, 128), float32]) {
             let %v = mnm.op.multiply(%x, %c);
             let %v1 = mnm.op.atan(%v);
@@ -411,6 +437,7 @@ class NestedBranchModel(mnm.Model):
             %v9
         }
         """
+
         def version1():
             builder = ANFBuilder()
             x = extended_var("x", shape=self.shape)
@@ -452,7 +479,9 @@ class NestedBranchModel(mnm.Model):
             x_4a = builder.call("multiply", [x_3a1, x_3a2])
             x_5 = builder.call("multiply", [x_4a, x_3b])
             return tvm.relay.Function([x, c], builder.ret(x_5))
+
         return [version1(), version2()]
+
 
 class CascadingCollectiveModel(mnm.Model):
     #        /-> allreduce -> relu ---------\     /-> allreduce -> relu ---------\
@@ -485,7 +514,7 @@ class CascadingCollectiveModel(mnm.Model):
         return a8
 
     def fifo_expected(self):
-        """ (version 1, version 1)
+        """(version 1, version 1)
         fn (%x: Tensor[(64, 128), float32], %c: Tensor[(64, 128), float32]) {
             let %v = mnm.op.multiply(%x, %c);
             let %v1 = (%v,);
@@ -505,6 +534,7 @@ class CascadingCollectiveModel(mnm.Model):
             %v14
         }
         """
+
         def version1(builder, input0, input1):
             a0 = builder.call("multiply", [input0, input1])
 
@@ -550,12 +580,19 @@ class CascadingCollectiveModel(mnm.Model):
 
         return candidate_irs
 
+
 @pytest.mark.skipif(not mnm.build.with_cuda(), reason="CUDA is not enabled")
-@pytest.mark.parametrize("model_class,shape", [
-    (TwoBranchModel, (64, 128)), (UnbalancedModel, (64, 128)),
-    (ExampleModel, (64, 128)), (NestedBranchModel, (64, 128)),
-    (DelayedSuccessorModel, (64, 128)), (CascadingCollectiveModel, (64, 128))
-])
+@pytest.mark.parametrize(
+    "model_class,shape",
+    [
+        (TwoBranchModel, (64, 128)),
+        (UnbalancedModel, (64, 128)),
+        (ExampleModel, (64, 128)),
+        (NestedBranchModel, (64, 128)),
+        (DelayedSuccessorModel, (64, 128)),
+        (CascadingCollectiveModel, (64, 128)),
+    ],
+)
 def test_fifo_schedule(model_class, shape):
     model = model_class(shape)
     x, _ = randn(shape)
@@ -563,16 +600,17 @@ def test_fifo_schedule(model_class, shape):
 
     mod = MNMSequential([ToGraphNormalForm(), DataParallelSchedule()])(mod)
 
-    print("Actual"+"<<"*20)
-    print(mnm.ir.AsText(mod["main"]))
+    err_msgs = []
+    err_msgs.append("Actual" + "<<" * 20)
+    err_msgs.append(mnm.ir.AsText(mod["main"]))
 
     equal_to_any = False
     for expected in model.fifo_expected():
-        result = tvm.ir.structural_equal(mod['main'], expected)
+        result = tvm.ir.structural_equal(mod["main"], expected)
         equal_to_any = equal_to_any or result
-        print("Expected Candidate"+"<<"*20)
-        print(mnm.ir.AsText(expected))
-    assert equal_to_any
+        err_msgs.append("Expected Candidate" + "<<" * 20)
+        err_msgs.append(mnm.ir.AsText(expected))
+    assert equal_to_any, "\n".join(err_msgs)
 
 
 if __name__ == "__main__":

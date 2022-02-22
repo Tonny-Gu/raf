@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2020 by Contributors
  * \file auto_cast.cc
  * \brief AutoCast pass
  */
@@ -7,11 +25,11 @@
 
 #include <stack>
 #include "mnm/op.h"
+#include "mnm/cache.h"
 #include "mnm/ir.h"
 #include "mnm/type.h"
 #include "mnm/value.h"
 #include "mnm/pass.h"
-#include "mnm/op_utils.h"
 #include "./let_list.h"
 #include "./common.h"
 
@@ -144,7 +162,8 @@ struct CastCacheEqual {
   }
 };
 
-using CastCache = std::unordered_map<std::pair<Expr, TypeHint>, Var, CastCacheHash, CastCacheEqual>;
+using CastCache =
+    std::unordered_map<std::pair<Expr, TypeHint>, Expr, CastCacheHash, CastCacheEqual>;
 
 class AutoCastMutator : public ExprMutator {
  public:
@@ -260,7 +279,8 @@ class AutoCastMutator : public ExprMutator {
     if (op == cast_op) {
       auto in_type = node->args[0]->checked_type().as<TensorTypeNode>();
       auto ret_type = node->checked_type().as<TensorTypeNode>();
-      CHECK(node->args[0]->IsInstance<VarNode>() && in_type != nullptr && ret_type != nullptr);
+      CHECK(node->args[0]->IsInstance<VarNode>() || node->args[0]->IsInstance<ConstantNode>());
+      CHECK(in_type != nullptr && ret_type != nullptr);
 
       // This case op is not required anymore because its argument already produces the AMP dtype.
       if (in_type->dtype == ret_type->dtype) {
@@ -269,7 +289,7 @@ class AutoCastMutator : public ExprMutator {
 
       // Add the cast op to the reversed cache to avoid generating back-to-back cast ops.
       auto pair_key = std::make_pair(curr_let_, PrimType(in_type->dtype));
-      reversed_cast_cache_[pair_key] = Downcast<Var>(node->args[0]);
+      reversed_cast_cache_[pair_key] = node->args[0];
       auto new_call = Call(op, node->args, node->attrs, node->type_args);
       new_call->checked_type_ = node->checked_type();
       return new_call;

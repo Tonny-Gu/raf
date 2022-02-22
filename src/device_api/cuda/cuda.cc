@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2019 by Contributors
  * \file src/device_api/cuda/cuda.cc
  * \brief CUDA device API
  */
@@ -7,6 +25,7 @@
 #include "mnm/op.h"
 #include "mnm/device_api.h"
 #include "mnm/registry.h"
+#include "mnm/profiler.h"
 #include "../../common/cuda_utils.h"
 
 #include "../../op/dialect/cudnn/cudnn_utils.h"
@@ -104,6 +123,51 @@ class CUDADeviceAPI final : public DeviceAPI {
   }
 #endif
 
+  void CopyDataFromTo(DLTensor* from, DLTensor* to, void* stream) final {
+    size_t nbytes = tvm::runtime::GetDataSize(*from);
+    ICHECK_EQ(nbytes, tvm::runtime::GetDataSize(*to));
+    ICHECK(tvm::runtime::IsContiguous(*from) && tvm::runtime::IsContiguous(*to))
+        << "CopyDataFromTo only support contiguous array for now";
+
+    cudaStream_t cu_stream = static_cast<cudaStream_t>(stream);
+    auto from_data_ptr = static_cast<const char*>(from->data) + from->byte_offset;
+    auto to_data_ptr = static_cast<char*>(to->data) + to->byte_offset;
+
+    auto from_dev_type =
+        (from->device.device_type == kDLCUDAHost) ? kDLCPU : from->device.device_type;
+    auto to_dev_type = (to->device.device_type == kDLCUDAHost) ? kDLCPU : to->device.device_type;
+
+    // In case there is a copy from host memory to host memory.
+    if (to_dev_type == kDLCPU && from_dev_type == kDLCPU) {
+      memcpy(to_data_ptr, from_data_ptr, nbytes);
+      return;
+    }
+
+    auto curr_device_id = device_id_;
+    if (from_dev_type == kDLCUDA && to_dev_type == kDLCUDA) {
+      // GPU to another GPU.
+      SetDevice(from->device.device_id);
+      if (from->device.device_id == to->device.device_id) {
+        HandleCopy(from_data_ptr, to_data_ptr, nbytes, cudaMemcpyDeviceToDevice, cu_stream);
+      } else {
+        cudaMemcpyPeerAsync(to_data_ptr, to->device.device_id, from_data_ptr,
+                            from->device.device_id, nbytes, cu_stream);
+      }
+    } else if (from_dev_type == kDLCUDA && to_dev_type == kDLCPU) {
+      // GPU to CPU.
+      SetDevice(from->device.device_id);
+      HandleCopy(from_data_ptr, to_data_ptr, nbytes, cudaMemcpyDeviceToHost, cu_stream);
+    } else if (from_dev_type == kDLCPU && to_dev_type == kDLCUDA) {
+      // CPU to GPU.
+      SetDevice(to->device.device_id);
+      HandleCopy(from_data_ptr, to_data_ptr, nbytes, cudaMemcpyHostToDevice, cu_stream);
+    } else {
+      LOG(FATAL) << "expect copy from/to GPU or between GPU";
+    }
+
+    SetDevice(curr_device_id);
+  }
+
   void* CreateStream(const Device& dev) override {
     CHECK_EQ(dev.device_type(), DevType::kCUDA());
     CUDA_CALL(cudaSetDevice(dev.device_id()));
@@ -182,6 +246,17 @@ class CUDADeviceAPI final : public DeviceAPI {
   }
 
  private:
+  static void HandleCopy(const void* from, void* to, size_t size, cudaMemcpyKind kind,
+                         cudaStream_t cu_stream) {
+    if (cu_stream != nullptr) {
+      // Note that async happens only for the CUDA-CUDA and CUDA-CUDAHost (pinned CPU memory).
+      // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#asynchronous-concurrent-execution
+      CUDA_CALL(cudaMemcpyAsync(to, from, size, kind, cu_stream));
+    } else {
+      CUDA_CALL(cudaMemcpy(to, from, size, kind));
+    }
+  }
+
   int device_id_;
   // using cuda default stream if stream is not set explicitly
   void* stream_ = nullptr;

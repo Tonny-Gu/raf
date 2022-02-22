@@ -1,11 +1,29 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2020 by Contributors
  * \file src/op/ty/collective_comm.cc
  * \brief Typing of collective communicate operators
  */
 #include <tvm/relay/type.h>
 #include <tvm/tir/op.h>
-#include "mnm/communicator.h"
+#include "mnm/dist_context.h"
 #include "mnm/type.h"
 #include "../schema/communication.h"
 #include "./utils.h"
@@ -16,7 +34,7 @@ namespace op {
 using namespace mnm::ir;
 using namespace mnm::value;
 using namespace mnm::op::schema;
-using namespace mnm::distributed::communicator;
+using mnm::distributed::DistContext;
 
 template <typename T>
 Type IdentityType(const CallValues& value) {
@@ -76,10 +94,10 @@ MNM_OP_TYPE("mnm.op._recv", "NCCLRecv", RecvInfer);
 Type AllGatherInfer(const CallValues& value) {
   const auto* args = value->args.as<AllgatherArgs>();
   CHECK(args != nullptr);
+  auto dctx = DistContext::Global();
   auto ttype = GetType(args->x).as<TensorTypeNode>();
   auto shape = ttype->shape;
-  auto new_size = shape[args->axis].as<IntImmNode>()->value *
-                  CommunicatorManager::Get()->GetCommunicator()->GetSize();
+  auto new_size = shape[args->axis].as<IntImmNode>()->value * dctx->size;
   shape.Set(args->axis, Integer(new_size));
   return TensorType(shape, DataType(ttype->dtype));
 }

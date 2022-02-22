@@ -1,6 +1,24 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # pylint: disable=attribute-defined-outside-init,invalid-name,protected-access,too-many-locals,no-self-use
 import pytest
 import mnm
+from mnm.ir import ScopeBuilder
 from mnm.testing import run_infer_type, randn
 import tvm
 from tvm import relay
@@ -67,6 +85,7 @@ def test_tuple():
 
 def test_diamond():
     konst, _ = randn((1,))
+
     class Model(mnm.Model):
         def build(self):
             self.c = konst
@@ -95,6 +114,36 @@ def test_diamond():
     func_after = run_infer_type(mnm._ffi.pass_.ToGraphNormalForm()(mod))["main"]
     func_expected = run_infer_type(expected())
     assert tvm.ir.structural_equal(func_after, func_expected)
+
+
+def test_may_share():
+    shape = (10, 10)
+    null = mnm.ir.const(None)
+
+    def before():
+        in0 = mnm.ir.var("in0", shape=shape)
+        in1 = mnm.ir.var("in1", shape=shape)
+
+        sb = ScopeBuilder()
+        a_1 = sb.let("a1", mnm.ir.op.add(in0, in1, null, null))
+        a_2 = sb.let("a2", mnm.ir.op.relu(a_1), may_share=in0)  # This let should be preserved.
+        sb.ret(a_2)
+        func = relay.Function([in0, in1], sb.get())
+        return tvm.IRModule.from_expr(func)
+
+    def expected():
+        in0 = mnm.ir.var("in0", shape=shape)
+        in1 = mnm.ir.var("in1", shape=shape)
+        a_1 = mnm.ir.op.add(in0, in1, null, null)
+        v_0 = mnm.ir.var("a2", may_share=in0)
+        a_2 = relay.Let(v_0, mnm.ir.op.relu(a_1), v_0)
+        func = relay.Function([in0, in1], a_2)
+        return func
+
+    mod = before()
+    after_func = run_infer_type(mnm._ffi.pass_.ToGraphNormalForm()(mod))["main"]
+    expected_func = run_infer_type(expected())
+    assert tvm.ir.structural_equal(after_func, expected_func)
 
 
 if __name__ == "__main__":

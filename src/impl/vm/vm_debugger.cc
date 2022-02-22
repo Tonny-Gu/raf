@@ -1,3 +1,22 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
  * \file src/impl/vm/vm_debugger.cc
  * \brief The implementation for Meta virtual machine debugger.
@@ -80,9 +99,9 @@ void VMDebugger::HandleInvokeJit(VMContext& ctx, const Instruction& instr) {
   OpEnvPtr op_env;
   std::vector<Value> inputs;
   Value output;
-  std::string input_str;
+  std::string op_env_cache_key;
 
-  std::tie(op_env, inputs, output, input_str) = PrepareOpEnv(ctx, instr);
+  std::tie(op_env, inputs, output, op_env_cache_key) = PrepareOpEnv(ctx, instr);
   op_env->Execute(inputs, output);
   ctx->pc++;
 

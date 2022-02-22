@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 """Testing utilities for models and executor."""
 # pylint: disable=invalid-name,protected-access,too-many-arguments
 import mnm
@@ -5,6 +22,7 @@ from mnm.model.trace import _get_func_inputs
 from mnm._core.executor import VMExecutor
 from mnm._core.vm import VMCompiler
 from mnm._core.core_utils import get_chained_attr
+from .common import check
 from .._core.module import IRModule
 from .._ffi import pass_
 from .._lib import tvm
@@ -13,7 +31,7 @@ from .._lib import tvm
 def get_param(model, name):
     """get parameter from model"""
     if isinstance(name, str):
-        name = name.split('.')
+        name = name.split(".")
     ret = get_chained_attr(model, name)
     if ret is None:
         raise AttributeError(f"No attribute {name}")
@@ -23,7 +41,7 @@ def get_param(model, name):
 def set_param(model, name, value):
     """set the value of a parameter"""
     if isinstance(name, str):
-        name = name.split('.')
+        name = name.split(".")
     assert len(name) > 0
     ins = get_param(model, name[:-1])
     setattr(ins, name[-1], value)
@@ -31,7 +49,7 @@ def set_param(model, name, value):
 
 # TODO: Remove this after all its use cases are migrated to pass manager with proper requirements
 def run_infer_type(expr):
-    """Helper function to infer the type of the given expr """
+    """Helper function to infer the type of the given expr"""
     if isinstance(expr, IRModule):
         return pass_.InferType()(expr)
     mod = IRModule.from_expr(expr)
@@ -67,15 +85,15 @@ def _get_vm_executor(mod, device, opt_level=2, disable_fusion=False, **options):
     """Get VM executor"""
     # pylint: disable=protected-access
     options.setdefault("stream_schedule_policy", "sequential")
+    options.setdefault("anf_only", False)
     options.setdefault("sch_file", None)
     options.setdefault("pass_seq", None)
-    options.setdefault("reuse_storage", False)
 
     config = {
         "mnm.stream_schedule.policy": options["stream_schedule_policy"],
-        "mnm.memory_plan.reuse_storage": options["reuse_storage"],
+        "mnm.vm.optimize.anf_only": options["anf_only"],
     }
-    pass_seq = options['pass_seq']
+    pass_seq = options["pass_seq"]
     disabled_pass = []
     if disable_fusion:
         disabled_pass += ["FuseDialect", "FuseTVM"]
@@ -90,14 +108,15 @@ def _get_vm_executor(mod, device, opt_level=2, disable_fusion=False, **options):
 def get_vm_executor(mod, device, opt_level=2, disable_fusion=False, **options):
     """Get VM executor"""
     executor = _get_vm_executor(mod, device, opt_level, disable_fusion, **options)
-    return executor.make_executor(sch_file=options.get('sch_file', None))
+    return executor.make_executor(sch_file=options.get("sch_file", None))
 
 
-def get_vm_profiler(mod, device, opt_level=2, disable_fusion=False, warmup=5, number=10, repeat=10,
-                    **options):
+def get_vm_profiler(
+    mod, device, opt_level=2, disable_fusion=False, warmup=5, number=10, repeat=10, **options
+):
     """Get VM Profiler"""
     executor = _get_vm_executor(mod, device, opt_level, disable_fusion, **options)
-    return executor.make_profiler(warmup, number, repeat, sch_file=options.get('sch_file', None))
+    return executor.make_profiler(warmup, number, repeat, sch_file=options.get("sch_file", None))
 
 
 def run_vm_model(model, device, args, opt_level=2, disable_fusion=False, **options):
@@ -111,8 +130,17 @@ def run_vm_model(model, device, args, opt_level=2, disable_fusion=False, **optio
     return out
 
 
-def profile_vm_model(model, device, args, opt_level=2, disable_fusion=False, warmup=5, number=10,
-                     repeat=10, **options):
+def profile_vm_model(
+    model,
+    device,
+    args,
+    opt_level=2,
+    disable_fusion=False,
+    warmup=5,
+    number=10,
+    repeat=10,
+    **options,
+):
     """Helper function to profile model executed by VM"""
     args, kwargs = ([], args) if isinstance(args, dict) else (args, {})
     record = model._internal(*args, **kwargs)
@@ -136,4 +164,27 @@ def lower_vm_model(model, target_name, args):
     compiler = VMCompiler()
     mod, _ = compiler.optimize(mod, target_name)
     # TODO (janimesh) - Revisit where the output is used
-    return mod['main']
+    return mod["main"]
+
+
+def run_model(model, args, device, check_result=True):
+    """Helper function to run the model using both interpreter and VM, and check if their
+    results are the same. Note that some ops (e.g., reduce, send/recv) may only produce
+    valid results at the target device. In this case, check_result should be skipped on
+    other devices.
+    """
+    out1 = model(*args)
+    ret = out1
+    out2 = run_vm_model(model, device, args)
+    if check_result:
+        if not isinstance(out1, (tuple, tvm.ir.container.Array, mnm._core.value.TupleValue)):
+            out1 = [out1]
+            out2 = [out2]
+        for o1, o2 in zip(out1, out2):
+            try:
+                check(o1, o2)
+            except AssertionError as e:
+                raise AssertionError(
+                    "Inconsistent results between interpreter and VM at %s" % device
+                ) from e
+    return ret

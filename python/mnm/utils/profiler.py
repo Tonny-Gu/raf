@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 """Runtime profiler"""
 import json
 from mnm import build
@@ -17,8 +34,7 @@ def start(prof_level=1):
 
 
 def stop():
-    """Disable the profiler in backend and stop to profile the execution from now.
-    """
+    """Disable the profiler in backend and stop to profile the execution from now."""
     DisableProfiler()
 
 
@@ -31,7 +47,7 @@ def dump(filename="profile.json"):
         The location to store the profiling results.
         Default lcoation is "profile.json" in the current folder.
     """
-    with open(filename, "w") as f: # pylint: disable=invalid-name
+    with open(filename, "w") as f:  # pylint: disable=invalid-name
         json.dump(get(), f, indent=4)
 
 
@@ -77,13 +93,13 @@ def get_duration(data, event, category=None):
     """
     start_time_stamp = None
     end_time_stamp = None
-    for e in data['traceEvents']:
-        if (not category or e['cat'] == category) and e['name'] == event and e['ph'] == 'B':
-            assert start_time_stamp is None, 'Multiple events with the same event name'
-            start_time_stamp = int(e['ts'])
-        if (not category or e['cat'] == category) and e['name'] == event and e['ph'] == 'E':
-            assert end_time_stamp is None, 'Multiple events with the same event name'
-            end_time_stamp = int(e['ts'])
+    for e in data["traceEvents"]:
+        if (not category or e["cat"] == category) and e["name"] == event and e["ph"] == "B":
+            assert start_time_stamp is None, "Multiple events with the same event name"
+            start_time_stamp = int(e["ts"])
+        if (not category or e["cat"] == category) and e["name"] == event and e["ph"] == "E":
+            assert end_time_stamp is None, "Multiple events with the same event name"
+            end_time_stamp = int(e["ts"])
     if start_time_stamp is None or end_time_stamp is None:
         raise ValueError(f"The start or end time stamp of event {event} does not exist")
     return float((end_time_stamp - start_time_stamp) / 1000.0)

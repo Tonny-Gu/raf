@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2021 by Contributors
  * \file nn.h
  * \brief Extra TVM attributes for nn operators
  */
@@ -143,9 +161,9 @@ struct Conv2dTransposeDxwAttrs : public tvm::AttrsNode<Conv2dTransposeDxwAttrs> 
             "dimensions respectively. Convolution is applied on the 'H' and"
             "'W' dimensions.");
     TVM_ATTR_FIELD(kernel_layout)
-        .set_default("OIHW")
+        .set_default("IOHW")
         .describe(
-            "Dimension ordering of weight. Can be 'OIHW', 'OIHW16o16i', etc."
+            "Dimension ordering of weight. Can be 'IOHW', 'IOHW16o16i', etc."
             "'O', 'I', 'H', 'W' stands for num_filter, input_channel, height, and width"
             "dimensions respectively.");
     TVM_ATTR_FIELD(out_layout)
@@ -221,10 +239,10 @@ struct ThresholdAttrs : public tvm::AttrsNode<ThresholdAttrs> {
 };
 
 /*! \brief Attributes used in threshold_dx operator */
-struct ThresholdDxAttr : public tvm::AttrsNode<ThresholdDxAttr> {
+struct ThresholdDxAttrs : public tvm::AttrsNode<ThresholdDxAttrs> {
   double threshold;
 
-  TVM_DECLARE_ATTRS(ThresholdDxAttr, "relay.attrs.ThresholdDxAttr") {
+  TVM_DECLARE_ATTRS(ThresholdDxAttrs, "relay.attrs.ThresholdDxAttrs") {
     TVM_ATTR_FIELD(threshold).set_default(0.0).describe("The value to threshold at");
   }
 };

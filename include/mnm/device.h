@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2021 by Contributors
  * \file device.h
  * \brief Definition of device related data structure.
  */
@@ -34,7 +52,7 @@ class DevType final : public EnumBase<DevType, 13, int32_t, int> {
   ENUM_DEF_ENTRY_WITH_NAME(DevType, 0, kUnknown, 0, "???");
   ENUM_DEF_ENTRY_WITH_NAME(DevType, 1, kCPU, (int)kDLCPU, "cpu");
   ENUM_DEF_ENTRY_WITH_NAME(DevType, 2, kCUDA, (int)kDLCUDA, "cuda");
-  ENUM_DEF_ENTRY_WITH_NAME(DevType, 3, kCPUPinned, (int)kDLCUDAHost, "cpupinned");
+  ENUM_DEF_ENTRY_WITH_NAME(DevType, 3, kCUDAHost, (int)kDLCUDAHost, "cuda_host");
   ENUM_DEF_ENTRY_WITH_NAME(DevType, 4, kOpenCL, (int)kDLOpenCL, "opencl");
   ENUM_DEF_ENTRY_WITH_NAME(DevType, 5, kAOCL, (int)kDLAOCL, "aocl");
   ENUM_DEF_ENTRY_WITH_NAME(DevType, 6, kSDAccel, (int)kDLSDAccel, "sdaccel");

@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2020 by Contributors
  * Auto generated. Do not touch.
  * \file src/op/regs/regs.cc
  * \brief Register op schemas.
@@ -106,6 +124,7 @@ static const char cross_entropy[] = "mnm.op.cross_entropy";
 static const char cross_entropy_dpred[] = "mnm.op.cross_entropy_dpred";
 static const char cross_entropy_dtrue[] = "mnm.op.cross_entropy_dtrue";
 static const char cumsum[] = "mnm.op.cumsum";
+static const char defuse_tensor[] = "mnm.op.defuse_tensor";
 static const char dense[] = "mnm.op.dense";
 static const char device_copy[] = "mnm.op.device_copy";
 static const char divide[] = "mnm.op.divide";
@@ -120,6 +139,7 @@ static const char floor[] = "mnm.op.floor";
 static const char floor_divide[] = "mnm.op.floor_divide";
 static const char full[] = "mnm.op.full";
 static const char full_like[] = "mnm.op.full_like";
+static const char fuse_tensor[] = "mnm.op.fuse_tensor";
 static const char gather[] = "mnm.op.gather";
 static const char gather_dx[] = "mnm.op.gather_dx";
 static const char gather_nd[] = "mnm.op.gather_nd";
@@ -132,6 +152,7 @@ static const char get_valid_counts[] = "mnm.op.get_valid_counts";
 static const char greater[] = "mnm.op.greater";
 static const char greater_equal[] = "mnm.op.greater_equal";
 static const char l2norm[] = "mnm.op.l2norm";
+static const char lans[] = "mnm.op.lans";
 static const char layer_norm[] = "mnm.op.layer_norm";
 static const char layer_norm_dx[] = "mnm.op.layer_norm_dx";
 static const char left_shift[] = "mnm.op.left_shift";
@@ -555,11 +576,20 @@ Attrs Cumsum(const TVMArgs& values, GradTape* tapes) {
   return Attrs(attrs);
 }
 
+Attrs DefuseTensor(const TVMArgs& values, GradTape* tapes) {
+  MNM_PRELUDE(schema::DefuseTensorArgs, 4);  // NOLINT(whitespace/line_length)
+  MNM_TAPE(0, ffi2schema::Tensor, data);
+  MNM_POD(1, ffi2schema::IntOrTupleInt, sizes);
+  MNM_POD(2, ffi2schema::IntOrTupleInt, shapes);
+  MNM_POD(3, ffi2schema::IntOrTupleInt, shape_indices);
+  return Attrs(attrs);
+}
+
 Attrs DeviceCopy(const TVMArgs& values, GradTape* tapes) {
   MNM_PRELUDE(schema::DeviceCopyArgs, 3);  // NOLINT(whitespace/line_length)
   MNM_TAPE(0, ffi2schema::Tensor, data);
-  MNM_POD(1, ffi2schema::Int, src_dev_type);
-  MNM_POD(2, ffi2schema::Int, dst_dev_type);
+  MNM_POD(1, ffi2schema::String, src_device);
+  MNM_POD(2, ffi2schema::String, dst_device);
   return Attrs(attrs);
 }
 
@@ -619,7 +649,7 @@ Attrs Free(const TVMArgs& values, GradTape* tapes) {
 Attrs Full(const TVMArgs& values, GradTape* tapes) {
   MNM_PRELUDE(schema::FullArgs, 4);  // NOLINT(whitespace/line_length)
   MNM_POD(0, ffi2schema::Double, fill_value);
-  MNM_POD(1, ffi2schema::IntOrTupleInt, shape);
+  MNM_TAPE(1, ffi2schema::ArrayLike, shape);
   MNM_POD(2, ffi2schema::String, dtype);
   MNM_POD(3, ffi2schema::String, device);
   return Attrs(attrs);
@@ -629,6 +659,12 @@ Attrs FullLike(const TVMArgs& values, GradTape* tapes) {
   MNM_PRELUDE(schema::FullLikeArgs, 2);  // NOLINT(whitespace/line_length)
   MNM_TAPE(0, ffi2schema::Tensor, data);
   MNM_POD(1, ffi2schema::Double, fill_value);
+  return Attrs(attrs);
+}
+
+Attrs FuseTensor(const TVMArgs& values, GradTape* tapes) {
+  MNM_PRELUDE(schema::FuseTensorArgs, 1);  // NOLINT(whitespace/line_length)
+  MNM_POD(0, ffi2schema::TupleTensor, data);
   return Attrs(attrs);
 }
 
@@ -682,7 +718,7 @@ Attrs InferType(const TVMArgs& values, GradTape* tapes) {
 
 Attrs InitOp(const TVMArgs& values, GradTape* tapes) {
   MNM_PRELUDE(schema::InitOpArgs, 3);  // NOLINT(whitespace/line_length)
-  MNM_POD(0, ffi2schema::IntOrTupleInt, shape);
+  MNM_TAPE(0, ffi2schema::ArrayLike, shape);
   MNM_POD(1, ffi2schema::String, dtype);
   MNM_POD(2, ffi2schema::String, device);
   return Attrs(attrs);
@@ -699,6 +735,22 @@ Attrs InvokeOp(const TVMArgs& values, GradTape* tapes) {
 Attrs L2Norm(const TVMArgs& values, GradTape* tapes) {
   MNM_PRELUDE(schema::L2NormArgs, 1);  // NOLINT(whitespace/line_length)
   MNM_TAPE(0, ffi2schema::Tensor, x);
+  return Attrs(attrs);
+}
+
+Attrs Lans(const TVMArgs& values, GradTape* tapes) {
+  MNM_PRELUDE(schema::LansArgs, 11);  // NOLINT(whitespace/line_length)
+  MNM_POD(0, ffi2schema::TupleTensor, tensor_list);
+  MNM_TAPE(1, ffi2schema::Tensor, step);
+  MNM_POD(2, ffi2schema::Double, learning_rate);
+  MNM_POD(3, ffi2schema::Double, beta1);
+  MNM_POD(4, ffi2schema::Double, beta2);
+  MNM_POD(5, ffi2schema::Double, eps);
+  MNM_POD(6, ffi2schema::Int, bias_correction);
+  MNM_POD(7, ffi2schema::Double, weight_decay);
+  MNM_POD(8, ffi2schema::Int, grad_averaging);
+  MNM_POD(9, ffi2schema::Int, mode);
+  MNM_POD(10, ffi2schema::Bool, normalize_grad);
   return Attrs(attrs);
 }
 
@@ -883,7 +935,7 @@ Attrs RepeatDx(const TVMArgs& values, GradTape* tapes) {
 Attrs Reshape(const TVMArgs& values, GradTape* tapes) {
   MNM_PRELUDE(schema::ReshapeArgs, 3);  // NOLINT(whitespace/line_length)
   MNM_TAPE(0, ffi2schema::Tensor, x);
-  MNM_POD(1, ffi2schema::IntOrTupleInt, shape);
+  MNM_TAPE(1, ffi2schema::ArrayLike, shape);
   MNM_POD(2, ffi2schema::Bool, reverse);
   return Attrs(attrs);
 }
@@ -891,7 +943,7 @@ Attrs Reshape(const TVMArgs& values, GradTape* tapes) {
 Attrs Resize2D(const TVMArgs& values, GradTape* tapes) {
   MNM_PRELUDE(schema::Resize2DArgs, 9);  // NOLINT(whitespace/line_length)
   MNM_TAPE(0, ffi2schema::Tensor, x);
-  MNM_POD(1, ffi2schema::IntOrTupleInt, size);
+  MNM_TAPE(1, ffi2schema::ArrayLike, size);
   MNM_POD(2, ffi2schema::String, layout);
   MNM_POD(3, ffi2schema::String, method);
   MNM_POD(4, ffi2schema::String, coordinate_transformation_mode);
@@ -1095,8 +1147,8 @@ Attrs StreamBarrier(const TVMArgs& values, GradTape* tapes) {
 Attrs StridedSlice(const TVMArgs& values, GradTape* tapes) {
   MNM_PRELUDE(schema::StridedSliceArgs, 5);  // NOLINT(whitespace/line_length)
   MNM_TAPE(0, ffi2schema::Tensor, x);
-  MNM_POD(1, ffi2schema::IntOrTupleInt, begin);
-  MNM_POD(2, ffi2schema::IntOrTupleInt, end);
+  MNM_TAPE(1, ffi2schema::ArrayLike, begin);
+  MNM_TAPE(2, ffi2schema::ArrayLike, end);
   MNM_POD(3, ffi2schema::IntOrTupleInt, strides);
   MNM_POD(4, ffi2schema::String, slice_mode);
   return Attrs(attrs);
@@ -1219,7 +1271,7 @@ Attrs ThresholdDx(const TVMArgs& values, GradTape* tapes) {
 Attrs Topk(const TVMArgs& values, GradTape* tapes) {
   MNM_PRELUDE(schema::TopkArgs, 6);  // NOLINT(whitespace/line_length)
   MNM_TAPE(0, ffi2schema::Tensor, data);
-  MNM_POD(1, ffi2schema::Int, k);
+  MNM_TAPE(1, ffi2schema::ArrayLike, k);
   MNM_POD(2, ffi2schema::Int, axis);
   MNM_POD(3, ffi2schema::String, ret_type);
   MNM_POD(4, ffi2schema::Bool, is_ascend);
@@ -1982,6 +2034,17 @@ MNM_REGISTER_GLOBAL("mnm.op.imp.cumsum").set_body([](TVMArgs args, TVMRetValue* 
   *ret = MNM_RET();
 });
 
+MNM_REGISTER_GLOBAL("mnm.op.imp.defuse_tensor").set_body([](TVMArgs args, TVMRetValue* ret) {
+  MNM_PRELUDE(defuse_tensor, 4, ffi2schema::DefuseTensor,
+              schema::DefuseTensorArgs);  // NOLINT(whitespace/line_length)
+  MNM_SET_ENV(vpack->x[0], schema2value::Tensor(schema->data));
+  MNM_SET_ENV(vpack->x[1], schema2value::IntOrTupleInt(schema->sizes));
+  MNM_SET_ENV(vpack->x[2], schema2value::IntOrTupleInt(schema->shapes));
+  MNM_SET_ENV(vpack->x[3], schema2value::IntOrTupleInt(schema->shape_indices));
+  MNM_SET_ENV(vpack->y, value);
+  *ret = MNM_RET();
+});
+
 MNM_REGISTER_GLOBAL("mnm.op.imp.dense").set_body([](TVMArgs args, TVMRetValue* ret) {
   MNM_PRELUDE(dense, 2, ffi2schema::Binary, schema::BinaryArgs);  // NOLINT(whitespace/line_length)
   MNM_SET_ENV(vpack->x[0], schema2value::ArrayLike(schema->x1));
@@ -1994,8 +2057,8 @@ MNM_REGISTER_GLOBAL("mnm.op.imp.device_copy").set_body([](TVMArgs args, TVMRetVa
   MNM_PRELUDE(device_copy, 3, ffi2schema::DeviceCopy,
               schema::DeviceCopyArgs);  // NOLINT(whitespace/line_length)
   MNM_SET_ENV(vpack->x[0], schema2value::Tensor(schema->data));
-  MNM_SET_ENV(vpack->x[1], schema2value::Int(schema->src_dev_type));
-  MNM_SET_ENV(vpack->x[2], schema2value::Int(schema->dst_dev_type));
+  MNM_SET_ENV(vpack->x[1], schema2value::String(schema->src_device));
+  MNM_SET_ENV(vpack->x[2], schema2value::String(schema->dst_device));
   MNM_SET_ENV(vpack->y, value);
   *ret = MNM_RET();
 });
@@ -2088,7 +2151,7 @@ MNM_REGISTER_GLOBAL("mnm.op.imp.floor_divide").set_body([](TVMArgs args, TVMRetV
 MNM_REGISTER_GLOBAL("mnm.op.imp.full").set_body([](TVMArgs args, TVMRetValue* ret) {
   MNM_PRELUDE(full, 4, ffi2schema::Full, schema::FullArgs);  // NOLINT(whitespace/line_length)
   MNM_SET_ENV(vpack->x[0], schema2value::Double(schema->fill_value));
-  MNM_SET_ENV(vpack->x[1], schema2value::IntOrTupleInt(schema->shape));
+  MNM_SET_ENV(vpack->x[1], schema2value::ArrayLike(schema->shape));
   MNM_SET_ENV(vpack->x[2], schema2value::String(schema->dtype));
   MNM_SET_ENV(vpack->x[3], schema2value::String(schema->device));
   MNM_SET_ENV(vpack->y, value);
@@ -2100,6 +2163,14 @@ MNM_REGISTER_GLOBAL("mnm.op.imp.full_like").set_body([](TVMArgs args, TVMRetValu
               schema::FullLikeArgs);  // NOLINT(whitespace/line_length)
   MNM_SET_ENV(vpack->x[0], schema2value::Tensor(schema->data));
   MNM_SET_ENV(vpack->x[1], schema2value::Double(schema->fill_value));
+  MNM_SET_ENV(vpack->y, value);
+  *ret = MNM_RET();
+});
+
+MNM_REGISTER_GLOBAL("mnm.op.imp.fuse_tensor").set_body([](TVMArgs args, TVMRetValue* ret) {
+  MNM_PRELUDE(fuse_tensor, 1, ffi2schema::FuseTensor,
+              schema::FuseTensorArgs);  // NOLINT(whitespace/line_length)
+  MNM_SET_ENV(vpack->x[0], schema2value::TupleTensor(schema->data));
   MNM_SET_ENV(vpack->y, value);
   *ret = MNM_RET();
 });
@@ -2210,6 +2281,23 @@ MNM_REGISTER_GLOBAL("mnm.op.imp.greater_equal").set_body([](TVMArgs args, TVMRet
 MNM_REGISTER_GLOBAL("mnm.op.imp.l2norm").set_body([](TVMArgs args, TVMRetValue* ret) {
   MNM_PRELUDE(l2norm, 1, ffi2schema::L2Norm, schema::L2NormArgs);  // NOLINT(whitespace/line_length)
   MNM_SET_ENV(vpack->x[0], schema2value::Tensor(schema->x));
+  MNM_SET_ENV(vpack->y, value);
+  *ret = MNM_RET();
+});
+
+MNM_REGISTER_GLOBAL("mnm.op.imp.lans").set_body([](TVMArgs args, TVMRetValue* ret) {
+  MNM_PRELUDE(lans, 11, ffi2schema::Lans, schema::LansArgs);  // NOLINT(whitespace/line_length)
+  MNM_SET_ENV(vpack->x[0], schema2value::TupleTensor(schema->tensor_list));
+  MNM_SET_ENV(vpack->x[1], schema2value::Tensor(schema->step));
+  MNM_SET_ENV(vpack->x[2], schema2value::Double(schema->learning_rate));
+  MNM_SET_ENV(vpack->x[3], schema2value::Double(schema->beta1));
+  MNM_SET_ENV(vpack->x[4], schema2value::Double(schema->beta2));
+  MNM_SET_ENV(vpack->x[5], schema2value::Double(schema->eps));
+  MNM_SET_ENV(vpack->x[6], schema2value::Int(schema->bias_correction));
+  MNM_SET_ENV(vpack->x[7], schema2value::Double(schema->weight_decay));
+  MNM_SET_ENV(vpack->x[8], schema2value::Int(schema->grad_averaging));
+  MNM_SET_ENV(vpack->x[9], schema2value::Int(schema->mode));
+  MNM_SET_ENV(vpack->x[10], schema2value::Bool(schema->normalize_grad));
   MNM_SET_ENV(vpack->y, value);
   *ret = MNM_RET();
 });
@@ -2559,7 +2647,7 @@ MNM_REGISTER_GLOBAL("mnm.op.imp.one_hot").set_body([](TVMArgs args, TVMRetValue*
 
 MNM_REGISTER_GLOBAL("mnm.op.imp.ones").set_body([](TVMArgs args, TVMRetValue* ret) {
   MNM_PRELUDE(ones, 3, ffi2schema::InitOp, schema::InitOpArgs);  // NOLINT(whitespace/line_length)
-  MNM_SET_ENV(vpack->x[0], schema2value::IntOrTupleInt(schema->shape));
+  MNM_SET_ENV(vpack->x[0], schema2value::ArrayLike(schema->shape));
   MNM_SET_ENV(vpack->x[1], schema2value::String(schema->dtype));
   MNM_SET_ENV(vpack->x[2], schema2value::String(schema->device));
   MNM_SET_ENV(vpack->y, value);
@@ -2655,7 +2743,7 @@ MNM_REGISTER_GLOBAL("mnm.op.imp.reshape").set_body([](TVMArgs args, TVMRetValue*
   MNM_PRELUDE(reshape, 3, ffi2schema::Reshape,
               schema::ReshapeArgs);  // NOLINT(whitespace/line_length)
   MNM_SET_ENV(vpack->x[0], schema2value::Tensor(schema->x));
-  MNM_SET_ENV(vpack->x[1], schema2value::IntOrTupleInt(schema->shape));
+  MNM_SET_ENV(vpack->x[1], schema2value::ArrayLike(schema->shape));
   MNM_SET_ENV(vpack->x[2], schema2value::Bool(schema->reverse));
   MNM_SET_ENV(vpack->y, value);
   *ret = MNM_RET();
@@ -2665,7 +2753,7 @@ MNM_REGISTER_GLOBAL("mnm.op.imp.resize2d").set_body([](TVMArgs args, TVMRetValue
   MNM_PRELUDE(resize2d, 9, ffi2schema::Resize2D,
               schema::Resize2DArgs);  // NOLINT(whitespace/line_length)
   MNM_SET_ENV(vpack->x[0], schema2value::Tensor(schema->x));
-  MNM_SET_ENV(vpack->x[1], schema2value::IntOrTupleInt(schema->size));
+  MNM_SET_ENV(vpack->x[1], schema2value::ArrayLike(schema->size));
   MNM_SET_ENV(vpack->x[2], schema2value::String(schema->layout));
   MNM_SET_ENV(vpack->x[3], schema2value::String(schema->method));
   MNM_SET_ENV(vpack->x[4], schema2value::String(schema->coordinate_transformation_mode));
@@ -2995,8 +3083,8 @@ MNM_REGISTER_GLOBAL("mnm.op.imp.strided_slice").set_body([](TVMArgs args, TVMRet
   MNM_PRELUDE(strided_slice, 5, ffi2schema::StridedSlice,
               schema::StridedSliceArgs);  // NOLINT(whitespace/line_length)
   MNM_SET_ENV(vpack->x[0], schema2value::Tensor(schema->x));
-  MNM_SET_ENV(vpack->x[1], schema2value::IntOrTupleInt(schema->begin));
-  MNM_SET_ENV(vpack->x[2], schema2value::IntOrTupleInt(schema->end));
+  MNM_SET_ENV(vpack->x[1], schema2value::ArrayLike(schema->begin));
+  MNM_SET_ENV(vpack->x[2], schema2value::ArrayLike(schema->end));
   MNM_SET_ENV(vpack->x[3], schema2value::IntOrTupleInt(schema->strides));
   MNM_SET_ENV(vpack->x[4], schema2value::String(schema->slice_mode));
   MNM_SET_ENV(vpack->y, value);
@@ -3137,7 +3225,7 @@ MNM_REGISTER_GLOBAL("mnm.op.imp.threshold_dx").set_body([](TVMArgs args, TVMRetV
 MNM_REGISTER_GLOBAL("mnm.op.imp.topk").set_body([](TVMArgs args, TVMRetValue* ret) {
   MNM_PRELUDE(topk, 6, ffi2schema::Topk, schema::TopkArgs);  // NOLINT(whitespace/line_length)
   MNM_SET_ENV(vpack->x[0], schema2value::Tensor(schema->data));
-  MNM_SET_ENV(vpack->x[1], schema2value::Int(schema->k));
+  MNM_SET_ENV(vpack->x[1], schema2value::ArrayLike(schema->k));
   MNM_SET_ENV(vpack->x[2], schema2value::Int(schema->axis));
   MNM_SET_ENV(vpack->x[3], schema2value::String(schema->ret_type));
   MNM_SET_ENV(vpack->x[4], schema2value::Bool(schema->is_ascend));
@@ -3259,7 +3347,7 @@ MNM_REGISTER_GLOBAL("mnm.op.imp.where").set_body([](TVMArgs args, TVMRetValue* r
 
 MNM_REGISTER_GLOBAL("mnm.op.imp.zeros").set_body([](TVMArgs args, TVMRetValue* ret) {
   MNM_PRELUDE(zeros, 3, ffi2schema::InitOp, schema::InitOpArgs);  // NOLINT(whitespace/line_length)
-  MNM_SET_ENV(vpack->x[0], schema2value::IntOrTupleInt(schema->shape));
+  MNM_SET_ENV(vpack->x[0], schema2value::ArrayLike(schema->shape));
   MNM_SET_ENV(vpack->x[1], schema2value::String(schema->dtype));
   MNM_SET_ENV(vpack->x[2], schema2value::String(schema->device));
   MNM_SET_ENV(vpack->y, value);
@@ -3587,11 +3675,20 @@ Array<Expr> Cumsum(const TVMArgs& values) {
   MNM_RET();
 }
 
+Array<Expr> DefuseTensor(const TVMArgs& values) {
+  MNM_PRELUDE(4);
+  MNM_ARG(0, ffi2expr::Tensor, data);
+  MNM_ARG(1, ffi2expr::IntOrTupleInt, sizes);
+  MNM_ARG(2, ffi2expr::IntOrTupleInt, shapes);
+  MNM_ARG(3, ffi2expr::IntOrTupleInt, shape_indices);
+  MNM_RET();
+}
+
 Array<Expr> DeviceCopy(const TVMArgs& values) {
   MNM_PRELUDE(3);
   MNM_ARG(0, ffi2expr::Tensor, data);
-  MNM_ARG(1, ffi2expr::Int, src_dev_type);
-  MNM_ARG(2, ffi2expr::Int, dst_dev_type);
+  MNM_ARG(1, ffi2expr::String, src_device);
+  MNM_ARG(2, ffi2expr::String, dst_device);
   MNM_RET();
 }
 
@@ -3651,7 +3748,7 @@ Array<Expr> Free(const TVMArgs& values) {
 Array<Expr> Full(const TVMArgs& values) {
   MNM_PRELUDE(4);
   MNM_ARG(0, ffi2expr::Double, fill_value);
-  MNM_ARG(1, ffi2expr::IntOrTupleInt, shape);
+  MNM_ARG(1, ffi2expr::ArrayLike, shape);
   MNM_ARG(2, ffi2expr::String, dtype);
   MNM_ARG(3, ffi2expr::String, device);
   MNM_RET();
@@ -3661,6 +3758,12 @@ Array<Expr> FullLike(const TVMArgs& values) {
   MNM_PRELUDE(2);
   MNM_ARG(0, ffi2expr::Tensor, data);
   MNM_ARG(1, ffi2expr::Double, fill_value);
+  MNM_RET();
+}
+
+Array<Expr> FuseTensor(const TVMArgs& values) {
+  MNM_PRELUDE(1);
+  MNM_ARG(0, ffi2expr::TupleTensor, data);
   MNM_RET();
 }
 
@@ -3714,7 +3817,7 @@ Array<Expr> InferType(const TVMArgs& values) {
 
 Array<Expr> InitOp(const TVMArgs& values) {
   MNM_PRELUDE(3);
-  MNM_ARG(0, ffi2expr::IntOrTupleInt, shape);
+  MNM_ARG(0, ffi2expr::ArrayLike, shape);
   MNM_ARG(1, ffi2expr::String, dtype);
   MNM_ARG(2, ffi2expr::String, device);
   MNM_RET();
@@ -3731,6 +3834,22 @@ Array<Expr> InvokeOp(const TVMArgs& values) {
 Array<Expr> L2Norm(const TVMArgs& values) {
   MNM_PRELUDE(1);
   MNM_ARG(0, ffi2expr::Tensor, x);
+  MNM_RET();
+}
+
+Array<Expr> Lans(const TVMArgs& values) {
+  MNM_PRELUDE(11);
+  MNM_ARG(0, ffi2expr::TupleTensor, tensor_list);
+  MNM_ARG(1, ffi2expr::Tensor, step);
+  MNM_ARG(2, ffi2expr::Double, learning_rate);
+  MNM_ARG(3, ffi2expr::Double, beta1);
+  MNM_ARG(4, ffi2expr::Double, beta2);
+  MNM_ARG(5, ffi2expr::Double, eps);
+  MNM_ARG(6, ffi2expr::Int, bias_correction);
+  MNM_ARG(7, ffi2expr::Double, weight_decay);
+  MNM_ARG(8, ffi2expr::Int, grad_averaging);
+  MNM_ARG(9, ffi2expr::Int, mode);
+  MNM_ARG(10, ffi2expr::Bool, normalize_grad);
   MNM_RET();
 }
 
@@ -3915,7 +4034,7 @@ Array<Expr> RepeatDx(const TVMArgs& values) {
 Array<Expr> Reshape(const TVMArgs& values) {
   MNM_PRELUDE(3);
   MNM_ARG(0, ffi2expr::Tensor, x);
-  MNM_ARG(1, ffi2expr::IntOrTupleInt, shape);
+  MNM_ARG(1, ffi2expr::ArrayLike, shape);
   MNM_ARG(2, ffi2expr::Bool, reverse);
   MNM_RET();
 }
@@ -3923,7 +4042,7 @@ Array<Expr> Reshape(const TVMArgs& values) {
 Array<Expr> Resize2D(const TVMArgs& values) {
   MNM_PRELUDE(9);
   MNM_ARG(0, ffi2expr::Tensor, x);
-  MNM_ARG(1, ffi2expr::IntOrTupleInt, size);
+  MNM_ARG(1, ffi2expr::ArrayLike, size);
   MNM_ARG(2, ffi2expr::String, layout);
   MNM_ARG(3, ffi2expr::String, method);
   MNM_ARG(4, ffi2expr::String, coordinate_transformation_mode);
@@ -4127,8 +4246,8 @@ Array<Expr> StreamBarrier(const TVMArgs& values) {
 Array<Expr> StridedSlice(const TVMArgs& values) {
   MNM_PRELUDE(5);
   MNM_ARG(0, ffi2expr::Tensor, x);
-  MNM_ARG(1, ffi2expr::IntOrTupleInt, begin);
-  MNM_ARG(2, ffi2expr::IntOrTupleInt, end);
+  MNM_ARG(1, ffi2expr::ArrayLike, begin);
+  MNM_ARG(2, ffi2expr::ArrayLike, end);
   MNM_ARG(3, ffi2expr::IntOrTupleInt, strides);
   MNM_ARG(4, ffi2expr::String, slice_mode);
   MNM_RET();
@@ -4251,7 +4370,7 @@ Array<Expr> ThresholdDx(const TVMArgs& values) {
 Array<Expr> Topk(const TVMArgs& values) {
   MNM_PRELUDE(6);
   MNM_ARG(0, ffi2expr::Tensor, data);
-  MNM_ARG(1, ffi2expr::Int, k);
+  MNM_ARG(1, ffi2expr::ArrayLike, k);
   MNM_ARG(2, ffi2expr::Int, axis);
   MNM_ARG(3, ffi2expr::String, ret_type);
   MNM_ARG(4, ffi2expr::Bool, is_ascend);
@@ -4421,6 +4540,8 @@ MNM_REGISTER_GLOBAL("mnm.op.sym.cross_entropy_dpred")
 MNM_REGISTER_GLOBAL("mnm.op.sym.cross_entropy_dtrue")
     .set_body(MNM_SYMBOLIC_API(cross_entropy_dtrue, 2, Loss));
 MNM_REGISTER_GLOBAL("mnm.op.sym.cumsum").set_body(MNM_SYMBOLIC_API(cumsum, 4, Cumsum));
+MNM_REGISTER_GLOBAL("mnm.op.sym.defuse_tensor")
+    .set_body(MNM_SYMBOLIC_API(defuse_tensor, 4, DefuseTensor));
 MNM_REGISTER_GLOBAL("mnm.op.sym.dense").set_body(MNM_SYMBOLIC_API(dense, 2, Binary));
 MNM_REGISTER_GLOBAL("mnm.op.sym.device_copy")
     .set_body(MNM_SYMBOLIC_API(device_copy, 3, DeviceCopy));
@@ -4438,6 +4559,8 @@ MNM_REGISTER_GLOBAL("mnm.op.sym.floor").set_body(MNM_SYMBOLIC_API(floor, 1, Unar
 MNM_REGISTER_GLOBAL("mnm.op.sym.floor_divide").set_body(MNM_SYMBOLIC_API(floor_divide, 2, Binary));
 MNM_REGISTER_GLOBAL("mnm.op.sym.full").set_body(MNM_SYMBOLIC_API(full, 4, Full));
 MNM_REGISTER_GLOBAL("mnm.op.sym.full_like").set_body(MNM_SYMBOLIC_API(full_like, 2, FullLike));
+MNM_REGISTER_GLOBAL("mnm.op.sym.fuse_tensor")
+    .set_body(MNM_SYMBOLIC_API(fuse_tensor, 1, FuseTensor));
 MNM_REGISTER_GLOBAL("mnm.op.sym.gather").set_body(MNM_SYMBOLIC_API(gather, 3, Gather));
 MNM_REGISTER_GLOBAL("mnm.op.sym.gather_dx").set_body(MNM_SYMBOLIC_API(gather_dx, 4, GatherDx));
 MNM_REGISTER_GLOBAL("mnm.op.sym.gather_nd").set_body(MNM_SYMBOLIC_API(gather_nd, 2, GatherNd));
@@ -4455,6 +4578,7 @@ MNM_REGISTER_GLOBAL("mnm.op.sym.greater").set_body(MNM_SYMBOLIC_API(greater, 2, 
 MNM_REGISTER_GLOBAL("mnm.op.sym.greater_equal")
     .set_body(MNM_SYMBOLIC_API(greater_equal, 2, Binary));
 MNM_REGISTER_GLOBAL("mnm.op.sym.l2norm").set_body(MNM_SYMBOLIC_API(l2norm, 1, L2Norm));
+MNM_REGISTER_GLOBAL("mnm.op.sym.lans").set_body(MNM_SYMBOLIC_API(lans, 11, Lans));
 MNM_REGISTER_GLOBAL("mnm.op.sym.layer_norm").set_body(MNM_SYMBOLIC_API(layer_norm, 5, LayerNorm));
 MNM_REGISTER_GLOBAL("mnm.op.sym.layer_norm_dx")
     .set_body(MNM_SYMBOLIC_API(layer_norm_dx, 5, LayerNormDx));
@@ -4953,11 +5077,21 @@ Attrs Cumsum(const Array<Value>& values) {
 }
 
 template <const char* op_name>
+Attrs DefuseTensor(const Array<Value>& values) {
+  MNM_PRELUDE(4, 4, schema::DefuseTensorArgs);
+  MNM_REQUIRED(0, value2schema::Tensor, data);
+  MNM_REQUIRED(1, value2schema::IntOrTupleInt, sizes);
+  MNM_REQUIRED(2, value2schema::IntOrTupleInt, shapes);
+  MNM_REQUIRED(3, value2schema::IntOrTupleInt, shape_indices);
+  return Attrs(attrs);
+}
+
+template <const char* op_name>
 Attrs DeviceCopy(const Array<Value>& values) {
   MNM_PRELUDE(1, 3, schema::DeviceCopyArgs);
   MNM_REQUIRED(0, value2schema::Tensor, data);
-  MNM_OPTIONAL(1, value2schema::Int, src_dev_type);
-  MNM_OPTIONAL(2, value2schema::Int, dst_dev_type);
+  MNM_OPTIONAL(1, value2schema::String, src_device);
+  MNM_OPTIONAL(2, value2schema::String, dst_device);
   return Attrs(attrs);
 }
 
@@ -5025,7 +5159,7 @@ template <const char* op_name>
 Attrs Full(const Array<Value>& values) {
   MNM_PRELUDE(2, 4, schema::FullArgs);
   MNM_REQUIRED(0, value2schema::Double, fill_value);
-  MNM_REQUIRED(1, value2schema::IntOrTupleInt, shape);
+  MNM_REQUIRED(1, value2schema::ArrayLike, shape);
   MNM_OPTIONAL(2, value2schema::String, dtype);
   MNM_OPTIONAL(3, value2schema::String, device);
   return Attrs(attrs);
@@ -5036,6 +5170,13 @@ Attrs FullLike(const Array<Value>& values) {
   MNM_PRELUDE(2, 2, schema::FullLikeArgs);
   MNM_REQUIRED(0, value2schema::Tensor, data);
   MNM_REQUIRED(1, value2schema::Double, fill_value);
+  return Attrs(attrs);
+}
+
+template <const char* op_name>
+Attrs FuseTensor(const Array<Value>& values) {
+  MNM_PRELUDE(1, 1, schema::FuseTensorArgs);
+  MNM_REQUIRED(0, value2schema::TupleTensor, data);
   return Attrs(attrs);
 }
 
@@ -5096,7 +5237,7 @@ Attrs InferType(const Array<Value>& values) {
 template <const char* op_name>
 Attrs InitOp(const Array<Value>& values) {
   MNM_PRELUDE(1, 3, schema::InitOpArgs);
-  MNM_REQUIRED(0, value2schema::IntOrTupleInt, shape);
+  MNM_REQUIRED(0, value2schema::ArrayLike, shape);
   MNM_OPTIONAL(1, value2schema::String, dtype);
   MNM_OPTIONAL(2, value2schema::String, device);
   return Attrs(attrs);
@@ -5115,6 +5256,23 @@ template <const char* op_name>
 Attrs L2Norm(const Array<Value>& values) {
   MNM_PRELUDE(1, 1, schema::L2NormArgs);
   MNM_REQUIRED(0, value2schema::Tensor, x);
+  return Attrs(attrs);
+}
+
+template <const char* op_name>
+Attrs Lans(const Array<Value>& values) {
+  MNM_PRELUDE(11, 11, schema::LansArgs);
+  MNM_REQUIRED(0, value2schema::TupleTensor, tensor_list);
+  MNM_REQUIRED(1, value2schema::Tensor, step);
+  MNM_REQUIRED(2, value2schema::Double, learning_rate);
+  MNM_REQUIRED(3, value2schema::Double, beta1);
+  MNM_REQUIRED(4, value2schema::Double, beta2);
+  MNM_REQUIRED(5, value2schema::Double, eps);
+  MNM_REQUIRED(6, value2schema::Int, bias_correction);
+  MNM_REQUIRED(7, value2schema::Double, weight_decay);
+  MNM_REQUIRED(8, value2schema::Int, grad_averaging);
+  MNM_REQUIRED(9, value2schema::Int, mode);
+  MNM_REQUIRED(10, value2schema::Bool, normalize_grad);
   return Attrs(attrs);
 }
 
@@ -5318,7 +5476,7 @@ template <const char* op_name>
 Attrs Reshape(const Array<Value>& values) {
   MNM_PRELUDE(2, 3, schema::ReshapeArgs);
   MNM_REQUIRED(0, value2schema::Tensor, x);
-  MNM_REQUIRED(1, value2schema::IntOrTupleInt, shape);
+  MNM_REQUIRED(1, value2schema::ArrayLike, shape);
   MNM_OPTIONAL(2, value2schema::Bool, reverse);
   return Attrs(attrs);
 }
@@ -5327,7 +5485,7 @@ template <const char* op_name>
 Attrs Resize2D(const Array<Value>& values) {
   MNM_PRELUDE(2, 9, schema::Resize2DArgs);
   MNM_REQUIRED(0, value2schema::Tensor, x);
-  MNM_REQUIRED(1, value2schema::IntOrTupleInt, size);
+  MNM_REQUIRED(1, value2schema::ArrayLike, size);
   MNM_OPTIONAL(2, value2schema::String, layout);
   MNM_OPTIONAL(3, value2schema::String, method);
   MNM_OPTIONAL(4, value2schema::String, coordinate_transformation_mode);
@@ -5554,8 +5712,8 @@ template <const char* op_name>
 Attrs StridedSlice(const Array<Value>& values) {
   MNM_PRELUDE(3, 5, schema::StridedSliceArgs);
   MNM_REQUIRED(0, value2schema::Tensor, x);
-  MNM_REQUIRED(1, value2schema::IntOrTupleInt, begin);
-  MNM_REQUIRED(2, value2schema::IntOrTupleInt, end);
+  MNM_REQUIRED(1, value2schema::ArrayLike, begin);
+  MNM_REQUIRED(2, value2schema::ArrayLike, end);
   MNM_OPTIONAL(3, value2schema::IntOrTupleInt, strides);
   MNM_OPTIONAL(4, value2schema::String, slice_mode);
   return Attrs(attrs);
@@ -5690,9 +5848,9 @@ Attrs ThresholdDx(const Array<Value>& values) {
 
 template <const char* op_name>
 Attrs Topk(const Array<Value>& values) {
-  MNM_PRELUDE(1, 6, schema::TopkArgs);
+  MNM_PRELUDE(2, 6, schema::TopkArgs);
   MNM_REQUIRED(0, value2schema::Tensor, data);
-  MNM_OPTIONAL(1, value2schema::Int, k);
+  MNM_REQUIRED(1, value2schema::ArrayLike, k);
   MNM_OPTIONAL(2, value2schema::Int, axis);
   MNM_OPTIONAL(3, value2schema::String, ret_type);
   MNM_OPTIONAL(4, value2schema::Bool, is_ascend);
@@ -6328,14 +6486,32 @@ int Cumsum(const std::string& field) {
 }
 
 template <const char* op_name>
+int DefuseTensor(const std::string& field) {
+  if (field == "data") {
+    return 0;
+  }
+  if (field == "sizes") {
+    return 1;
+  }
+  if (field == "shapes") {
+    return 2;
+  }
+  if (field == "shape_indices") {
+    return 3;
+  }
+  LOG(WARNING) << "Cannot find " << field << " in the schema of op " << op_name;
+  return -1;
+}
+
+template <const char* op_name>
 int DeviceCopy(const std::string& field) {
   if (field == "data") {
     return 0;
   }
-  if (field == "src_dev_type") {
+  if (field == "src_device") {
     return 1;
   }
-  if (field == "dst_dev_type") {
+  if (field == "dst_device") {
     return 2;
   }
   LOG(WARNING) << "Cannot find " << field << " in the schema of op " << op_name;
@@ -6469,6 +6645,15 @@ int FullLike(const std::string& field) {
 }
 
 template <const char* op_name>
+int FuseTensor(const std::string& field) {
+  if (field == "data") {
+    return 0;
+  }
+  LOG(WARNING) << "Cannot find " << field << " in the schema of op " << op_name;
+  return -1;
+}
+
+template <const char* op_name>
 int Gather(const std::string& field) {
   if (field == "data") {
     return 0;
@@ -6592,6 +6777,45 @@ template <const char* op_name>
 int L2Norm(const std::string& field) {
   if (field == "x") {
     return 0;
+  }
+  LOG(WARNING) << "Cannot find " << field << " in the schema of op " << op_name;
+  return -1;
+}
+
+template <const char* op_name>
+int Lans(const std::string& field) {
+  if (field == "tensor_list") {
+    return 0;
+  }
+  if (field == "step") {
+    return 1;
+  }
+  if (field == "learning_rate") {
+    return 2;
+  }
+  if (field == "beta1") {
+    return 3;
+  }
+  if (field == "beta2") {
+    return 4;
+  }
+  if (field == "eps") {
+    return 5;
+  }
+  if (field == "bias_correction") {
+    return 6;
+  }
+  if (field == "weight_decay") {
+    return 7;
+  }
+  if (field == "grad_averaging") {
+    return 8;
+  }
+  if (field == "mode") {
+    return 9;
+  }
+  if (field == "normalize_grad") {
+    return 10;
   }
   LOG(WARNING) << "Cannot find " << field << " in the schema of op " << op_name;
   return -1;
@@ -8002,6 +8226,10 @@ MNM_BIND_SCHEMA("mnm.op.cumsum", names::cumsum,
                 value2schema::Cumsum);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op.cumsum", names::cumsum,
                             schema_field_idx::Cumsum);  // NOLINT(whitespace/line_length)
+MNM_BIND_SCHEMA("mnm.op.defuse_tensor", names::defuse_tensor,
+                value2schema::DefuseTensor);  // NOLINT(whitespace/line_length)
+MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op.defuse_tensor", names::defuse_tensor,
+                            schema_field_idx::DefuseTensor);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA("mnm.op.dense", names::dense,
                 value2schema::Binary);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op.dense", names::dense,
@@ -8055,6 +8283,10 @@ MNM_BIND_SCHEMA("mnm.op.full_like", names::full_like,
                 value2schema::FullLike);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op.full_like", names::full_like,
                             schema_field_idx::FullLike);  // NOLINT(whitespace/line_length)
+MNM_BIND_SCHEMA("mnm.op.fuse_tensor", names::fuse_tensor,
+                value2schema::FuseTensor);  // NOLINT(whitespace/line_length)
+MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op.fuse_tensor", names::fuse_tensor,
+                            schema_field_idx::FuseTensor);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA("mnm.op.gather", names::gather,
                 value2schema::Gather);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op.gather", names::gather,
@@ -8101,7 +8333,10 @@ MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op.greater_equal", names::greater_equal,
 MNM_BIND_SCHEMA("mnm.op.l2norm", names::l2norm,
                 value2schema::L2Norm);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op.l2norm", names::l2norm,
-                            schema_field_idx::L2Norm);  // NOLINT(whitespace/line_length)
+                            schema_field_idx::L2Norm);            // NOLINT(whitespace/line_length)
+MNM_BIND_SCHEMA("mnm.op.lans", names::lans, value2schema::Lans);  // NOLINT(whitespace/line_length)
+MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op.lans", names::lans,
+                            schema_field_idx::Lans);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA("mnm.op.layer_norm", names::layer_norm,
                 value2schema::LayerNorm);  // NOLINT(whitespace/line_length)
 MNM_BIND_SCHEMA_FIELD_INDEX("mnm.op.layer_norm", names::layer_norm,
@@ -8568,6 +8803,7 @@ MNM_REGISTER_OBJECT_REFLECT(ConvDxwArgs);
 MNM_REGISTER_OBJECT_REFLECT(ConvTransArgs);
 MNM_REGISTER_OBJECT_REFLECT(ConvTransposeDxwArgs);
 MNM_REGISTER_OBJECT_REFLECT(CumsumArgs);
+MNM_REGISTER_OBJECT_REFLECT(DefuseTensorArgs);
 MNM_REGISTER_OBJECT_REFLECT(DeviceCopyArgs);
 MNM_REGISTER_OBJECT_REFLECT(DropoutArgs);
 MNM_REGISTER_OBJECT_REFLECT(DropoutDxArgs);
@@ -8578,6 +8814,7 @@ MNM_REGISTER_OBJECT_REFLECT(ExpandDimsArgs);
 MNM_REGISTER_OBJECT_REFLECT(FreeArgs);
 MNM_REGISTER_OBJECT_REFLECT(FullArgs);
 MNM_REGISTER_OBJECT_REFLECT(FullLikeArgs);
+MNM_REGISTER_OBJECT_REFLECT(FuseTensorArgs);
 MNM_REGISTER_OBJECT_REFLECT(GatherArgs);
 MNM_REGISTER_OBJECT_REFLECT(GatherDxArgs);
 MNM_REGISTER_OBJECT_REFLECT(GatherNdArgs);
@@ -8587,6 +8824,7 @@ MNM_REGISTER_OBJECT_REFLECT(InferTypeArgs);
 MNM_REGISTER_OBJECT_REFLECT(InitOpArgs);
 MNM_REGISTER_OBJECT_REFLECT(InvokeOpArgs);
 MNM_REGISTER_OBJECT_REFLECT(L2NormArgs);
+MNM_REGISTER_OBJECT_REFLECT(LansArgs);
 MNM_REGISTER_OBJECT_REFLECT(LayerNormArgs);
 MNM_REGISTER_OBJECT_REFLECT(LayerNormDxArgs);
 MNM_REGISTER_OBJECT_REFLECT(LocalResponseNormArgs);

@@ -1,9 +1,26 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # pylint: disable=attribute-defined-outside-init,no-self-use,protected-access
 import pytest
 import numpy as np
 
 import mnm
-from mnm.testing import randn, get_device_list, check, run_vm_model
+from mnm.testing import randn, get_testable_devices, check, run_vm_model
 from mnm._core.ndarray import ndarray
 from mnm._core.core_utils import get_chained_attr
 from mnm._op import sym
@@ -11,7 +28,7 @@ from mnm.model.trace import trace_mutate_attr
 from tvm import relay
 
 
-@pytest.mark.parametrize("device", get_device_list())
+@pytest.mark.parametrize("device", get_testable_devices())
 def test_tup_inputs(device):
     class MNMTupleTest(mnm.Model):
         def build(self):
@@ -48,43 +65,56 @@ class BatchNorm(mnm.Model):
 
     def reset(self):
         n_f = self.num_features
-        self.running_mean = ndarray(np.zeros(n_f, dtype="float32"),
-                                    name="running_mean",
-                                    device=get_chained_attr(self, ["running_mean", "device"],
-                                                            "cpu"))
-        self.running_var = ndarray(np.ones(n_f, dtype="float32"),
-                                   name="running_var",
-                                   device=get_chained_attr(self, ["running_var", "device"], "cpu"))
+        self.running_mean = ndarray(
+            np.zeros(n_f, dtype="float32"),
+            name="running_mean",
+            device=get_chained_attr(self, ["running_mean", "device"], "cpu"),
+        )
+        self.running_var = ndarray(
+            np.ones(n_f, dtype="float32"),
+            name="running_var",
+            device=get_chained_attr(self, ["running_var", "device"], "cpu"),
+        )
         if self.affine:
-            self.w = ndarray(np.ones(n_f, dtype="float32"),
-                             name="w", device=get_chained_attr(self, ["w", "device"], "cpu"))
-            self.b = ndarray(np.zeros(n_f, dtype="float32"),
-                             name="b", device=get_chained_attr(self, ["b", "device"], "cpu"))
+            self.w = ndarray(
+                np.ones(n_f, dtype="float32"),
+                name="w",
+                device=get_chained_attr(self, ["w", "device"], "cpu"),
+            )
+            self.b = ndarray(
+                np.zeros(n_f, dtype="float32"),
+                name="b",
+                device=get_chained_attr(self, ["b", "device"], "cpu"),
+            )
 
     # pylint: enable=attribute-defined-outside-init
 
     @mnm.model.trace
     def forward(self, x):
-        ret = sym.batch_norm_train(x=x,
-                                   w=self.w,
-                                   b=self.b,
-                                   running_mean=self.running_mean,
-                                   running_var=self.running_var,
-                                   eps=self.eps,
-                                   momentum=self.momentum)
+        ret = sym.batch_norm_train(
+            x=x,
+            w=self.w,
+            b=self.b,
+            running_mean=self.running_mean,
+            running_var=self.running_var,
+            eps=self.eps,
+            momentum=self.momentum,
+        )
         trace_mutate_attr(self, "running_mean", ret[1])
         trace_mutate_attr(self, "running_var", ret[2])
         return ret[0]
 
     @mnm.model.trace
     def forward_infer(self, x):
-        ret = sym.batch_norm_infer(x=x,
-                                   w=self.w,
-                                   b=self.b,
-                                   running_mean=self.running_mean,
-                                   running_var=self.running_var,
-                                   eps=self.eps,
-                                   momentum=self.momentum)
+        ret = sym.batch_norm_infer(
+            x=x,
+            w=self.w,
+            b=self.b,
+            running_mean=self.running_mean,
+            running_var=self.running_var,
+            eps=self.eps,
+            momentum=self.momentum,
+        )
         return ret
 
 
@@ -111,7 +141,7 @@ def test_mutate_bn():
             return x
 
     shape = (2, 3, 4, 5)
-    dtype = 'float32'
+    dtype = "float32"
     data = mnm.array(np.ones(shape), dtype=dtype)
     model = Test(num_features=3)
     mod = model._internal(data).mod

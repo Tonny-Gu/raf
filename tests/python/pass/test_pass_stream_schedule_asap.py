@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # pylint: disable=no-self-use, protected-access, unused-variable, too-many-locals, too-many-statements
 from typing import Dict, List
 import pytest
@@ -10,6 +27,7 @@ from mnm._ffi.pass_ import ToGraphNormalForm, ASAPStreamSchedule
 from mnm._core.ir_ext import extended_var
 from mnm.ir import ScopeBuilder
 
+
 class ANFBuilder:
     def __init__(self):
         self.scope_builder = ScopeBuilder()
@@ -21,10 +39,10 @@ class ANFBuilder:
         return self.operators[op_name]
 
     def make_tuple(self, fields: List[tvm.relay.Expr]) -> tvm.relay.Var:
-        return self.scope_builder.let('', tvm.relay.Tuple(fields))
+        return self.scope_builder.let("", tvm.relay.Tuple(fields))
 
     def call(self, op_name: str, args: List[tvm.relay.Expr]) -> tvm.relay.Var:
-        return self.scope_builder.let('', tvm.relay.Call(self.get_operator(op_name), args))
+        return self.scope_builder.let("", tvm.relay.Call(self.get_operator(op_name), args))
 
     def set_stream(self, device_id: int, stream_id: int) -> tvm.relay.Var:
         return self.call("set_stream", [mnm.ir.const(device_id), mnm.ir.const(stream_id)])
@@ -50,19 +68,19 @@ class ANFBuilder:
 def test_asap_schedule_simple_branches():
     class Model(mnm.Model):
         """
-          ┌───────x──────┐
-          │       │      │
-          ▼       ▼      ▼
-         atan0  atan1  atan2
-          │       │      │
-          │       ▼      ▼
-          │     atan3  atan4
-          │       │      │
-          │       │      ▼
-          └───┐   │    atan5
-              │   │   ┌───
-              ▼   ▼   ▼
-             concatenate
+         ┌───────x──────┐
+         │       │      │
+         ▼       ▼      ▼
+        atan0  atan1  atan2
+         │       │      │
+         │       ▼      ▼
+         │     atan3  atan4
+         │       │      │
+         │       │      ▼
+         └───┐   │    atan5
+             │   │   ┌───
+             ▼   ▼   ▼
+            concatenate
         """
 
         def build(self):
@@ -111,16 +129,16 @@ def test_asap_schedule_simple_branches():
         sb = ANFBuilder()
         x = extended_var("x", shape=input_shape)
         x_0 = sb.set_stream(0, 1)
-        x_1 = sb.atan(x)       # atan 2
-        x_2 = sb.atan(x_1)     # atan 4
-        x_3 = sb.atan(x_2)     # atan 6
+        x_1 = sb.atan(x)  # atan 2
+        x_2 = sb.atan(x_1)  # atan 4
+        x_3 = sb.atan(x_2)  # atan 6
         x_4 = sb.add_event(0)
         x_5 = sb.set_stream(0, 2)
-        x_6 = sb.atan(x)       # atan 1
-        x_7 = sb.atan(x_6)     # atan 3
+        x_6 = sb.atan(x)  # atan 1
+        x_7 = sb.atan(x_6)  # atan 3
         x_8 = sb.add_event(1)
         x_9 = sb.set_stream(0, 3)
-        x_10 = sb.atan(x)      # atan 0
+        x_10 = sb.atan(x)  # atan 0
         x_11 = sb.wait_event(1)
         x_12 = sb.wait_event(0)
         x_13 = sb.make_tuple([x_10, x_7, x_3])
@@ -129,7 +147,7 @@ def test_asap_schedule_simple_branches():
 
     # To draw the dataflow graph with schedule, uncomment the following line:
     # mnm.utils.visualizer.draw_dataflow_graph(mod['main'], 'sb.png', draw_event_nodes=True)
-    assert tvm.ir.structural_equal(mod['main'], expected())
+    assert tvm.ir.structural_equal(mod["main"], expected())
 
 
 @pytest.mark.skipif(not mnm.build.with_cuda(), reason="CUDA is not enabled")
@@ -242,7 +260,7 @@ def test_asap_schedule_branch_in_branch():
         return tvm.relay.Function([x], sb.ret(x_24))
 
     # mnm.utils.visualizer.draw_dataflow_graph(mod['main'], 'bnb.png', draw_event_nodes=True)
-    assert tvm.ir.structural_equal(mod['main'], expected())
+    assert tvm.ir.structural_equal(mod["main"], expected())
 
 
 @pytest.mark.skipif(not mnm.build.with_cuda(), reason="CUDA is not enabled")
@@ -361,8 +379,8 @@ def test_asap_schedule_stacked_blocks():
         return tvm.relay.Function([x], sb.ret(x_27))
 
     # mnm.utils.visualizer.draw_dataflow_graph(mod['main'], 'stack.png', draw_event_nodes=True)
-    assert tvm.ir.structural_equal(mod['main'], expected())
+    assert tvm.ir.structural_equal(mod["main"], expected())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     pytest.main([__file__])

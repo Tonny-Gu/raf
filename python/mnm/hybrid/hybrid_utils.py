@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # pylint: disable=missing-module-docstring,missing-class-docstring,missing-function-docstring
 import ast
 
@@ -5,6 +22,7 @@ from mnm._core.value import IntValue, Value
 from mnm._lib import _get_global_func, relay
 
 _GET_OP = _get_global_func("ir.GetOp")
+
 
 def _wrap_op(name):
     return lambda *args: relay.Call(op=_GET_OP(name), args=args, attrs=None)
@@ -50,19 +68,19 @@ SUPPORTED_OPS = set(py_op for py_op, relay_op in OP_MAKER.items() if relay_op)
 
 
 class NodeVisitor:
-
     def __init__(self, strict=True):
         self.strict = strict
 
     def visit(self, node, *args, **kwargs):
-        method = 'visit_' + node.__class__.__name__
+        method = "visit_" + node.__class__.__name__
         visitor = getattr(self, method, None)
 
         if visitor is None:
             if not self.strict:
                 return self.generic_visit(node, *args, **kwargs)
-            raise NotImplementedError("{} is not supported in {}".format(
-                node.__class__.__name__, self.__class__.__name__))
+            raise NotImplementedError(
+                "{} is not supported in {}".format(node.__class__.__name__, self.__class__.__name__)
+            )
 
         return visitor(node, *args, **kwargs)
 
@@ -79,7 +97,6 @@ class NodeVisitor:
 
 
 class NodeTransformer(NodeVisitor):
-
     def generic_visit(self, node, *args, **kwargs):
         for field, old_value in ast.iter_fields(node):
             if isinstance(old_value, list):

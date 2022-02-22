@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # pylint: disable=no-self-use,invalid-name, protected-access, too-many-locals, too-many-branches
 """Test collective communication operators in a cluster with 2 GPUs.
 As pytest do not support mpirun, thus we skip this test in pytest progress.
@@ -5,34 +22,17 @@ To test collective_communication, you should run:
 `mpirun -np 2 python3 tests/python/distributed/test_collective_communication.py`
 (in ci/tash_python_unittest.sh)
 """
+import sys
 import pytest
 import numpy as np
 
 import mnm
-import tvm
 from mnm import distributed as dist
 from mnm._core.ndarray import Symbol
-from mnm.testing import check, get_dist_info, skip_dist_test, run_vm_model
+from mnm.testing import check, get_dist_info, skip_dist_test, run_vm_model, run_model
 
 dctx = dist.get_context()
 SKIP_REASON = "Distribution is not enabled or #rank is not expected"
-
-def run_model(model, args, device, check_result=True):
-    """Helper function to run the model using both interpreter and VM, and check if their
-    results are the same. Note that some ops (e.g., reduce, send/recv) may only produce
-    valid results at the target device. In this case, check_result should be skipped on
-    other devices.
-    """
-    out1 = model(*args)
-    ret = out1
-    out2 = run_vm_model(model, device, args)
-    if check_result:
-        if not isinstance(out1, (tuple, tvm.ir.container.Array, mnm._core.value.TupleValue)):
-            out1 = [out1]
-            out2 = [out2]
-        for o1, o2 in zip(out1, out2):
-            assert check(o1, o2), "Inconsistent results between interpreter and VM at %s" % device
-    return ret
 
 
 @pytest.mark.skipif(skip_dist_test(min_rank_num=2), reason=SKIP_REASON)
@@ -49,6 +49,7 @@ def test_allreduce_with_tensor(dtype, computation):
         def forward(self, x):
             x = mnm.allreduce(x, computation=computation)
             return x
+
     if computation == "avg" and mnm.build.with_nccl() < 21000:
         pytest.skip("avg is not supported in NCCL < 2.10")
 
@@ -61,7 +62,7 @@ def test_allreduce_with_tensor(dtype, computation):
         print(f"{rank} - X: ", x)
     model.to(device=device)
     y = model(x)
-    vx = np.ones(shape=(4, 4), dtype="float32") * (rank+1)
+    vx = np.ones(shape=(4, 4), dtype="float32") * (rank + 1)
     vx = mnm.array(vx, device=device)
     run_vm_model(model, device, [vx])
     check(y, vx)
@@ -94,7 +95,7 @@ def test_allreduce_with_tensor_list(computation):
         def build(self):
             pass
 
-        @ mnm.model.trace
+        @mnm.model.trace
         def forward(self, x1, x2):
             x = mnm.allreduce([x1, x2], computation=computation)
             a = x[0]
@@ -115,8 +116,8 @@ def test_allreduce_with_tensor_list(computation):
         print(f"{rank} - X: ", [x1, x2])
     model.to(device=device)
     y = model(x1, x2)
-    vx1 = np.ones(shape=(4, 4), dtype="float32") * (rank+1)
-    vx2 = np.ones(shape=(4, 4), dtype="float32") * (-rank-1)
+    vx1 = np.ones(shape=(4, 4), dtype="float32") * (rank + 1)
+    vx2 = np.ones(shape=(4, 4), dtype="float32") * (-rank - 1)
     vx1 = mnm.array(vx1, device=device)
     vx2 = mnm.array(vx2, device=device)
     run_vm_model(model, device, [vx1, vx2])
@@ -124,19 +125,25 @@ def test_allreduce_with_tensor_list(computation):
     if rank == 0:
         ones = np.ones(shape=(4, 4), dtype="float32")
         if computation == "sum":
-            target_y = np.concatenate([ones * sum(range(1, total_rank + 1)),
-                                       ones * -sum(range(1, total_rank + 1))])
+            target_y = np.concatenate(
+                [ones * sum(range(1, total_rank + 1)), ones * -sum(range(1, total_rank + 1))]
+            )
         elif computation == "prod":
             sign = 1 if total_rank % 2 == 0 else -1
-            target_y = np.concatenate([ones * np.prod(range(1, total_rank + 1)),
-                                       ones * sign * np.prod(range(1, total_rank + 1))])
+            target_y = np.concatenate(
+                [
+                    ones * np.prod(range(1, total_rank + 1)),
+                    ones * sign * np.prod(range(1, total_rank + 1)),
+                ]
+            )
         elif computation == "min":
             target_y = np.concatenate([ones, ones * -total_rank])
         elif computation == "max":
             target_y = np.concatenate([ones * total_rank, ones * -1])
         elif computation == "avg":
-            target_y = np.concatenate([ones * sum(range(1, total_rank + 1)),
-                                       ones * -sum(range(1, total_rank + 1))])
+            target_y = np.concatenate(
+                [ones * sum(range(1, total_rank + 1)), ones * -sum(range(1, total_rank + 1))]
+            )
             target_y = target_y / total_rank
         else:
             assert False, "Invalid computation"
@@ -192,8 +199,8 @@ def test_allgather_with_tensor_list(axis):
     model = TestModel()
     total_rank, rank, local_rank = get_dist_info(verbose=True)
     device = f"cuda({local_rank})"
-    x1 = np.ones(shape=(4, 4), dtype="float32") * (rank+1)
-    x2 = np.ones(shape=(4, 4), dtype="float32") * (-rank-1)
+    x1 = np.ones(shape=(4, 4), dtype="float32") * (rank + 1)
+    x2 = np.ones(shape=(4, 4), dtype="float32") * (-rank - 1)
     x1 = mnm.array(x1, device=device)
     x2 = mnm.array(x2, device=device)
     if rank == 0:
@@ -211,7 +218,7 @@ def test_allgather_with_tensor_list(axis):
         check(y, target_y)
 
 
-@pytest.mark.skipif(skip_dist_test(min_rank_num=2), reason=SKIP_REASON)
+@pytest.mark.skipif(skip_dist_test(min_rank_num=2, require_exact_rank=True), reason=SKIP_REASON)
 @pytest.mark.parametrize("computation", ["sum", "prod", "min", "max"])
 def test_reduce_scatter(computation):
     class TestModel(mnm.Model):
@@ -255,7 +262,7 @@ def test_reduce_scatter(computation):
         if computation == "sum":
             n_out = -n_ones * sum(range(1, total_rank + 1))
         elif computation == "prod":
-            n_out = -n_ones * np.prod(range(1, total_rank + 1))
+            n_out = n_ones * np.prod(range(1, total_rank + 1))
         elif computation == "min":
             n_out = -n_ones * max(1, total_rank)
         elif computation == "max":
@@ -266,8 +273,7 @@ def test_reduce_scatter(computation):
         check(m_out, n_out)
 
 
-@pytest.mark.skipif(skip_dist_test(min_rank_num=2, require_exact_rank=True),
-                    reason=SKIP_REASON)
+@pytest.mark.skipif(skip_dist_test(min_rank_num=2, require_exact_rank=True), reason=SKIP_REASON)
 def test_send_recv():
     shape = [2, 2]
     dtype = "float32"
@@ -300,14 +306,14 @@ def test_send_recv():
     device = f"cuda({local_rank})"
     model = TestModel_0() if rank == 0 else TestModel_1()
     n_ones = np.ones(shape=shape, dtype=dtype)
-    n_x = n_ones * (rank+1)
+    n_x = n_ones * (rank + 1)
     m_x = mnm.array(n_x, device=device)
     model.to(device=device)
-    m_out = run_model(model, [m_x], device, check_result=bool(rank > 0))
-    m_out = m_out[0]
-    if rank > 0:
-        n_out = n_ones * 3
-        check(m_out, n_out)
+    out1 = model(m_x)
+    out2 = run_vm_model(model, device, [m_x])
+    check(out1[0], out2[0])  # NOTE: out[1] is not set by NCCLSend currently
+    n_out = n_ones * 3
+    check(out1[0], n_out)
 
 
 @pytest.mark.skipif(skip_dist_test(min_rank_num=2), reason=SKIP_REASON)
@@ -337,8 +343,7 @@ def test_reduce(computation):
     y = model(x)
     vx = np.ones(shape=(4, 4), dtype="float32") * (rank + 1)
     vx = mnm.array(vx, device=device)
-    run_vm_model(model, device, [vx])
-    check(y, vx)
+    vy = run_vm_model(model, device, [vx])
     if rank == 0:
         ones = np.ones(shape=(4, 4), dtype="float32")
         if computation == "sum":
@@ -357,6 +362,7 @@ def test_reduce(computation):
         print(f"{rank} - Y: ", y)
         print(f"{rank} - T: ", target_y)
         check(y, target_y)
+        check(y, vy)
 
 
 @pytest.mark.skipif(skip_dist_test(min_rank_num=2), reason=SKIP_REASON)
@@ -380,12 +386,12 @@ def test_reduce_list(computation):
     model = TestModel()
     total_rank, rank, local_rank = get_dist_info(verbose=True)
     device = f"cuda({local_rank})"
-    x1 = np.ones(shape=(4, 4), dtype="float32") * (rank+1)
-    x2 = np.ones(shape=(4, 4), dtype="float32") * (-rank-1)
+    x1 = np.ones(shape=(4, 4), dtype="float32") * (rank + 1)
+    x2 = np.ones(shape=(4, 4), dtype="float32") * (-rank - 1)
     x1 = mnm.array(x1, device=device)
     x2 = mnm.array(x2, device=device)
-    vx1 = np.ones(shape=(4, 4), dtype="float32") * (rank+1)
-    vx2 = np.ones(shape=(4, 4), dtype="float32") * (-rank-1)
+    vx1 = np.ones(shape=(4, 4), dtype="float32") * (rank + 1)
+    vx2 = np.ones(shape=(4, 4), dtype="float32") * (-rank - 1)
     vx1 = mnm.array(vx1, device=device)
     vx2 = mnm.array(vx2, device=device)
     run_vm_model(model, device, [vx1, vx2])
@@ -396,19 +402,25 @@ def test_reduce_list(computation):
     if rank == 0:
         ones = np.ones(shape=(4, 4), dtype="float32")
         if computation == "sum":
-            target_y = np.concatenate([ones * sum(range(1, total_rank + 1)),
-                                       ones * -sum(range(1, total_rank + 1))])
+            target_y = np.concatenate(
+                [ones * sum(range(1, total_rank + 1)), ones * -sum(range(1, total_rank + 1))]
+            )
         elif computation == "prod":
             sign = 1 if total_rank % 2 == 0 else -1
-            target_y = np.concatenate([ones * np.prod(range(1, total_rank + 1)),
-                                       ones * sign * np.prod(range(1, total_rank + 1))])
+            target_y = np.concatenate(
+                [
+                    ones * np.prod(range(1, total_rank + 1)),
+                    ones * sign * np.prod(range(1, total_rank + 1)),
+                ]
+            )
         elif computation == "min":
             target_y = np.concatenate([ones, ones * -total_rank])
         elif computation == "max":
             target_y = np.concatenate([ones * total_rank, ones * -1])
         elif computation == "avg":
-            target_y = np.concatenate([ones * sum(range(1, total_rank + 1)),
-                                       ones * -sum(range(1, total_rank + 1))])
+            target_y = np.concatenate(
+                [ones * sum(range(1, total_rank + 1)), ones * -sum(range(1, total_rank + 1))]
+            )
             target_y = target_y / total_rank
         else:
             assert False, "Invalid computation"
@@ -436,7 +448,7 @@ def test_broadcast():
     model = TestModel(root=0)
     _, rank, local_rank = get_dist_info(verbose=True)
     device = f"cuda({local_rank})"
-    x = np.ones(shape=(4, 4), dtype="float32") * (rank+1)
+    x = np.ones(shape=(4, 4), dtype="float32") * (rank + 1)
     x = mnm.array(x, device=device)
     print(f"{rank} - X: ", x)
     model.to(device=device)
@@ -449,5 +461,6 @@ def test_broadcast():
 
 
 if __name__ == "__main__":
-    pytest.main([__file__])
+    exit_code = pytest.main([__file__])
     dist.RemoveCommunicator()
+    sys.exit(exit_code)

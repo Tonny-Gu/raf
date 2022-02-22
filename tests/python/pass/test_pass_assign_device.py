@@ -1,3 +1,19 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 
 # pylint: disable=unused-import, attribute-defined-outside-init, protected-access
 # pylint: disable=missing-module-docstring, missing-function-docstring, no-self-use
@@ -22,11 +38,14 @@ def verify_device(m_model, args=None):
 
 
 @pytest.mark.skipif(not mnm.build.with_cuda(), reason="CUDA is not enabled")
-@pytest.mark.parametrize("op_n_args", [
-    (mnm._op.sym.zeros, {"shape": (3, 2), "dtype": "float32", "device": "cpu"}),
-    (mnm._op.sym.ones, {"shape": (3, 2), "dtype": "float32", "device": "cpu"}),
-    (mnm._op.sym.full, {"fill_value": 0, "shape": (3, 2), "dtype": "float32", "device": "cpu"}),
-])
+@pytest.mark.parametrize(
+    "op_n_args",
+    [
+        (mnm._op.sym.zeros, {"shape": (3, 2), "dtype": "float32", "device": "cpu"}),
+        (mnm._op.sym.ones, {"shape": (3, 2), "dtype": "float32", "device": "cpu"}),
+        (mnm._op.sym.full, {"fill_value": 0, "shape": (3, 2), "dtype": "float32", "device": "cpu"}),
+    ],
+)
 def test_init_ops(op_n_args):
     class Model(mnm.Model):
         def build(self, op_n_args):
@@ -49,8 +68,9 @@ def test_one_hot():
 
         @mnm.model.trace
         def forward(self, indices, on_value, off_value):
-            return mnm.one_hot(indices, on_value, off_value, depth=self.depth,
-                               dtype=self.dtype, device=self.device)
+            return mnm.one_hot(
+                indices, on_value, off_value, depth=self.depth, dtype=self.dtype, device=self.device
+            )
 
     m_indices, _ = randint(shape=(1, 2, 3), high=10, device="cpu")
     m_on_value = mnm.array(1.0, device="cpu")

@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 from . import def_schema
 from .codegen_utils import Op
 
@@ -114,6 +131,7 @@ OPS = [
     Op(name="get_reduce_axis", schema_name="binary"),
     Op(name="get_kept_dims", schema_name="binary"),
     Op(name="sgd", schema_name="sgd"),
+    Op(name="lans", schema_name="lans"),
     Op(name="shape", schema_name="unary"),
     Op(name="swap_axis", schema_name="swap_axis"),
     Op(name="take", schema_name="take"),
@@ -152,6 +170,8 @@ OPS = [
     Op(name="_contrib_dropout_dx", schema_name="dropout_dx"),
     Op(name="non_max_suppression", schema_name="non_max_suppression"),
     Op(name="stream_sync", schema_name="stream"),
+    Op(name="fuse_tensor", schema_name="fuse_tensor"),
+    Op(name="defuse_tensor", schema_name="defuse_tensor"),
     Op(name="cast", schema_name="cast"),
     Op(name="cast_like", schema_name="cast_like"),
     Op(name="gather", schema_name="gather"),
@@ -209,6 +229,7 @@ OPS = [
     Op(name="numel", schema_name="unary"),
     Op(name="shape_as_tensor", schema_name="unary"),
 ]
+
 
 def by_name():
     result = dict()

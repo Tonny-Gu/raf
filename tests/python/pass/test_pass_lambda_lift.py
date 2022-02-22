@@ -1,15 +1,30 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 import pytest
 import tvm
 import mnm
-from mnm.testing import randn, get_device_list
+from mnm.testing import randn, get_testable_devices
 from mnm._ffi.pass_ import AutoDiff, LambdaLift, FromRelay, LiftBranchBody, InferType
 from tvm import relay
 
-@pytest.mark.parametrize("device", get_device_list())
-@pytest.mark.parametrize("shape", [
-    [3, 3],
-    [4, 4]
-])
+
+@pytest.mark.parametrize("device", get_testable_devices())
+@pytest.mark.parametrize("shape", [[3, 3], [4, 4]])
 def test_basic(device, shape):
     # pylint: disable=protected-access
     # Create a symbolic model and run it
@@ -37,6 +52,7 @@ def test_basic(device, shape):
     lifted_mod = LambdaLift()(mod)
 
     assert len(lifted_mod.functions) == 2
+
 
 def test_while_loop():
     """
@@ -82,7 +98,7 @@ def test_while_loop():
         let = relay.Let(loop, func, loop)
 
         body = relay.Call(let, [relay.const(0, ti32), y])
-        mod['main'] = relay.Function([y], body)
+        mod["main"] = relay.Function([y], body)
         return mod
 
     tvm_mod = get_recursive_mod()
@@ -91,7 +107,7 @@ def test_while_loop():
     try:
         mod = LiftBranchBody()(mod)
         assert False, "LiftBranchBody pass should have failed"
-    except: # pylint: disable=bare-except
+    except:  # pylint: disable=bare-except
         mod = LambdaLift()(mod)
         mod = LiftBranchBody()(mod)
     assert len(mod.get_global_vars()) == 4

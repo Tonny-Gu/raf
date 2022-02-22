@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2019 by Contributors
  * \file pass.h
  * \brief A compatibility layer for TVM/Relay passes
  */
@@ -10,6 +28,7 @@
 #include "tvm/relay/dataflow_matcher.h"
 #include "tvm/relay/transform.h"
 #include "mnm/ir.h"
+#include "mnm/value.h"
 #include "mnm/ir_ext.h"
 #include "mnm/pass_manager.h"
 #include "mnm/sharding.h"
@@ -151,6 +170,12 @@ Pass AutoCast();
  * \return The created pass.
  */
 Pass Rematerialization();
+
+/*!
+ * \brief A pass that schedules ANF for memory optimization.
+ * \return The created pass.
+ */
+Pass MemorySchedule();
 
 /*!
  * \brief A pass that inlines the Let stmt that assigns a var to another and TupleGetItem that can
@@ -353,7 +378,14 @@ Pass DataParallelSchedule();
  * ensure correctness. This pass must be run if AutoDataParallel is enabled.
  * \return The created pass.
  */
-Pass AnnotateDistOps();
+Pass EnforceSync();
+
+/*!
+ * \brief This pass works in ANF and adds neccessary memory copy ops before and after
+ * multi-input collectives ops to pipeline memory copies.
+ * \return The created pass.
+ */
+Pass AnnotateCollectiveOps();
 
 /*!
  * \brief This pass implements IOS (Inter-Operator-Scheduler) stream schedule policy. It transforms
@@ -385,6 +417,18 @@ Pass AnnotateDistOps();
  */
 Pass IOSStreamSchedule();
 
+/*!
+ * \brief Deduplicate a GNF IR (merge the same patterns into function calls).
+ * \param forward_steps The additional num of steps to search.
+ * \param consider_type Whether considering the type information.
+ * \param must_dominate Whether the root node of a subgraph must dominate other nodes in the
+ * subgraph.
+ * \param salt An optional hash salt.
+ * \return The created pass.
+ */
+Pass Deduplicate(int forward_steps, bool consider_type, bool must_dominate,
+                 ir::Optional<ir::String> salt);
+
 // Helper functions
 
 /*!
@@ -400,8 +444,15 @@ ir::Expr BindParam(ir::Function func, ir::Array<ir::Expr> args);
  * \param expr The expression.
  * \return The expression with checked types.
  */
-
 ir::Expr InferType(ir::Expr expr);
+
+/*!
+ * \brief Infer the type of a given func by using values.
+ * \param expr The func.
+ * \param value The values.
+ * \return The func with checked types.
+ */
+ir::Expr InferTypeWithValues(const ir::Expr& func, const ir::Array<value::Value>& values);
 
 /*!
  * \brief Infer the type of a given expression and IR module.

@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # pylint: disable=missing-class-docstring,missing-function-docstring
 """Operator definition for TOPI (TVM Operator Inventory)."""
 import sys
@@ -39,7 +56,11 @@ OP_MAP = {
     "mnm.op.tvm.gather_nd": ["gather_nd", "", "kInjective"],
     "mnm.op.tvm.greater": ["greater", "", "kBroadcast"],
     "mnm.op.tvm.greater_equal": ["greater_equal", "", "kBroadcast"],
-    "mnm.op.tvm.layout_transform": ["layout_transform", "relay.attrs.LayoutTransformAttrs", "kInjective"],
+    "mnm.op.tvm.layout_transform": [
+        "layout_transform",
+        "relay.attrs.LayoutTransformAttrs",
+        "kInjective",
+    ],
     "mnm.op.tvm.left_shift": ["left_shift", "", "kBroadcast"],
     "mnm.op.tvm.less": ["less", "", "kBroadcast"],
     "mnm.op.tvm.less_equal": ["less_equal", "", "kBroadcast"],
@@ -72,7 +93,11 @@ OP_MAP = {
     "mnm.op.tvm.rsqrt": ["rsqrt", "", "kElemWise"],
     "mnm.op.tvm.reshape": ["reshape", "relay.attrs.ReshapeAttrs", "kInjective"],
     "mnm.op.tvm.sequence_mask": ["sequence_mask", "relay.attrs.SequenceMaskAttrs", "kInjective"],
-    "mnm.op.tvm.reverse_sequence": ["reverse_sequence", "relay.attrs.ReverseSequenceAttrs", "kInjective"],
+    "mnm.op.tvm.reverse_sequence": [
+        "reverse_sequence",
+        "relay.attrs.ReverseSequenceAttrs",
+        "kInjective",
+    ],
     "mnm.op.tvm.scatter": ["scatter", "relay.attrs.ScstterAttrs", "kOpaque"],
     "mnm.op.tvm.sigmoid": ["sigmoid", "", "kElemWise"],
     "mnm.op.tvm.sign": ["sign", "", "kElemWise"],
@@ -90,7 +115,11 @@ OP_MAP = {
     "mnm.op.tvm.topk": ["topk", "relay.attrs.TopkAttrs", "kOpaque"],
     "mnm.op.tvm.transpose": ["transpose", "relay.attrs.TransposeAttrs", "kInjective"],
     "mnm.op.tvm.trunc": ["trunc", "", "kElemWise"],
-    "mnm.op.tvm.threefry_generate": ["random.threefry_generate", "relay.attrs.ThreefryGenerateAttrs", "kOpaque"],
+    "mnm.op.tvm.threefry_generate": [
+        "random.threefry_generate",
+        "relay.attrs.ThreefryGenerateAttrs",
+        "kOpaque",
+    ],
     "mnm.op.tvm.threefry_split": ["random.threefry_split", "", "kOpaque"],
     "mnm.op.tvm.variance": ["variance", "relay.attrs.ReduceAttrs", "kCommReduce"],
     "mnm.op.tvm.where": ["where", "", "kBroadcast"],
@@ -105,11 +134,23 @@ OP_MAP = {
     "mnm.op.tvm.max_pool2d": ["nn.max_pool2d", "", "kOpaque"],
     "mnm.op.tvm.max_pool2d_dx": ["nn.max_pool2d_grad", "relay.attrs.MaxPool2DAttrs", "kOpaque"],
     "mnm.op.tvm.adaptive_avg_pool2d": ["nn.adaptive_avg_pool2d", "", "kOpaque"],
-    "mnm.op.tvm.adaptive_avg_pool2d_dx": ["nn.avg_pool2d_grad", "relay.attrs.MaxPool2DAttrs", "kOpaque"],
+    "mnm.op.tvm.adaptive_avg_pool2d_dx": [
+        "nn.avg_pool2d_grad",
+        "relay.attrs.MaxPool2DAttrs",
+        "kOpaque",
+    ],
     "mnm.op.tvm.adaptive_max_pool2d": ["nn.adaptive_max_pool2d", "", "kOpaque"],
-    "mnm.op.tvm.adaptive_max_pool2d_dx": ["nn.max_pool2d_grad", "relay.attrs.MaxPool2DAttrs", "kOpaque"],
+    "mnm.op.tvm.adaptive_max_pool2d_dx": [
+        "nn.max_pool2d_grad",
+        "relay.attrs.MaxPool2DAttrs",
+        "kOpaque",
+    ],
     "mnm.op.tvm.get_valid_counts": ["get_valid_counts", "", "kInjective"],
-    "mnm.op.tvm.non_max_suppression": ["non_max_suppression", "relay.attrs.NonMaxSuppressionAttrs", "kInjective"],
+    "mnm.op.tvm.non_max_suppression": [
+        "non_max_suppression",
+        "relay.attrs.NonMaxSuppressionAttrs",
+        "kInjective",
+    ],
     "mnm.op.tvm.batch_flatten": ["nn.batch_flatten", "", "kInjective"],
     "mnm.op.tvm.device_copy": ["device_copy", "relay.attrs.DeviceCopyAttrs", "kOpaque"],
     "mnm.op.tvm.roi_align": ["vision.roi_align", "relay.attrs.ROIAlignAttrs", "kOutEWiseFusable"],
@@ -193,11 +234,7 @@ def collect_op():
         if pattern is None:
             skip_reasons.append("No-TOpPattern")
         if skip_reasons:
-            print("[Skip]",
-                  op_name,
-                  ":",
-                  ", ".join(skip_reasons),
-                  file=sys.stderr)
+            print("[Skip]", op_name, ":", ", ".join(skip_reasons), file=sys.stderr)
             continue
         if not attrs:
             attrs = ""

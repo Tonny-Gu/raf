@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2019 by Contributors
  * \file profiler.h
  * \brief profiler
  */
@@ -227,8 +245,6 @@ class Profiler {
   std::recursive_mutex m_;
   /*! \brief The helper pool. */
   std::vector<ProfilerHelper> helpers_;
-  /*! \brief Initial time for profiler. */
-  uint64_t init_time_;
 };
 
 inline void ProfilerHelper::start() {
@@ -248,6 +264,32 @@ inline void ProfilerHelper::stop() {
 inline void ProfilerHelper::collect() {
   Profiler::Get()->AddNewProfileStat(categories_, name_, start_time_, end_time_, args);
 }
+
+/*!
+ * \brief A helper class and macro to profile the execution time of a scope (e.g., function).
+ * This is used for debugging purpose. For example:
+ * void some_func() {
+ *   MNM_TIMED("some_func")
+ *   // do something;
+ * }
+ * The profiled time is then the life time of the created TimeSection object, and will be
+ * logged to stderr.
+ */
+class TimedSection {
+ public:
+  explicit TimedSection(std::string name) : name_(name), start_(ProfileStat::NowInMicrosec()) {
+  }
+
+  ~TimedSection() {
+    uint64_t now = ProfileStat::NowInMicrosec();
+    LOG(WARNING) << "Timed " << name_ << ": " << (now - start_) << " ms";
+  }
+
+ private:
+  std::string name_;
+  uint64_t start_;
+};
+#define MNM_TIMED(name) mnm::profiler::TimedSection timed_section(name);
 
 }  // namespace profiler
 }  // namespace mnm

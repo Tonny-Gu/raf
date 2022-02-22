@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # pylint: disable=too-many-locals,too-many-arguments,protected-access,attribute-defined-outside-init
 # pylint: disable=no-self-use,no-member
 import random
@@ -25,6 +42,7 @@ def test_mnm_conv2d(xshape, wshape, stride, dilation, padding, dtype):
     class TestModel(mnm.Model):
         def build(self):
             pass
+
         @mnm.model.trace
         def forward(self, x, w):
             return mnm.conv2d(x, w, stride=stride, padding=padding, dilation=dilation, groups=1)
@@ -47,26 +65,32 @@ def test_mnm_conv2d(xshape, wshape, stride, dilation, padding, dtype):
     check(m_x.grad, t_x.grad, rtol=rtol, atol=atol)
     check(m_w.grad, t_w.grad, rtol=rtol, atol=atol)
 
+
 @with_dialect(["cudnn", "tvm"])
 @pytest.mark.skipif(not mnm.build.with_cuda(), reason="CUDA is not enabled")
-@pytest.mark.parametrize("shape", [
-    [],
-    [3],
-    [3, 2, 5, 8, 4, 7],
-])
+@pytest.mark.parametrize(
+    "shape",
+    [
+        [],
+        [3],
+        [3, 2, 5, 8, 4, 7],
+    ],
+)
 @pytest.mark.parametrize(
     "funcs",
     [
         [mnm._op.sym.relu, torch.relu],
         [mnm._op.sym.tanh, torch.tanh],
         [mnm._op.sym.sigmoid, torch.sigmoid],
-    ])
+    ],
+)
 def test_mnm_unary(shape, funcs):
     mnm_fwd, torch_fwd = funcs
 
     class TestModel(mnm.Model):
         def build(self):
             pass
+
         @mnm.model.trace
         def forward(self, x):
             return mnm_fwd(x)
@@ -88,23 +112,28 @@ def test_mnm_unary(shape, funcs):
 
 @with_dialect(["cudnn", "tvm"])
 @pytest.mark.skipif(not mnm.build.with_cuda(), reason="CUDA is not enabled")
-@pytest.mark.parametrize("shape", [
-    [3],
-    [3, 2, 5, 8, 4, 7],
-])
+@pytest.mark.parametrize(
+    "shape",
+    [
+        [3],
+        [3, 2, 5, 8, 4, 7],
+    ],
+)
 @pytest.mark.parametrize("axis", range(-8, 8))
 @pytest.mark.parametrize(
     "funcs",
     [
         [mnm._op.sym.softmax, torch.softmax],
         [mnm._op.sym.log_softmax, torch.log_softmax],
-    ])
+    ],
+)
 def test_mnm_softmax(shape, axis, funcs):
     mnm_fwd, torch_fwd = funcs
 
     class TestModel(mnm.Model):
         def build(self):
             pass
+
         @mnm.model.trace
         def forward(self, x):
             return mnm_fwd(x, axis=axis)
@@ -138,7 +167,8 @@ def test_mnm_softmax(shape, axis, funcs):
     [
         [mnm._op.sym.max_pool2d, torch.nn.functional.max_pool2d],
         [mnm._op.sym.avg_pool2d, torch.nn.functional.avg_pool2d],
-    ])
+    ],
+)
 def test_mnm_pool2d(kernel, stride, padding, funcs):
     mnm_fwd, torch_fwd = funcs
     if padding > kernel // 2:
@@ -147,6 +177,7 @@ def test_mnm_pool2d(kernel, stride, padding, funcs):
     class TestModel(mnm.Model):
         def build(self):
             pass
+
         @mnm.model.trace
         def forward(self, x):
             return mnm_fwd(x, kernel=kernel, stride=stride, padding=padding)
@@ -184,6 +215,7 @@ def test_mnm_batch_norm_infer(shape, momentum, eps, dtype):
     class TestModel(mnm.Model):
         def build(self):
             pass
+
         @mnm.model.trace
         def forward(self, m_x, m_m, m_v, m_w, m_b):
             return mnm.batch_norm_infer(m_x, m_m, m_v, m_w, m_b, momentum, eps)
@@ -191,8 +223,7 @@ def test_mnm_batch_norm_infer(shape, momentum, eps, dtype):
     model = TestModel()
     m_y = model(m_x, m_m, m_v, m_w, m_b)
     v_y = run_vm_model(model, "cuda", [m_x, m_m, m_v, m_w, m_b])
-    t_y = torch.nn.functional.batch_norm(t_x, t_m, t_v, t_w, t_b, False,
-                                         momentum, eps)
+    t_y = torch.nn.functional.batch_norm(t_x, t_m, t_v, t_w, t_b, False, momentum, eps)
     check(m_y, t_y, rtol=1e-4, atol=1e-4)
     check(v_y, t_y, rtol=1e-4, atol=1e-4)
 
@@ -217,6 +248,7 @@ def test_mnm_batch_norm_train(shape, momentum, eps, dtype):
     class TestModel(mnm.Model):
         def build(self):
             pass
+
         @mnm.model.trace
         def forward(self, m_x, m_m, m_v, m_w, m_b):
             result = mnm.batch_norm_train(m_x, m_m, m_v, m_w, m_b, momentum, eps)
@@ -266,8 +298,9 @@ def test_mnm_dropout(dropout):
     class TestModel(mnm.Model):
         def build(self):
             self.dropout = dropout
-            self.dropout_state = ndarray.from_tensor_value(mnm._ffi.backend.cudnn.GetDropoutState(
-                dropout, random.getrandbits(63))).to(device="cuda")
+            self.dropout_state = ndarray.from_tensor_value(
+                mnm._ffi.backend.cudnn.GetDropoutState(dropout, random.getrandbits(63))
+            ).to(device="cuda")
 
         @mnm.model.trace
         def forward(self, x):

@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # pylint: disable=missing-module-docstring,missing-class-docstring,missing-function-docstring
 import ast
 import inspect
@@ -78,16 +95,16 @@ def pyfunc2relay(pyfunc, entry: relay.GlobalVar):
     mem = dict(inspect.getmembers(pyfunc))
     # getting AST
     node = ast.parse(inspect.getsource(pyfunc))
-    ast.increment_lineno(node, mem['__code__'].co_firstlineno - 1)
+    ast.increment_lineno(node, mem["__code__"].co_firstlineno - 1)
     # AST -> IR builder
     node = sanity_check(node)
-    invoker_name = find_invoker_name(mem['__globals__'])
+    invoker_name = find_invoker_name(mem["__globals__"])
     node, local_names = to_builder(node, pyfunc, invoker_name)
-    compiled = compile(node, filename="<string>", mode='exec')
+    compiled = compile(node, filename="<string>", mode="exec")
     # IR builder -> AST
     # TODO(@junrushao1994): deal with nonlocals
-    exec(compiled, mem['__globals__'])  # pylint: disable=exec-used
-    node = build_ir(mem['__globals__'][invoker_name], debug=False)
+    exec(compiled, mem["__globals__"])  # pylint: disable=exec-used
+    node = build_ir(mem["__globals__"][invoker_name], debug=False)
     # AST -> CFG
     cfg = ast2cfg(node)
     # CFG -> Relay

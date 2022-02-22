@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2021 by Contributors
  * \file src/pass/to_a_normal_form.cc
  * \brief Convert dataflow graph to A-normal form.
  */
@@ -45,7 +63,7 @@ Expr Fill::VisitExpr(const Expr& e, const Var& v) {
   }
   auto ret = memo.at(e);
   // if no include_set is specified, every expression should be atomic.
-  if (include_set_ == nullptr) ICHECK(IsAtomic(ret));
+  if (include_set_ == nullptr) ICHECK(IsAtomic(ret)) << ret->GetTypeKey();
   return ret;
 }
 
@@ -65,7 +83,18 @@ Expr Fill::Compound(const Expr& orig, const Expr& now, const Var& v) {
   if (!v.defined() && not_included) {
     return now;
   } else {
-    return GetScope(orig)->let_list->Push(var, now);
+    auto let_list = GetScope(orig)->let_list;
+    if (auto let = now.as<LetNode>()) {
+      // If the expression is a Let, then we inline the expression LetList directly.
+      Expr ret, body;
+      do {
+        ret = let_list->Push(let->var, let->value);
+        body = let->body;
+        let = body.as<LetNode>();
+      } while (let);
+      return ret;
+    }
+    return let_list->Push(var, now);
   }
 }
 

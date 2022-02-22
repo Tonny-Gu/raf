@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 """Meta virtual machine and utility functions."""
 # pylint: disable=no-self-use
 import numpy as np
@@ -9,6 +26,7 @@ from .._core.value import Value, TupleValue
 from . import ndarray as _nd
 from .core_utils import register_node, DEVICE_TYPE_MAP
 from .device import Device
+
 
 class Executable:
     # pylint: disable=too-many-instance-attributes
@@ -109,12 +127,16 @@ class Executable:
         if isinstance(bytecode, (bytes, str)):
             bytecode = bytearray(bytecode)
         elif not isinstance(bytecode, (bytearray, _ByteArray)):
-            raise TypeError("bytecode is expected to be the type of bytearray " +
-                            "or TVMByteArray, but received {}".format(type(bytecode)))
+            raise TypeError(
+                "bytecode is expected to be the type of bytearray "
+                + "or TVMByteArray, but received {}".format(type(bytecode))
+            )
 
         if lib is not None and not isinstance(lib, tvm.runtime.Module):
-            raise TypeError("lib is expected to be the type of tvm.runtime.Module" +
-                            ", but received {}".format(type(lib)))
+            raise TypeError(
+                "lib is expected to be the type of tvm.runtime.Module"
+                + ", but received {}".format(type(lib))
+            )
 
         return Executable(_ffi.vm.Load_Executable(bytecode, lib))
 
@@ -355,12 +377,14 @@ class VMCompiler:
                 device = Device(dev) if isinstance(dev, str) else dev
                 device_map[tvm.tir.IntImm("int32", DEVICE_TYPE_MAP[dev_type])] = device
         else:
-            raise TypeError("device is expected to be str, Device, "
-                            "or dict of str to str/Device, but received %s" % type(device))
+            raise TypeError(
+                "device is expected to be str, Device, "
+                "or dict of str to str/Device, but received %s" % type(device)
+            )
         return device_map
 
 
-def compile(mod, device=None, params=None): #pylint: disable=redefined-builtin
+def compile(mod, device=None, params=None):  # pylint: disable=redefined-builtin
     """Compile the module to VM executable. A helper function for VMCompiler.
 
     Parameters
@@ -423,12 +447,17 @@ class VirtualMachine:
 
     enable_cuda_graph : bool
         Whether use CUDA graph.
+
+    dryrun: bool
+        Whether to create a dryrun VM that skips the op execution.
     """
-    def __init__(self, exe, device, enable_cuda_graph=False):
+
+    def __init__(self, exe, device, enable_cuda_graph=False, dryrun=False):
         if not isinstance(exe, Executable):
-            raise TypeError("mod is expected to be the type of Executable, but received {}"
-                            .format(type(exe)))
-        self.module = _ffi.vm.VirtualMachine(exe.module, enable_cuda_graph)
+            raise TypeError(
+                "mod is expected to be the type of Executable, but received {}".format(type(exe))
+            )
+        self.module = _ffi.vm.VirtualMachine(exe.module, enable_cuda_graph, dryrun)
         self._exec = exe
         self._set_devices = self.module["set_devices"]
         self._prepare_context = self.module["prepare_context"]

@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2020 by Contributors
  * \file liveness_analysis.cc
  * \brief A pass for analyzing tensor liveness.
  */
@@ -11,6 +29,7 @@
 #include "tvm/ir/type_functor.h"
 #include "./let_list.h"
 #include "./common.h"
+#include "../common/shape_utils.h"
 
 namespace mnm {
 namespace pass {
@@ -344,6 +363,66 @@ void LivenessAnalyzer::FormCheck(const Expr& e) {
 
 Var LivenessAnalyzer::CreateTensorVar(const Type& type) {
   return VarCreator(this).Run(type);
+}
+
+/*! \brief Calculate the byte compact size of the given type. If the type is a tuple,
+ * then the size of each tensor in the tuple will be returned. Note that size 0 means
+ * a tensor with dynamic shape.
+ */
+std::vector<int64_t> CalcBytesCompactSizes(const Type& type) {
+  std::vector<const TensorTypeNode*> ttypes;
+  std::vector<int64_t> sizes;
+  if (auto tuple_type = type.as<TupleTypeNode>()) {
+    for (auto field : tuple_type->fields) {
+      auto ttype = field.as<TensorTypeNode>();
+      CHECK(ttype != nullptr) << "Nested tuple is not supported";
+      ttypes.push_back(ttype);
+    }
+  } else if (auto ttype = type.as<TensorTypeNode>()) {
+    ttypes.push_back(ttype);
+  } else {
+    LOG(FATAL) << "Unsupported type: " << type->GetTypeKey();
+    throw;
+  }
+
+  for (auto ttype : ttypes) {
+    sizes.push_back(common::shape_utils::BytesCompactTensor(ttype));
+  }
+  return sizes;
+}
+
+/*! \brief Dump liveness analysis result statistics. */
+void DumpLivenessStat(const MapVSet& live_in) {
+  std::stringstream ss;
+  ss << "Liveness Analysis Result Statistics: " << std::endl;
+
+  // Peak tensor number.
+  int peak_tensor_num = 0;
+
+  // Each tensor (var) to the length of its live.
+  StdMap<int> var_to_live_length;
+  for (auto it : live_in) {
+    peak_tensor_num = (it.second.size() > peak_tensor_num) ? it.second.size() : peak_tensor_num;
+    for (auto var : it.second) {
+      var_to_live_length[var]++;
+    }
+  }
+  ss << "Peak number of live tensors: " << peak_tensor_num << std::endl;
+
+  // Each appeared live length to nmuber of tensors.
+  float avg_length = 0;
+  std::unordered_map<int, int> live_length_to_freq;
+  for (auto it : var_to_live_length) {
+    live_length_to_freq[it.second] += 1;
+    avg_length += it.second;
+  }
+  avg_length /= var_to_live_length.size();
+  ss << "Average life length: " << avg_length << std::endl;
+  ss << "Detail live length to frequency: " << std::endl;
+  for (auto it : live_length_to_freq) {
+    ss << std::setw(5) << it.first << std::setw(5) << it.second << std::endl;
+  }
+  LOG(INFO) << ss.str();
 }
 
 }  // namespace liveness_analysis

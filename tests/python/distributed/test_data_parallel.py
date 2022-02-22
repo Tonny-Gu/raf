@@ -1,5 +1,23 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # pylint: disable=attribute-defined-outside-init,protected-access,too-many-locals
-# pylint: disable=too-many-statements
+# pylint: disable=too-many-statements,invalid-name
+import sys
 import pytest
 
 import mnm
@@ -13,14 +31,10 @@ import tvm
 class MNMTest(mnm.Model):
     # pylint: disable=attribute-defined-outside-init
     def build(self, input_shape=28, num_classes=10):
-        self.conv1 = Conv2d(in_channels=3,
-                            out_channels=6,
-                            kernel_size=5,
-                            padding=2,
-                            bias=False)
+        self.conv1 = Conv2d(in_channels=3, out_channels=6, kernel_size=5, padding=2, bias=False)
         self.bn1 = BatchNorm(6)
-        self.linear1 = Linear((input_shape // 2) ** 2 * 6,
-                              num_classes)
+        self.linear1 = Linear((input_shape // 2) ** 2 * 6, num_classes)
+
     # pylint: enable=attribute-defined-outside-init
 
     @mnm.model.trace
@@ -39,6 +53,7 @@ class MNMTest(mnm.Model):
         out = self.linear1(out)
         return out
 
+
 def run_model(device):
     tvm_device = tvm.nd.device("cuda")
 
@@ -55,8 +70,10 @@ def run_model(device):
     tvm_device.sync()
 
 
-@pytest.mark.skipif(skip_dist_test(min_rank_num=2),
-                    reason="Distribution is not enabled or only one device is available")
+@pytest.mark.skipif(
+    skip_dist_test(min_rank_num=2),
+    reason="Distribution is not enabled or only one device is available",
+)
 @with_seed(0)
 def test_data_parallel():
     dctx = dist.get_context()
@@ -68,8 +85,10 @@ def test_data_parallel():
     dctx.enable_data_parallel = False
 
 
-@pytest.mark.skipif(skip_dist_test(min_rank_num=2),
-                    reason="Distribution is not enabled or only one device is available")
+@pytest.mark.skipif(
+    skip_dist_test(min_rank_num=2),
+    reason="Distribution is not enabled or only one device is available",
+)
 @with_seed(0)
 def test_zero_opt_1():
     dctx = dist.get_context()
@@ -84,5 +103,6 @@ def test_zero_opt_1():
 
 
 if __name__ == "__main__":
-    pytest.main([__file__])
+    exit_code = pytest.main([__file__])
     dist.RemoveCommunicator()
+    sys.exit(exit_code)

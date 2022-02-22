@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2020 by Contributors
  * \file type_infer.cc
  * \brief Type inference pass
  */
@@ -137,18 +155,25 @@ class TypeInferencer : public ExprMutator {
       ret->checked_type_ = InferClosure(ret);
     } else if (const OpNode* opn = ret->op.as<OpNode>()) {
       ret->checked_type_ = InferPrimitive(ret, opn);
-    } else if (const VarNode* var_node = ret->op.as<VarNode>()) {
-      // The var node can be a result of the output type of a func call. A var node
-      // here is valid if it points to a function. Check that the type is a FuncType
-      // and the args of the Call match the type of the FuncType. If yes, return the
-      // FuncType's ret_type.
-      VisitPrimitiveClosureFromCallerArgs(var_node, call->args);
-      const FuncTypeNode* fty_node = ret->op->checked_type_.as<FuncTypeNode>();
-      CHECK(fty_node);
-      for (size_t i = 0; i < fty_node->arg_types.size(); i++) {
-        ret->args[i]->checked_type_ = Unify(fty_node->arg_types[i], ret->args[i]->checked_type());
+    } else if (ret->op.as<VarNode>() || ret->op.as<LetNode>()) {
+      // handle recursive func call when op is a var node
+      if (op->checked_type()->IsInstance<IncompleteTypeNode>()) {
+        ret->checked_type_ = IncompleteType(kType);
+      } else {
+        // The var node can be a result of the output type of a func call. A var node
+        // here is valid if it points to a function. Check that the type is a FuncType
+        // and the args of the Call match the type of the FuncType. If yes, return the
+        // FuncType's ret_type.
+        if (const auto* var_node = ret->op.as<VarNode>()) {
+          VisitPrimitiveClosureFromCallerArgs(var_node, call->args);
+        }
+        const FuncTypeNode* fty_node = ret->op->checked_type_.as<FuncTypeNode>();
+        CHECK(fty_node);
+        for (size_t i = 0; i < fty_node->arg_types.size(); i++) {
+          ret->args[i]->checked_type_ = Unify(fty_node->arg_types[i], ret->args[i]->checked_type());
+        }
+        ret->checked_type_ = fty_node->ret_type;
       }
-      ret->checked_type_ = fty_node->ret_type;
     } else if (const auto* ftn = op->checked_type().as<FuncTypeNode>()) {
       ret->checked_type_ = ftn->ret_type;
     } else {
@@ -561,6 +586,19 @@ Pass InferType() {
 Expr InferType(Expr func) {
   auto mod = GlobalModule();
   return type_infer::TypeInferencer(mod).VisitExpr(func);
+}
+
+Expr InferTypeWithValues(const Expr& func, const Array<Value>& values) {
+  auto mod = GlobalModule();
+  auto ti = type_infer::TypeInferencer(mod);
+  Array<Expr> args;
+  for (const auto& v : values) {
+    // It's safe to wrap the values with `MakeConstant`, as the type functions
+    // need to access the real data in values, and there is no write operation.
+    args.push_back(MakeConstant(v));
+  }
+  ti.UpdateFuncParamVarMap(func.as<FunctionNode>(), args);
+  return ti.VisitExpr(func);
 }
 
 Expr InferTypeWithModule(const Expr& expr, const IRModule& m) {

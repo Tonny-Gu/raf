@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # pylint: disable=missing-function-docstring, undefined-loop-variable, unused-argument
 """Compute definition and schedules for data transform operators"""
 from mnm._tvm_op.nn import schedule_generic
@@ -8,10 +25,12 @@ from .._lib import _reg
 
 _topi = _tvm.topi  # pylint: disable=invalid-name,no-member
 
+
 @register_compute("mnm.op.tvm.embedding")
 def embedding_compute(attrs, inputs, output_type):
     x, indices = inputs
     return [_topi.take(x, indices, axis=0)]
+
 
 _reg.register_injective_schedule("mnm.op.tvm.embedding")
 
@@ -40,7 +59,9 @@ def repeat_dx_compute(attrs, inputs, output_type):
     out = _topi.concatenate(tuple(result_list), axis)
     return [out]
 
+
 _reg.register_schedule("mnm.op.tvm.repeat_dx", schedule_generic)
+
 
 @register_compute("mnm.op.tvm.swap_axis")
 def swap_axis_compute(attrs, inputs, output_type):
@@ -53,15 +74,18 @@ def swap_axis_compute(attrs, inputs, output_type):
     out = _topi.transpose(x, axes=axes)
     return [out]
 
+
 @register_compute("mnm.op.tvm.full")
 def full_compute(attrs, inputs, output_type):
     out = _topi.full(attrs.shape, attrs.dtype, attrs.fill_value)
     return [out]
 
+
 @register_compute("mnm.op.tvm.full_like")
 def full_like_compute(attrs, inputs, output_type):
     out = _topi.full_like(inputs[0], attrs.fill_value)
     return [out]
+
 
 @register_compute("mnm.op.tvm.mesh_grid")
 def mesh_grid_compute(attrs, inputs, output_type):
@@ -69,12 +93,14 @@ def mesh_grid_compute(attrs, inputs, output_type):
     for tensor in inputs:
         target_shape.append(tensor.shape[0])
     out = []
+
     def fbroadcast(*args):
         return tensor(args[i])
 
     for i, tensor in enumerate(inputs):
         out.append(_tvm.te.compute(target_shape, fbroadcast))
     return out
+
 
 @register_compute("mnm.op.tvm.scatter_dx")
 def scatter_dx_like_compute(attrs, inputs, output_type):
@@ -85,6 +111,7 @@ def scatter_dx_like_compute(attrs, inputs, output_type):
 
     def fcompute(*args):
         return _tvm.tir.if_then_else(x[args] == y[args], dy[args], _tvm.tir.const(0, dy.dtype))
+
     out = _tvm.te.compute(shape=x.shape, fcompute=fcompute)
     return [out]
 
@@ -133,18 +160,27 @@ def take_dx_compute(attrs, inputs, output_type):
         normalized = _topi.mod(_topi.mod(indices, x.shape[axis]) + x.shape[axis], x.shape[axis])
     else:
         raise ValueError("Not supported mode: " + mode)
-    shape = dy.shape[:axis + idim] + [x.shape[axis],] + dy.shape[axis + idim:]
+    shape = (
+        dy.shape[: axis + idim]
+        + [
+            x.shape[axis],
+        ]
+        + dy.shape[axis + idim :]
+    )
     out1 = _tvm.te.compute(
         shape,
         lambda *idx: _tvm.tir.if_then_else(
-            idx[axis + idim] == normalized[idx[axis: axis + idim]],
-            dy[idx[:axis + idim] + idx[axis + idim + 1:]],
-            _tvm.tir.const(0, dy.dtype)
-        ))
+            idx[axis + idim] == normalized[idx[axis : axis + idim]],
+            dy[idx[: axis + idim] + idx[axis + idim + 1 :]],
+            _tvm.tir.const(0, dy.dtype),
+        ),
+    )
     out2 = _topi.sum(out1, axis=tuple(range(axis, axis + idim))) if idim > 0 else out1
     return [out2]
 
+
 _reg.register_injective_schedule("mnm.op.tvm.take_dx")
+
 
 @register_compute("mnm.op.tvm.strided_slice_dx")
 def strided_slice_dx_compute(attrs, inputs, output_type):
@@ -155,11 +191,13 @@ def strided_slice_dx_compute(attrs, inputs, output_type):
     grads = _tvm.te.gradient(out, [var], head=dy)
     return grads
 
+
 _reg.register_injective_schedule("mnm.op.tvm.strided_slice_dx")
+
 
 @register_compute("mnm.op.tvm.resize2d")
 def compute_resize2d(attrs, inputs, out_type):
-    """ compute definition for resize2d op """
+    """compute definition for resize2d op"""
     size = attrs.size
     layout = attrs.layout
     method = attrs.method
@@ -171,22 +209,25 @@ def compute_resize2d(attrs, inputs, out_type):
     return [
         _topi.image.resize2d(
             inputs[0],
+            (None, None, None, None),
             size,
             layout,
             method,
             coord_trans,
             rounding_method,
-            cubic_alpha,
-            cubic_exclude,
-            out_dtype
+            bicubic_alpha=cubic_alpha,
+            bicubic_exclude=cubic_exclude,
+            out_dtype=out_dtype,
         )
     ]
 
+
 _reg.register_injective_schedule("mnm.op.tvm.resize2d")
+
 
 @register_compute("mnm.op.tvm.resize2d_dx")
 def resize2d_dx_compute(attrs, inputs, out_type):
-    """ compute definition for resize2d_dx op """
+    """compute definition for resize2d_dx op"""
     dy = inputs[1]
     size = attrs.size
     layout = attrs.layout
@@ -199,19 +240,22 @@ def resize2d_dx_compute(attrs, inputs, out_type):
 
     out = _topi.image.resize2d(
         inputs[0],
+        (None, None, None, None),
         size,
         layout,
         method,
         coord_trans,
         rounding_method,
-        cubic_alpha,
-        cubic_exclude,
-        out_dtype
+        bicubic_alpha=cubic_alpha,
+        bicubic_exclude=cubic_exclude,
+        out_dtype=out_dtype,
     )
     grads = _tvm.te.gradient(out, [inputs[0]], head=dy)
     return grads
 
+
 _reg.register_injective_schedule("mnm.op.tvm.resize2d_dx")
+
 
 @register_compute("mnm.op.tvm.adv_index")
 def adv_index_compute(attrs, inputs, output_type):
@@ -226,13 +270,31 @@ _reg.register_injective_schedule("mnm.op.tvm.adv_index")
 
 @register_compute("mnm.op.tvm.adv_index_dx")
 def adv_index_dx_compute(attrs, inputs, output_type):
+    # pylint: disable=too-many-locals
+    def _get_broadcast_shape(shape1, shape2):
+        if shape1 == shape2:
+            return shape1
+        length1 = len(shape1)
+        length2 = len(shape2)
+        if length1 > length2:
+            shape = list(shape1)
+        else:
+            shape = list(shape2)
+        i = max(length1, length2) - 1
+        for a, b in zip(shape1[::-1], shape2[::-1]):
+            if a != 1 and b != 1 and a != b:
+                raise ValueError("shape1=%s is not broadcastable to shape2=%s" % (shape1, shape2))
+            shape[i] = b if a == 1 else a
+            i -= 1
+        return list(shape)
+
     dy = inputs[0]
     data = inputs[1]
     indices = inputs[2:]
     idim = len(indices)
     bshape = list(indices[0].shape)
     for ind in indices[1:]:
-        bshape = max(bshape, list(ind.shape))
+        bshape = _get_broadcast_shape(bshape, list(ind.shape))
 
     for i, ind in enumerate(indices):
         if list(ind.shape) != bshape:
@@ -245,12 +307,14 @@ def adv_index_dx_compute(attrs, inputs, output_type):
         for i in range(1, idim):
             tmp = idx[b_len + i] == indices[i][idx[:b_len]]
             expr = expr & tmp
-        return _tvm.tir.if_then_else(expr, dy[idx[:b_len] + idx[b_len + idim:]],
-                                     _tvm.tir.const(0, dy.dtype))
+        return _tvm.tir.if_then_else(
+            expr, dy[idx[:b_len] + idx[b_len + idim :]], _tvm.tir.const(0, dy.dtype)
+        )
 
     out1 = _tvm.te.compute(shape, index_dx)
     out2 = _topi.sum(out1, axis=tuple(range(b_len)))
     return [out2]
+
 
 _reg.register_injective_schedule("mnm.op.tvm.adv_index_dx")
 
@@ -262,9 +326,10 @@ def clip_dx_compute(attrs, inputs, output_type):
     a_max = _tvm.tir.const(attrs.a_max, x.dtype)
 
     def _select(*indices):
-        return _tvm.tir.if_then_else(_tvm.tir.any(x[indices] <= a_min,
-                                                  x[indices] >= a_max),
-                                     0, dy(*indices))
+        return _tvm.tir.if_then_else(
+            _tvm.tir.any(x[indices] <= a_min, x[indices] >= a_max), 0, dy(*indices)
+        )
+
     return [_tvm.te.compute(x.shape, _select)]
 
 
@@ -283,19 +348,20 @@ def gather_nd_dx_compute(attrs, inputs, output_type):
     data_s_0 = data_s[:x]
 
     def compute_match(*idx):
-        ind_i = idx[:ind_l - 1]
-        data_i = idx[ind_l - 1:]
+        ind_i = idx[: ind_l - 1]
+        data_i = idx[ind_l - 1 :]
         ret = _tvm.tir.const(True, "bool")
         for i in range(x):
             ind_idx = (i,) + ind_i
             ret = _tvm.tir.And(ret, indices[ind_idx] == data_i[i])
         return ret
+
     match = _tvm.te.compute(ind_s_1 + data_s_0, compute_match)
 
     def compute_temp(*idx):
-        ind_i = idx[:ind_l - 1]
-        data_i_0 = idx[ind_l - 1: ind_l - 1 + x]
-        data_i_1 = idx[ind_l - 1 + x:]
+        ind_i = idx[: ind_l - 1]
+        data_i_0 = idx[ind_l - 1 : ind_l - 1 + x]
+        data_i_1 = idx[ind_l - 1 + x :]
         temp_cond = match[ind_i + data_i_0]
         t_val = dy[ind_i + data_i_1]
         f_val = _tvm.tir.const(0, dy.dtype)
@@ -305,6 +371,7 @@ def gather_nd_dx_compute(attrs, inputs, output_type):
     ret = _topi.sum(temp, axis=tuple(range(0, ind_l - 1)))
     return [ret]
 
+
 @register_compute("mnm.op.tvm.gather_dx")
 def gather_dx_compute(attrs, inputs, output_type):
     data, indices, dy = inputs
@@ -313,35 +380,54 @@ def gather_dx_compute(attrs, inputs, output_type):
     if axis < 0:
         assert axis > -dim
         axis = dim + axis
-    shape = dy.shape[:axis+1] + [data.shape[axis],] + dy.shape[axis + 1:]
-    out1 = _tvm.te.compute(shape, lambda *idx:
-                           _tvm.tir.if_then_else(idx[axis + 1] ==
-                                                 indices[idx[: axis + 1] + idx[axis + 2:]],
-                                                 dy[idx[: axis + 1] + idx[axis + 2:]],
-                                                 _tvm.tir.const(0, dy.dtype)))
+    shape = (
+        dy.shape[: axis + 1]
+        + [
+            data.shape[axis],
+        ]
+        + dy.shape[axis + 1 :]
+    )
+    out1 = _tvm.te.compute(
+        shape,
+        lambda *idx: _tvm.tir.if_then_else(
+            idx[axis + 1] == indices[idx[: axis + 1] + idx[axis + 2 :]],
+            dy[idx[: axis + 1] + idx[axis + 2 :]],
+            _tvm.tir.const(0, dy.dtype),
+        ),
+    )
     out2 = _topi.sum(out1, axis=axis)
     return [out2]
+
 
 _reg.register_injective_schedule("mnm.op.tvm.gather")
 _reg.register_injective_schedule("mnm.op.tvm.gather_dx")
 _reg.register_injective_schedule("mnm.op.tvm.gather_nd")
 _reg.register_injective_schedule("mnm.op.tvm.gather_nd_dx")
 
+
 @register_compute("mnm.op.tvm.embedding_dx")
 def embedding_dx_compute(attrs, inputs, output_type):
     dy, indices = inputs
     num_weight = int(attrs.dims[0])
     idim = len(indices.shape)
-    shape = dy.shape[:idim] + [num_weight,] + dy.shape[idim:]
+    shape = (
+        dy.shape[:idim]
+        + [
+            num_weight,
+        ]
+        + dy.shape[idim:]
+    )
     out1 = _tvm.te.compute(
         shape,
         lambda *idx: _tvm.tir.if_then_else(
             idx[idim] == indices[idx[:idim]],
-            dy[idx[:idim] + idx[idim + 1:]],
-            _tvm.tir.const(0, dy.dtype)
-        ))
+            dy[idx[:idim] + idx[idim + 1 :]],
+            _tvm.tir.const(0, dy.dtype),
+        ),
+    )
     out2 = _topi.sum(out1, axis=tuple(range(idim))) if idim > 0 else out1
     return [out2]
+
 
 _reg.register_injective_schedule("mnm.op.tvm.embedding_dx")
 

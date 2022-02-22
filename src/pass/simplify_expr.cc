@@ -1,22 +1,25 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 // Acknowledgement: The main logic originates from TVM
+
 /*!
- * Copyright (c) 2021 by Contributors
  * \file simplify_expr.cc
  * \brief Simplifies the commonly seen patterns.
  */
@@ -25,6 +28,7 @@
 #include "mnm/op_utils.h"
 #include "mnm/pass.h"
 #include "mnm/value.h"
+#include "../op/ty/utils.h"
 
 namespace mnm {
 namespace pass {
@@ -141,11 +145,16 @@ class ConcretizeLikeRewrite : public DFPatternRewrite {
 
 /*!
  * \brief Converts `*_like` unary operators to their explicit shape equivalent
- * (e.g. `zeros_like(x, y)` to `zeros(x, y.shape)`), when the target information is concrete.
+ * (e.g. `zeros_like(x)` to `zeros(x.shape, x.dtype, device)`), when the target information
+ * is known.
+ * Note that the simplified *_like op becomes an init op and needs to specify the target device.
+ * Hoever, the target device is not included in the type system, so we assume the target device
+ * is the current device.
  */
 class ConcretizeUnaryLikeRewrite : public ConcretizeLikeRewrite {
  public:
-  ConcretizeUnaryLikeRewrite(const std::string op_like, const std::string op) : op_(Op::Get(op)) {
+  ConcretizeUnaryLikeRewrite(const std::string op_like, const std::string op)
+      : op_(Op::Get(op)), device_(std::string(Device::Current(false).c_str())) {
     like_pat_ = IsWildcard();
     pattern_ = IsExpr(Op::Get(op_like))({like_pat_});
   }
@@ -153,12 +162,14 @@ class ConcretizeUnaryLikeRewrite : public ConcretizeLikeRewrite {
   Expr Concretize(const Map<DFPattern, Array<Expr>>& node_map, Array<Integer> shape,
                   DataType dtype) const override {
     return Call(op_, {MakeConstant(ArrayToIntTuple(shape)),
-                      MakeConstant(StringValue::make(DLDataType2String(dtype)))});
+                      MakeConstant(StringValue::make(DLDataType2String(dtype))),
+                      MakeConstant(StringValue::make(device_))});
   }
 
  protected:
   DFPattern like_pat_;
   const Op op_;
+  const std::string device_;
 };
 
 class ConcretizeZerosLikeRewrite : public ConcretizeUnaryLikeRewrite {
@@ -216,6 +227,182 @@ class ConcretizeBroadcastToLikeRewrite : public ConcretizeBinaryLikeRewrite {
   }
 };
 
+/*! \brief Check whether the given expr is a constant scalar with the expected value.
+ * It is also applicable when the constant is a 0-dim tensor.
+ */
+bool IsExpectedScalar(const Expr& arg, float expected) {
+  if (auto node = arg.as<ConstantNode>()) {
+    if (auto val_obj = node->value.as<IntValueObj>()) {
+      return val_obj->value == (int64_t)expected;
+    } else if (auto val_obj = node->value.as<FloatValueObj>()) {
+      return val_obj->value == expected;
+    } else if (auto val_obj = node->value.as<TensorValueObj>()) {
+      tensor::Tensor tensor = val_obj->tensor;
+      if (tensor->ndim != 0) {  // Not even a scalar.
+        return false;
+      }
+
+      bool is_expected = false;
+      if (DataType(tensor->dtype) == DataType::Float(32) ||
+          DataType(tensor->dtype) == DataType::Float(16)) {
+        float value = GetScalarValueData<float>(GetRef<TensorValue>(val_obj));
+        is_expected = value == expected;
+      } else if (DataType(tensor->dtype) == DataType::Int(32)) {
+        int32_t value = GetScalarValueData<int32_t>(GetRef<TensorValue>(val_obj));
+        is_expected = value == (int32_t)expected;
+      } else if (DataType(tensor->dtype) == DataType::Int(64)) {
+        int64_t value = GetScalarValueData<int64_t>(GetRef<TensorValue>(val_obj));
+        is_expected = value == (int64_t)expected;
+      } else {
+        LOG(WARNING) << "Unsupported type: " << DataType(tensor->dtype);
+      }
+      return is_expected;
+    }
+  }
+  return false;
+}
+
+/*! \brief A helper function to free a constant tensor. */
+void FreeConstTensor(const Expr& expr) {
+  auto node = expr.as<ConstantNode>();
+  CHECK(node != nullptr) << "Expected a ConstantNode, but got " << expr->GetTypeKey();
+  if (auto val_obj = node->value.as<TensorValueObj>()) {
+    val_obj->mem.reset();
+  }
+}
+
+/*! \brief Remove *1 and fold *0. */
+class ConcretizeMultiplyRewrite : public DFPatternRewrite {
+ public:
+  ConcretizeMultiplyRewrite() {
+    in1_pat_ = IsWildcard();
+    in2_pat_ = IsWildcard();
+    pattern_ = IsOp("mnm.op.multiply")({in1_pat_, in2_pat_});
+  }
+
+  Expr Callback(const Expr& pre, const Expr& post,
+                const Map<DFPattern, Array<Expr>>& node_map) const override {
+    // Remove *1.
+    if (IsExpectedScalar(node_map[in1_pat_][0], 1)) {
+      FreeConstTensor(node_map[in1_pat_][0]);
+      return node_map[in2_pat_][0];
+    }
+    if (IsExpectedScalar(node_map[in2_pat_][0], 1)) {
+      FreeConstTensor(node_map[in2_pat_][0]);
+      return node_map[in1_pat_][0];
+    }
+
+    // Fold *0.
+    bool is_1st_zero = IsExpectedScalar(node_map[in1_pat_][0], 0);
+    bool is_2nd_zero = IsExpectedScalar(node_map[in2_pat_][0], 0);
+    if (is_1st_zero || is_2nd_zero) {
+      static auto op = Op::Get("mnm.op.zeros");
+      auto call = Downcast<Call>(pre);
+      auto non_zero_in = (is_1st_zero) ? call->args[1] : call->args[0];
+      const TensorTypeNode* ttype_node = non_zero_in->checked_type().as<TensorTypeNode>();
+      CHECK(ttype_node) << "Expected a TensorType, but got " << non_zero_in->GetTypeKey();
+      try {
+        auto shape = ArrayToInt(ttype_node->shape);
+        CHECK_GT(shape.size(), 0U) << "Expected non-scalar tensor (ndim > 0)";
+
+        // Free the useless 0 tensor(s).
+        if (is_1st_zero) {
+          FreeConstTensor(node_map[in1_pat_][0]);
+        }
+        if (is_2nd_zero) {
+          FreeConstTensor(node_map[in2_pat_][0]);
+        }
+        return Call(op, {MakeConstant(ArrayToIntTuple(shape)),
+                         MakeConstant(StringValue::make(DLDataType2String(ttype_node->dtype)))});
+      } catch (const dmlc::Error& e) {
+        // Shape is not static, don't concretize.
+        return post;
+      }
+    }
+    return post;
+  }
+
+ protected:
+  DFPattern in1_pat_, in2_pat_;
+};
+
+/*!
+ * \brief Remove +0 and -0.
+ */
+class ConcretizeAddSubRewrite : public DFPatternRewrite {
+ public:
+  ConcretizeAddSubRewrite() {
+    in1_pat_ = IsWildcard();
+    in2_pat_ = IsWildcard();
+    out_pat_ = IsWildcard();
+    op_pat_ = IsOp("mnm.op.add") || IsOp("mnm.op.subtract");
+    pattern_ = op_pat_({in1_pat_, in2_pat_, out_pat_, IsWildcard()});
+  }
+
+  Expr Callback(const Expr& pre, const Expr& post,
+                const Map<DFPattern, Array<Expr>>& node_map) const override {
+    // Do not rewrite if the output is shared.
+    if (!node_map[out_pat_][0]->IsInstance<ConstantNode>()) {
+      return post;
+    }
+
+    Op op = Downcast<Op>(node_map[op_pat_][0]);
+    static auto add_op = Op::Get("mnm.op.add");
+
+    // Remove 0+x, x+0, and x-0. Note that 0-x cannot be simplified.
+    if (op == add_op && IsExpectedScalar(node_map[in1_pat_][0], 0)) {
+      FreeConstTensor(node_map[in1_pat_][0]);
+      return node_map[in2_pat_][0];
+    }
+    if (IsExpectedScalar(node_map[in2_pat_][0], 0)) {
+      FreeConstTensor(node_map[in2_pat_][0]);
+      return node_map[in1_pat_][0];
+    }
+    return post;
+  }
+
+ protected:
+  DFPattern in1_pat_, in2_pat_, out_pat_, op_pat_;
+};
+
+/*!
+ * \brief Check whether the cast from lhs to rhs is reversible. A cast is reversible
+ * if lhs can be casted to rhs and then casted back without significant truncation
+ */
+bool IsCastReversible(const DataType& lhs, const DataType& rhs) {
+  /*! Reversible cast map:
+   *        Bool  UInt  Int  Float (to)
+   * Bool    Y     Y     Y     Y
+   * UInt    N     Y     Y     Y
+   * Int     N     N     Y     Y
+   * Float   N     N     N     Y
+   * (from)
+   */
+  auto cast_level = [](const DataType& type) {
+    if (type.is_bool()) {
+      return 4;
+    }
+    if (type.is_uint()) {
+      return 3;
+    }
+    if (type.is_int()) {
+      return 2;
+    }
+    if (type.is_float() || type.is_bfloat16()) {
+      return 1;
+    }
+    return -1;
+  };
+  int lhs_level = cast_level(lhs);
+  int rhs_level = cast_level(rhs);
+  if (lhs_level == -1 || rhs_level == -1) {
+    // handle or custom data type, don't simplify
+    return false;
+  }
+  // type with higher cast level can be reversibly cast to type with lower level
+  return lhs_level >= rhs_level;
+}
+
 /*! \brief Simplify useless cast ops. */
 class SimplifyCast : public DFPatternRewrite {
  public:
@@ -234,7 +421,11 @@ class SimplifyCast : public DFPatternRewrite {
     auto arg = Downcast<Call>(pre)->args[0];
     if (auto prev_node = arg.as<CallNode>()) {
       if (prev_node->op->IsInstance<OpNode>() && Downcast<Op>(prev_node->op) == cast_op) {
-        arg = prev_node->args[0];
+        // ignore the situation where the cast of arg to intermediate type is not reversible
+        auto intermediate_dtype = arg->checked_type().as<TensorTypeNode>()->dtype;
+        if (IsCastReversible(out_ty->dtype, intermediate_dtype)) {
+          arg = prev_node->args[0];
+        }
       }
     }
     const TensorTypeNode* data_ty = arg->checked_type().as<TensorTypeNode>();
@@ -291,10 +482,27 @@ class SimplifyMatmulReshapeBiasAct : public DFPatternRewrite {
       return false;
     }
 
-    auto shape1 = ttype1->shape.back().as<ir::IntImmNode>();
-    auto shape2 = ttype2->shape.back().as<ir::IntImmNode>();
-    if (shape1 != nullptr && shape2 != nullptr) {
-      return shape1->value == shape2->value;
+    // We need to check if bias_add inputs are still broadcastable after moving reshape.
+    static const Op& reshape_op = Op::Get("mnm.op.reshape");
+    auto reshape_call_node = call->args[0].as<CallNode>();
+    auto other_arg_ttype = ttype2;
+    if (reshape_call_node == nullptr || reshape_call_node->op != reshape_op) {
+      // We may need to also check second argument since we have commutative matching
+      reshape_call_node = call.as<CallNode>()->args[1].as<CallNode>();
+      other_arg_ttype = ttype1;
+      CHECK(reshape_call_node != nullptr && reshape_call_node->op == reshape_op)
+          << "Expected an add call with a reshape call as argument, but got "
+          << mnm::ir::AsText(call);
+    }
+
+    if (auto reshape_arg_ttype = reshape_call_node->args[0]->checked_type().as<TensorTypeNode>()) {
+      try {
+        // try broadcast reshape_arg and other_arg
+        BroadcastShape(GetRef<TensorType>(reshape_arg_ttype), GetRef<TensorType>(other_arg_ttype));
+        return true;
+      } catch (const dmlc::Error& e) {
+        // shape not compatible, don't modify
+      }
     }
     return false;
   }
@@ -417,14 +625,16 @@ Expr SimplifyExpr(const Expr& expr, const IRModule& mod) {
   composer.AddRewrite<ConcretizeOnesLikeRewrite>();
   composer.AddRewrite<ConcretizeCastLikeRewrite>();
   composer.AddRewrite<ConcretizeBroadcastToLikeRewrite>();
-  auto ret = mnm::ir::RewritePatterns(composer.MakeCallbacks(), expr, mod);
+  composer.AddRewrite<ConcretizeMultiplyRewrite>();
+  composer.AddRewrite<ConcretizeAddSubRewrite>();
+  auto ret = mnm::ir::MNMRewritePatterns(composer.MakeCallbacks(), expr, mod);
 
   // Phase 2: Sequence patterns that may need to be applied iteratively.
   composer.Clear();
   composer.AddRewrite<SimplifyMatmulReshapeBiasAct>();
   composer.AddRewrite<SimplifyCast>();
   composer.AddRewrite<SimplifyReshape>();
-  return mnm::ir::RewritePatterns(composer.MakeCallbacks(), ret, mod);
+  return mnm::ir::MNMRewritePatterns(composer.MakeCallbacks(), ret, mod);
 }
 
 }  // namespace simplify_expr

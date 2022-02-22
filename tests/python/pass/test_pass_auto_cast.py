@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # pylint: disable=protected-access, no-self-use, unused-argument
 # pylint: disable=too-many-locals, too-many-arguments, attribute-defined-outside-init
 import pytest
@@ -9,7 +26,8 @@ from tvm import relay
 from tvm.ir import PrimType
 from mnm.ir import AsText, ScopeBuilder
 from mnm.frontend.model import FrameworkModel
-from mnm.testing import randn, randn_torch, run_vm_model, check, get_device_list
+from mnm.testing import randn, randn_torch, run_vm_model, check, get_testable_devices
+
 
 def verify_correctness(model, device, args, ref_outs=None, tol=1e-5):
     # A helper function to verify the correctness
@@ -302,10 +320,10 @@ def test_cast_reuse():
 
         @mnm.model.trace
         def forward(self, x):
-            out1 = mnm.matmul(x, self.w) # Always cast.
-            out6 = mnm.matmul(x, self.w) # Should reuse the cast ops of two inputs.
-            out2 = mnm.softmax(out1) # Use a never cast op to produce a cast op.
-            out3 = mnm.exp(out1) # This is a fuable op so it cannot reuse the cast op.
+            out1 = mnm.matmul(x, self.w)  # Always cast.
+            out6 = mnm.matmul(x, self.w)  # Should reuse the cast ops of two inputs.
+            out2 = mnm.softmax(out1)  # Use a never cast op to produce a cast op.
+            out3 = mnm.exp(out1)  # This is a fuable op so it cannot reuse the cast op.
             out4 = mnm.add(out2, out3)
             out5 = mnm.add(out4, out6)
             return out5
@@ -316,14 +334,17 @@ def test_cast_reuse():
     verify_cast_num(model, [m_x], 5)
 
 
-@pytest.mark.parametrize("params", [
-    # Majority is float16, cast 2 float32 to float16.
-    (2, 3, 2),
-    # Majority is float32, cast 2 float16 to float32.
-    (3, 2, 2),
-    # Total input > 5, force to cast all inputs to float32.
-    (3, 4, 4)
-])
+@pytest.mark.parametrize(
+    "params",
+    [
+        # Majority is float16, cast 2 float32 to float16.
+        (2, 3, 2),
+        # Majority is float32, cast 2 float16 to float32.
+        (3, 2, 2),
+        # Total input > 5, force to cast all inputs to float32.
+        (3, 4, 4),
+    ],
+)
 def test_concatenate(params):
     shape = (12, 10)
     n_fp32_inputs, n_fp16_inputs, expected_cast_num = params
@@ -337,12 +358,13 @@ def test_concatenate(params):
             return mnm.concatenate(args, axis=0)
 
     model = Model()
-    args = ([randn(shape, requires_grad=False, dtype="float32")[0] for _ in range(n_fp32_inputs)] +
-            [randn(shape, requires_grad=False, dtype="float16")[0] for _ in range(n_fp16_inputs)])
+    args = [randn(shape, requires_grad=False, dtype="float32")[0] for _ in range(n_fp32_inputs)] + [
+        randn(shape, requires_grad=False, dtype="float16")[0] for _ in range(n_fp16_inputs)
+    ]
     verify_cast_num(model, args, expected_cast_num)
 
 
-@pytest.mark.parametrize("device", get_device_list())
+@pytest.mark.parametrize("device", get_testable_devices())
 def test_mean_dx(device):
     class Model(mnm.Model):
         def build(self):

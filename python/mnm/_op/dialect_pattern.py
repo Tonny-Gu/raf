@@ -1,21 +1,40 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 """Define dialect fusion patterns."""
 from .dialect import register_pattern
-from .._lib import is_op, wildcard, has_dtype
+from ..ir.dataflow_pattern import is_op, wildcard, is_constant, has_dtype, has_shape
+from .._core.value import StringValue
 
 MATMUL_OPS = [
     "mnm.op.dense",
     "mnm.op.matmul",
     "mnm.op.matmul_nt",
     "mnm.op.matmul_tn",
-    "mnm.op.matmul_tt"
+    "mnm.op.matmul_tt",
 ]
 
 BATCH_MATMUL_OPS = [
     "mnm.op.batch_matmul",
     "mnm.op.batch_matmul_nt",
     "mnm.op.batch_matmul_tn",
-    "mnm.op.batch_matmul_tt"
+    "mnm.op.batch_matmul_tt",
 ]
+
 
 def is_ops(ops):
     """Create a pattern that match to a list of ops."""
@@ -33,10 +52,12 @@ def is_ops(ops):
 
 def n_wildcards(n):
     """Create a list of wildcard patterns."""
-    ret = []
-    for _ in range(n):
-        ret.append(wildcard())
-    return ret
+    return [wildcard() for _ in range(n)]
+
+
+def n_null_constant(n):
+    """Create a list of wildcard patterns."""
+    return [is_constant(None) for _ in range(n)]
 
 
 def call_binary_ops(ops, dtype=None):
@@ -54,10 +75,12 @@ def _cutlass_matmul_fusion(matmul_ops, dtype=None):
     # matmul
     matmul = call_binary_ops(matmul_ops, dtype)
     # bias
-    scaled_bias = is_op("mnm.op.multiply")(*n_wildcards(2))
-    bias = scaled_bias | wildcard()
+    bias = wildcard()
+    beta = has_shape(()) | has_shape((1,))
+    scaled_bias = is_op("mnm.op.multiply")(beta, bias)
+    bias = scaled_bias | bias
     # pattern: matmul+scaled_bias or matmul+bias
-    with_bias = is_op("mnm.op.add")(matmul, bias, *n_wildcards(2))
+    with_bias = is_op("mnm.op.add")(matmul, bias, *n_null_constant(2))
     # pattern: matmul+(scaled_)bias+act or matmul+act
     with_act = is_ops(act_ops)(with_bias | matmul)
     # We exclude the single matmul op pattern as ther perf of cutlass is worse than cublas
@@ -83,11 +106,16 @@ def _call_conv2d_dxw(dtype=None):
     return is_ops(ops)(x_or_w, y, dy, *n_wildcards(5))
 
 
-def _cutlass_conv2d_fusion(dtype=None):
+def _cutlass_conv2d_fusion():
     act_ops = ["mnm.op.relu"]
-    conv = _call_conv2d(dtype)
+    conv = is_op("mnm.op.conv2d")(
+        *n_wildcards(6),
+        is_constant(StringValue("NHWC")),
+        is_constant(StringValue("OHWI")),
+        is_constant(StringValue("NHWC"))
+    )
     # pattern: conv2d+bias
-    with_bias = is_op("mnm.op.add")(conv, *n_wildcards(3))
+    with_bias = is_op("mnm.op.add")(conv, wildcard(), *n_null_constant(2))
     # pattern: conv2d+bias+act || conv2d+act
     with_act = is_ops(act_ops)(with_bias | conv)
     return with_act | with_bias
@@ -96,6 +124,7 @@ def _cutlass_conv2d_fusion(dtype=None):
 def _call_pool2d_dx():
     pool_ops = ["mnm.op.max_pool2d_dx", "mnm.op.avg_pool2d_dx"]
     return is_ops(pool_ops)(*n_wildcards(9))
+
 
 # pool2d_dx
 register_pattern(_call_pool2d_dx(), "cudnn", 50, "pool2d_dx")

@@ -1,4 +1,21 @@
-# pylint: disable=missing-function-docstring
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+# pylint: disable=missing-function-docstring,too-many-arguments
 """NN-specific random initializers."""
 import math
 
@@ -35,20 +52,27 @@ def _calc_gain(nonlinearity, param=None):
     raise NotImplementedError("gain for nonlinearity: " + str(nonlinearity))
 
 
-def xavier_uniform(shape, gain=1.0, name="", dtype='float32', device='cpu'):
+def xavier_uniform(shape, gain=1.0, name="", dtype="float32", device="cpu"):
     fan_in, fan_out = _calc_fan_in_out(shape)
     a = gain * np.sqrt(6.0 / (fan_in + fan_out))
     return uniform(low=-a, high=a, shape=shape, name=name, dtype=dtype, device=device)
 
 
-def xavier_normal(shape, gain=1.0, name="", dtype='float32', device='cpu'):
+def xavier_normal(shape, gain=1.0, name="", dtype="float32", device="cpu"):
     fan_in, fan_out = _calc_fan_in_out(shape)
     std = gain * math.sqrt(2.0 / (fan_in + fan_out))
     return normal(mean=0.0, std=std, shape=shape, name=name, dtype=dtype, device=device)
 
 
-def kaiming_uniform(shape, a=0, mode='fan_in', nonlinearity="leaky_relu", name="", # pylint: disable=too-many-arguments
-                    dtype='float32', device='cpu'):
+def kaiming_uniform(
+    shape,
+    a=0,
+    mode="fan_in",
+    nonlinearity="leaky_relu",
+    name="",  # pylint: disable=too-many-arguments
+    dtype="float32",
+    device="cpu",
+):
     fan_in, fan_out = _calc_fan_in_out(shape)
     if mode == "fan_in":
         fan = fan_in
@@ -62,8 +86,15 @@ def kaiming_uniform(shape, a=0, mode='fan_in', nonlinearity="leaky_relu", name="
     return uniform(low=-bound, high=bound, shape=shape, name=name, dtype=dtype, device=device)
 
 
-def kaiming_normal(shape, a=0, mode='fan_in', nonlinearity="leaky_relu", name="", # pylint: disable=too-many-arguments
-                   dtype='float32', device='cpu'):
+def kaiming_normal(
+    shape,
+    a=0,
+    mode="fan_in",
+    nonlinearity="leaky_relu",
+    name="",  # pylint: disable=too-many-arguments
+    dtype="float32",
+    device="cpu",
+):
     fan_in, fan_out = _calc_fan_in_out(shape)
     if mode == "fan_in":
         fan = fan_in

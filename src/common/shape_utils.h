@@ -1,11 +1,31 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2019 by Contributors
  * \file src/common/shape_utils.h
  * \brief Utilities for shape-related manipulation
  */
 #pragma once
 #include <vector>
 #include "mnm/ir.h"
+#include "mnm/op.h"
+#include "mnm/value.h"
 
 namespace mnm {
 namespace common {
@@ -148,6 +168,64 @@ inline int64_t GetNumel(const DLTensor& dlt) {
     numel *= dlt.shape[i];
   }
   return numel;
+}
+
+inline int64_t GetSizeFromType(ir::Type ty) {
+  if (auto tuple_type = ty.as<TupleTypeNode>()) {
+    int64_t total_size = 0;
+    for (auto field : tuple_type->fields) {
+      auto size = GetSizeFromType(field);
+      if (size == 0) {
+        return 0;
+      }
+      total_size += size;
+    }
+    return total_size;
+  } else if (auto ttype = ty.as<TensorTypeNode>()) {
+    int64_t size = 1;
+    for (auto axis : ttype->shape) {
+      auto node = axis.as<ir::IntImmNode>();
+      CHECK(node != nullptr) << "Axis " << axis << " is not IntImmNode";
+      size *= (int64_t)node->value;
+    }
+    return size;
+  }
+  LOG(FATAL) << "Unsupported type: " << ty->GetTypeKey();
+  throw;
+}
+
+inline int64_t GetDimSize(const Expr& expr, const int64_t dim) {
+  auto ttype = expr->checked_type().as<TensorTypeNode>();
+  ICHECK(ttype != nullptr);
+  ICHECK_LT(dim, ttype->shape.size())
+      << "Dim to access must be less than the shape size, but got " << dim << " (dim) and "
+      << ttype->shape.size() << " (shape size)";
+  return ttype->shape[dim].as<IntImmNode>()->value;
+}
+
+/*!
+ * \brief Calculate the byte compact size of the given type. If the type is a tuple,
+ * then the total size of summing up all tensors in the tuple will be returned.
+ * Note that size 0 means a tensor with dynamic shape and cannot determine the size.
+ * \param type The type to calculate the size of.
+ * \return The size of the type in bytes.
+ */
+inline int64_t BytesCompactType(const Type& type) {
+  if (auto tuple_type = type.as<TupleTypeNode>()) {
+    int64_t total_size = 0;
+    for (auto field : tuple_type->fields) {
+      auto size = BytesCompactType(field);
+      if (size == 0) {
+        return 0;
+      }
+      total_size += size;
+    }
+    return total_size;
+  } else if (auto ttype = type.as<TensorTypeNode>()) {
+    return BytesCompactTensor(ttype);
+  }
+  LOG(FATAL) << "Unsupported type: " << type->GetTypeKey();
+  throw;
 }
 
 }  // namespace shape_utils

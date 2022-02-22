@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 import os
 from numbers import Number
 
@@ -7,8 +24,26 @@ from .codegen_utils import snake_to_pascal, write_to_file
 
 def gen_file(schemas, filename):
     FILE = """
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2020 by Contributors
  * Auto generated. Do not touch.
  * \\file {FILENAME}
  * \\brief Operator schema.
@@ -51,9 +86,12 @@ class {CLASS_NAME} : public ir::AttrsNode<{CLASS_NAME}> {{
 
 
 def gen_arg(entry):
-    ARG = " " * 2 + """
+    ARG = (
+        " " * 2
+        + """
   {TYPE} {NAME}{DEFAULT};
 """.strip()
+    )
     typ = entry.cxx_type
     name = entry.name
     default = entry.cxx_default
@@ -63,7 +101,7 @@ def gen_arg(entry):
         default = str(default).lower()
     elif isinstance(default, (Number, str)):
         if entry.cxx_normalizer == "IntArray" and len(default) > 2:
-            value = default[1:-1].split(',')
+            value = default[1:-1].split(",")
             re = "ir::Array<value::IntValue> {"
             for i in value:
                 re += "value::IntValue::make(" + i + ")"

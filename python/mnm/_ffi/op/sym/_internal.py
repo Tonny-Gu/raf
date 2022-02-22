@@ -1,7 +1,25 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # pylint: disable=invalid-name,redefined-builtin,line-too-long
 # pylint: disable=missing-class-docstring,missing-function-docstring
 """Auto generated. Do not touch."""
 from mnm._lib import _APIS
+
 # Defined in ./src/op/regs/regs.cc
 _allgather = _APIS.get("mnm.op.sym._allgather", None)
 # Defined in ./src/op/regs/regs.cc
@@ -131,6 +149,8 @@ cross_entropy_dtrue = _APIS.get("mnm.op.sym.cross_entropy_dtrue", None)
 # Defined in ./src/op/regs/regs.cc
 cumsum = _APIS.get("mnm.op.sym.cumsum", None)
 # Defined in ./src/op/regs/regs.cc
+defuse_tensor = _APIS.get("mnm.op.sym.defuse_tensor", None)
+# Defined in ./src/op/regs/regs.cc
 dense = _APIS.get("mnm.op.sym.dense", None)
 # Defined in ./src/op/regs/regs.cc
 device_copy = _APIS.get("mnm.op.sym.device_copy", None)
@@ -159,6 +179,8 @@ full = _APIS.get("mnm.op.sym.full", None)
 # Defined in ./src/op/regs/regs.cc
 full_like = _APIS.get("mnm.op.sym.full_like", None)
 # Defined in ./src/op/regs/regs.cc
+fuse_tensor = _APIS.get("mnm.op.sym.fuse_tensor", None)
+# Defined in ./src/op/regs/regs.cc
 gather = _APIS.get("mnm.op.sym.gather", None)
 # Defined in ./src/op/regs/regs.cc
 gather_dx = _APIS.get("mnm.op.sym.gather_dx", None)
@@ -182,6 +204,8 @@ greater = _APIS.get("mnm.op.sym.greater", None)
 greater_equal = _APIS.get("mnm.op.sym.greater_equal", None)
 # Defined in ./src/op/regs/regs.cc
 l2norm = _APIS.get("mnm.op.sym.l2norm", None)
+# Defined in ./src/op/regs/regs.cc
+lans = _APIS.get("mnm.op.sym.lans", None)
 # Defined in ./src/op/regs/regs.cc
 layer_norm = _APIS.get("mnm.op.sym.layer_norm", None)
 # Defined in ./src/op/regs/regs.cc

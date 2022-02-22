@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # pylint: disable=protected-access
 import pytest
 import mnm
@@ -9,6 +26,7 @@ from mnm._ffi.pass_ import EstimateGFLOPS
 from mnm.ir import ScopeBuilder
 from mnm.testing import run_infer_type
 
+
 def verify_flops(mod, expected_map):
     with Device("cpu"):
         ret = EstimateGFLOPS(run_infer_type(mod))
@@ -16,8 +34,8 @@ def verify_flops(mod, expected_map):
 
     for var_name, expected_flops in expected_map.items():
         assert var_name in ret, "Missing %s" % var_name
-        assert abs(expected_flops / 1e9 - ret[var_name]) <= 1e-2, \
-            "%s GFLOPS mismatch" % var_name
+        assert abs(expected_flops / 1e9 - ret[var_name]) <= 1e-2, "%s GFLOPS mismatch" % var_name
+
 
 def test_conv2d():
     shape = (16, 16, 64, 64)
@@ -36,6 +54,7 @@ def test_conv2d():
 
     # 2 * (N * CI * CO * H * W * kh * kw)
     verify_flops(get_mod(), {"a1": 2 * 16 * 16 * 16 * 64 * 64 * 3 * 3})
+
 
 def test_unary():
     shape = (10, 5)
@@ -72,6 +91,7 @@ def test_fusion():
         return tvm.IRModule.from_expr(func)
 
     verify_flops(get_mod(), {"a1": 10 * 5 * 2})
+
 
 def test_multi_func():
     shape = (10, 5)

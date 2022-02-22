@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2019 by Contributors
  * \file ir.h
  * \brief A compatibility layer between MNM and TVM/Relay IR.
  */
@@ -171,70 +189,6 @@ using tvm::relay::ExprVisitor;
 using tvm::relay::MixedModeMutator;
 using tvm::relay::MixedModeVisitor;
 
-// Relay Patterns
-using tvm::relay::DFPattern;
-using tvm::relay::DFPatternCallback;
-using tvm::relay::DFPatternFunctor;
-using tvm::relay::DFPatternVisitor;
-
-using tvm::relay::AltPattern;
-using tvm::relay::AltPatternNode;
-
-using tvm::relay::AttrPattern;
-using tvm::relay::AttrPatternNode;
-
-using tvm::relay::CallPattern;
-using tvm::relay::CallPatternNode;
-
-using tvm::relay::ConstantPattern;
-using tvm::relay::ConstantPatternNode;
-
-using tvm::relay::DataTypePattern;
-using tvm::relay::DataTypePatternNode;
-
-using tvm::relay::DominatorPattern;
-using tvm::relay::DominatorPatternNode;
-
-using tvm::relay::ExprPattern;
-using tvm::relay::ExprPatternNode;
-
-using tvm::relay::FunctionPattern;
-using tvm::relay::FunctionPatternNode;
-
-using tvm::relay::IfPattern;
-using tvm::relay::IfPatternNode;
-
-using tvm::relay::LetPattern;
-using tvm::relay::LetPatternNode;
-
-using tvm::relay::ShapePattern;
-using tvm::relay::ShapePatternNode;
-
-using tvm::relay::TupleGetItemPattern;
-using tvm::relay::TupleGetItemPatternNode;
-
-using tvm::relay::TuplePattern;
-using tvm::relay::TuplePatternNode;
-
-using tvm::relay::TypePattern;
-using tvm::relay::TypePatternNode;
-
-using tvm::relay::VarPattern;
-using tvm::relay::VarPatternNode;
-
-using tvm::relay::WildcardPattern;
-using tvm::relay::WildcardPatternNode;
-
-// Relay pattern helper function
-using tvm::relay::IsConstant;
-using tvm::relay::IsExpr;
-using tvm::relay::IsOp;
-using tvm::relay::IsTuple;
-using tvm::relay::IsTupleGetItem;
-using tvm::relay::IsVar;
-using tvm::relay::IsWildcard;
-using tvm::relay::MatchPattern;
-
 // Relay attributes
 using tvm::WithAttr;
 
@@ -256,13 +210,13 @@ constexpr const char* kPatternName = "PatternName";
 }  // namespace mnm
 
 #define MNM_BASE_OBJECT(TypeName, ParentType)                                                  \
-  static const uint32_t RuntimeTypeIndex() {                                                   \
+  static uint32_t RuntimeTypeIndex() {                                                         \
     if (TypeName::_type_index != ::tvm::runtime::TypeIndex::kDynamic) {                        \
       return TypeName::_type_index;                                                            \
     }                                                                                          \
     return _GetOrAllocRuntimeTypeIndex();                                                      \
   }                                                                                            \
-  static const uint32_t _GetOrAllocRuntimeTypeIndex() {                                        \
+  static uint32_t _GetOrAllocRuntimeTypeIndex() {                                              \
     static uint32_t tidx = GetOrAllocRuntimeTypeIndex(                                         \
         TypeName::_type_key, TypeName::_type_index, ParentType::_GetOrAllocRuntimeTypeIndex(), \
         TypeName::_type_child_slots, TypeName::_type_child_slots_can_overflow);                \
@@ -308,3 +262,4 @@ constexpr const char* kPatternName = "PatternName";
               })
 
 #include "./ir_ext.h"
+#include "./dataflow_pattern.h"

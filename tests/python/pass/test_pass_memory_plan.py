@@ -1,25 +1,46 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # pylint: disable=protected-access, no-self-use, attribute-defined-outside-init, invalid-name
 # pylint: disable=unused-variable, too-many-arguments
 import pytest
 import mnm
 from mnm._lib import tvm
-from mnm.testing import get_device_list, randn, check, run_vm_model
+from mnm.testing import get_testable_devices, randn, check, run_vm_model
 
 
-def optimize(mod, device, reuse_storage=False, fusion=False):
+def optimize(mod, device, fusion=False):
     device_name = device if device != "cpu" else "llvm"
     disabled_pass = []
     if not fusion:
         disabled_pass = ["FuseDialect", "FuseTVM"]
-    with tvm.transform.PassContext(opt_level=3,
-                                   disabled_pass=disabled_pass,
-                                   config={"mnm.memory_plan.reuse_storage": reuse_storage}):
+    with tvm.transform.PassContext(opt_level=3, disabled_pass=disabled_pass):
         opt_mod, _ = mnm._core.vm.VMCompiler().optimize(mod, device=device_name, params={})
     return opt_mod
 
 
-def verify_alloc_num(func, expected_alloc_storage, expected_alloc_tensor, expected_out_tensor,
-                     expected_free_memory, expected_size):
+def verify_alloc_num(
+    func,
+    expected_alloc_storage,
+    expected_alloc_tensor,
+    expected_out_tensor,
+    expected_free_memory,
+    expected_size,
+):
     # A helper function to verify alloc_storage and alloc_tensor numbers and total sizes
     alloc_storage = 0
     alloc_tensor = 0
@@ -38,8 +59,9 @@ def verify_alloc_num(func, expected_alloc_storage, expected_alloc_tensor, expect
             free_memory += 1
 
     assert (
-        alloc_storage == expected_alloc_storage and alloc_tensor == expected_alloc_tensor and
-        out_tensor == expected_out_tensor
+        alloc_storage == expected_alloc_storage
+        and alloc_tensor == expected_alloc_tensor
+        and out_tensor == expected_out_tensor
     ), "#storage %d, #tensor %d, #out %d" % (alloc_storage, alloc_tensor, out_tensor)
     assert free_memory == expected_free_memory, "#free %d" % free_memory
     assert total_size == expected_size, "Total size %d, but expected %d" % (
@@ -48,9 +70,9 @@ def verify_alloc_num(func, expected_alloc_storage, expected_alloc_tensor, expect
     )
 
 
-def verify_correctness(model, device, args, reuse_storage, fusion):
+def verify_correctness(model, device, args, fusion):
     # A helper function to verify the correctness
-    outs = run_vm_model(model, device, args, disable_fusion=not fusion, reuse_storage=reuse_storage)
+    outs = run_vm_model(model, device, args, disable_fusion=not fusion)
     outs = outs if isinstance(outs, (tuple, list)) else (outs,)
 
     ref_outs = model(*args)
@@ -61,7 +83,7 @@ def verify_correctness(model, device, args, reuse_storage, fusion):
         check(ref_out, out)
 
 
-@pytest.mark.parametrize("device", get_device_list())
+@pytest.mark.parametrize("device", get_testable_devices())
 @pytest.mark.parametrize("fusion", [False, True])
 def test_memory_plan_basic(device, fusion):
     class Model(mnm.Model):
@@ -73,8 +95,8 @@ def test_memory_plan_basic(device, fusion):
             t0 = mnm.add(a, a)
             t1 = mnm.add(t0, b)
             t2 = mnm.add(t1, c)
-            t3 = mnm.add(t2, t0)  # t1 and t3 share buffer
-            t4 = mnm.add(t3, d)  # t4 is the final output so cannot share with t0
+            t3 = mnm.add(t2, t0)
+            t4 = mnm.add(t3, d)
             return t4
 
     shape = (5, 5)
@@ -88,17 +110,16 @@ def test_memory_plan_basic(device, fusion):
 
     mod = model_before._internal(*args).mod
 
-    mod1 = optimize(mod, device, reuse_storage=True, fusion=fusion)
+    mod1 = optimize(mod, device, fusion=fusion)
     if not fusion:
-        verify_alloc_num(mod1["main"], 4, 5, 1, 3, 400)
+        verify_alloc_num(mod1["main"], 5, 5, 1, 4, 500)
     else:
         verify_alloc_num(mod1["main"], 1, 1, 1, 0, 100)
 
-    verify_correctness(model_before, device, args, reuse_storage=False, fusion=fusion)
-    verify_correctness(model_before, device, args, reuse_storage=True, fusion=fusion)
+    verify_correctness(model_before, device, args, fusion=fusion)
 
 
-@pytest.mark.parametrize("device", get_device_list())
+@pytest.mark.parametrize("device", get_testable_devices())
 @pytest.mark.parametrize("fusion", [False, True])
 def test_memory_plan_multi_outs(device, fusion):
     class Model(mnm.Model):
@@ -112,8 +133,8 @@ def test_memory_plan_multi_outs(device, fusion):
             t1 = res[0]
             t2 = res[1]
             t3 = res[2]
-            t4 = mnm.relu(t1)  # t0 and t4 can share buffer
-            t5 = mnm.relu(t4)  # t1 is the final output so cannot share with t5
+            t4 = mnm.relu(t1)
+            t5 = mnm.relu(t4)
             return t5
 
     model_before = Model()
@@ -128,50 +149,13 @@ def test_memory_plan_multi_outs(device, fusion):
     args = [m_x, m_m, m_v, m_w, m_b]
 
     mod = model_before._internal(*args).mod
-    mod = optimize(mod, device, reuse_storage=True, fusion=fusion)
+    mod = optimize(mod, device, fusion=fusion)
     if not fusion:
-        verify_alloc_num(mod["main"], 5, 6, 1, 4, 28901400)
+        verify_alloc_num(mod["main"], 6, 6, 1, 5, 38535192)
     else:
-        # The memory footprint is the same as no-fused one because FuseOps
-        # just fuses two relu ops.
         verify_alloc_num(mod["main"], 5, 5, 1, 4, 28901400)
 
-    verify_correctness(model_before, device, args, reuse_storage=False, fusion=fusion)
-    verify_correctness(model_before, device, args, reuse_storage=True, fusion=fusion)
-
-
-@pytest.mark.parametrize("device", get_device_list())
-@pytest.mark.parametrize("fusion", [False, True])
-def test_memory_plan_group_selection(device, fusion):
-    class Model(mnm.Model):
-        def build(self):
-            pass
-
-        @mnm.model.trace
-        def forward(self, a, b):
-            t0 = mnm.add(a, a)  # new buffer size 20
-            t1 = mnm.add(b, t0)  # new buffer size 200
-            t2 = mnm.add(t0, t1)  # new buffer size 200
-            t3 = mnm.repeat(t2, 2, axis=0)  # can share with t0, t1. select t1, size 400
-            t4 = mnm.sum(t3, axis=0)  # can share with t0, t2. select t0, size 20
-            t5 = mnm.add(t3, t4)  # final output cannot share with t2. new buffer size 400
-            return t5
-
-    model_before = Model()
-    model_before.infer_mode()
-    m_a, _ = randn((1, 5), device=device)
-    m_b, _ = randn((10, 5), device=device)
-    args = [m_a, m_b]
-
-    mod = model_before._internal(*args).mod
-    mod = optimize(mod, device, reuse_storage=True, fusion=fusion)
-    if not fusion:
-        verify_alloc_num(mod["main"], 4, 6, 1, 3, 1020)
-    else:
-        verify_alloc_num(mod["main"], 3, 3, 1, 2, 820)
-
-    verify_correctness(model_before, device, args, reuse_storage=False, fusion=fusion)
-    verify_correctness(model_before, device, args, reuse_storage=True, fusion=fusion)
+    verify_correctness(model_before, device, args, fusion=fusion)
 
 
 def test_set_shape():
@@ -192,9 +176,9 @@ def test_set_shape():
     m_x, _ = randn(shape, device="cpu")
     args = [m_x]
     mod = model._internal(*args).mod
-    mod = optimize(mod, "cpu", reuse_storage=False, fusion=False)
+    mod = optimize(mod, "cpu", fusion=False)
     verify_alloc_num(mod["main"], 2, 2, 1, 1, 480)
-    verify_correctness(model, "cpu", args, reuse_storage=False, fusion=False)
+    verify_correctness(model, "cpu", args, fusion=False)
 
 
 if __name__ == "__main__":

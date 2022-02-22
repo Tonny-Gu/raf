@@ -1,17 +1,39 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2021 by Contributors
  * \file src/impl/base_ops.cc
  * \brief Implementation of some OpEnvs registered on base ops.
  */
+#include "./schema/memory.h"
 #include "./schema/transform.h"
 #include "./schema/ufunc.h"
 #include "mnm/op.h"
 #include "mnm/device_api.h"
+#include "mnm/value.h"
+#include "mnm/stream_pool.h"
 
 namespace mnm {
 namespace op {
 
 using namespace mnm::ir;
+using namespace mnm::tensor;
 using namespace mnm::value;
 
 void SizeImpl(const DLTensor* x, const Value& axis, Value& out) {
@@ -155,6 +177,43 @@ class ShapeAsTensorOpEnv : public mnm::op::OpEnv {
 };
 
 MNM_OP_ENV_MAKER("mnm.op.shape_as_tensor", ShapeAsTensorOpEnv::make);
+
+class DeviceCopyOpEnv : public mnm::op::OpEnv {
+ public:
+  explicit DeviceCopyOpEnv(const CallValues& cv) {
+    static auto fschema_index =
+        ir::Op::GetAttrMap<op::FMNMSchemaFieldIndex>("FMNMSchemaFieldIndex");
+    static const std::string op_name = "mnm.op.device_copy";
+    static const auto op = ir::Op::Get(op_name);
+    this->arg_indices = {fschema_index[op]("data")};
+    env_name_ = TruncateName(GetUniqueName(op_name));
+  }
+
+  std::string name() const override {
+    return env_name_;
+  }
+
+  void Execute(const CallValues& cv) override {
+    // Note that "CopyTo" is able to use the current stream (if set) to perform the async copy.
+    const auto* args = cv->args.as<op::schema::DeviceCopyArgs>();
+    ICHECK(args != nullptr);
+    CopyTo(args->data, cv->out);
+  }
+
+  void Execute(const std::vector<Value>& inputs, Value output) override {
+    CHECK_EQ(inputs.size(), 1U);
+    CopyTo(inputs[0], output);
+  }
+
+  static OpEnv* make(const CallValues& cv) {
+    return new DeviceCopyOpEnv(cv);
+  }
+
+ private:
+  std::string env_name_;
+};
+
+MNM_OP_ENV_MAKER("mnm.op.device_copy", DeviceCopyOpEnv::make);
 
 }  // namespace op
 }  // namespace mnm

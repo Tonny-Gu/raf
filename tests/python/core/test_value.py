@@ -1,7 +1,23 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 import numpy as np
 
-from mnm._core.value import (BoolValue, FloatValue, IntValue, StringValue,
-                             TensorValue, TupleValue)
+from mnm._core.value import BoolValue, FloatValue, IntValue, StringValue, TensorValue, TupleValue
 
 
 def test_int_value():
@@ -38,7 +54,7 @@ def test_string_value():
 
 def test_nested():
     d_0 = TensorValue.assemble((), "float32", "cpu")
-    d_1 = TensorValue.assemble((3, ), "float64", "cpu")
+    d_1 = TensorValue.assemble((3,), "float64", "cpu")
     d_2 = TensorValue.assemble((3, 2), "float16", "cpu")
     d_3 = TensorValue.assemble((3, 2, 6), "float32", "cpu")
     v_0 = TupleValue([d_0, d_1, d_2, d_3])
@@ -72,10 +88,10 @@ def test_assemble_0d():
 
 
 def test_assemble_1d():
-    data = TensorValue.assemble((3, ), "float32", "cpu")
+    data = TensorValue.assemble((3,), "float32", "cpu")
     assert data.ndim == 1
-    assert data.shape == (3, )
-    assert data.strides == (1, )
+    assert data.shape == (3,)
+    assert data.strides == (1,)
 
 
 def test_assemble_2d():
@@ -93,9 +109,9 @@ def test_assemble_3d():
 
 
 def test_assemble_null_1d():
-    data = TensorValue.assemble((0, ), "float32", "cpu")
+    data = TensorValue.assemble((0,), "float32", "cpu")
     assert data.ndim == 1
-    assert data.shape == (0, )
+    assert data.shape == (0,)
 
 
 def test_assemble_null_3d():

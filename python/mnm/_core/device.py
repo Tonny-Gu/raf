@@ -1,9 +1,27 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 """Device."""
 import re
 
 from .core_utils import register_node, DEVICE_TYPE_MAP
 from .._lib import Object
 from .._ffi import device as ffi
+
 
 @register_node("mnm.device.Device")
 class Device(Object):
@@ -15,6 +33,7 @@ class Device(Object):
         The device string such as "cpu", "cuda", or the device string with ID,
         such as "cuda(1)".
     """
+
     def __init__(self, device_str):
         tokens = re.search(r"(\w+).?(\d?)", device_str)
         if not tokens or len(tokens.groups()) != 2:
@@ -24,8 +43,10 @@ class Device(Object):
         device_type_str = tokens.groups()[0]
 
         if device_type_str not in DEVICE_TYPE_MAP:
-            raise ValueError("Unrecognized device type: %s. Supported types:\n%s" %
-                             (device_type_str, ",".join(DEVICE_TYPE_MAP.keys())))
+            raise ValueError(
+                "Unrecognized device type: %s. Supported types:\n%s"
+                % (device_type_str, ",".join(DEVICE_TYPE_MAP.keys()))
+            )
         device_type = DEVICE_TYPE_MAP[device_type_str]
 
         # Process device ID.
@@ -72,13 +93,16 @@ class Device(Object):
         dev = ffi.DeviceCurrent(allow_none)
         return dev if dev.device_type != 0 or dev.device_id != -1 else None
 
+
 def device(device_str):
     """Create a device."""
     return Device(device_str)
 
+
 def cpu(device_id=0):
     """Create a CPU device object."""
     return Device(f"cpu({device_id})")
+
 
 def cuda(device_id=0):
     """Create a CPU device object."""

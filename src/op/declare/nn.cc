@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2019 by Contributors
  * \file src/op/declare/nn.cc
  * \brief Declaration of nn-specific operators
  */
@@ -92,7 +110,7 @@ void Conv2D(const CallValues& call) {
 MNM_OP_DECLARE("mnm.op.conv2d", Conv2D);
 
 void Conv2dTrans(const CallValues& call) {
-  // N.B.: NCHW + OIHW
+  // N.B.: NCHW + IOHW
   const auto* args = call->args.as<ConvTransArgs>();
   CHECK(args != nullptr);
   const DLTensor* x = args->x;
@@ -109,7 +127,7 @@ void Conv2dTrans(const CallValues& call) {
       tvm::Integer(x->shape[2]),
       tvm::Integer(x->shape[3]),
   };
-  tvm::tir::BijectiveLayout w_layout_converter(args->kernel_layout, "OIHW");
+  tvm::tir::BijectiveLayout w_layout_converter(args->kernel_layout, "IOHW");
   tvm::Array<tvm::PrimExpr> w_shape{
       tvm::Integer(w->shape[0]),
       tvm::Integer(w->shape[1]),

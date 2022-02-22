@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # pylint: disable=too-many-arguments, protected-access, attribute-defined-outside-init
 # pylint: disable=too-many-locals
 import re
@@ -11,6 +28,7 @@ from mnm.frontend.model import FrameworkModel
 from mnm.model import BatchNorm, Conv2d, Linear
 from mnm.optim.optim import with_autodiff
 from mnm.testing import compile_vm_model, randn, one_hot_torch
+
 
 def verify_ir(opt_level, ad_model, args, rank_size, rank, n_grad, n_pad):
     record = ad_model._internal(*args)
@@ -80,11 +98,7 @@ def verify_ir(opt_level, ad_model, args, rank_size, rank, n_grad, n_pad):
 def test_basic(mock_get_context, opt_level, batch):
     class Model(mnm.Model):
         def build(self, input_shape=28, num_classes=10):
-            self.conv1 = Conv2d(in_channels=3,
-                                out_channels=6,
-                                kernel_size=5,
-                                padding=2,
-                                bias=False)
+            self.conv1 = Conv2d(in_channels=3, out_channels=6, kernel_size=5, padding=2, bias=False)
             self.bn1 = BatchNorm(6)
             self.linear1 = Linear((input_shape // 2) ** 2 * 6, num_classes)
 
@@ -105,12 +119,13 @@ def test_basic(mock_get_context, opt_level, batch):
             return out
 
     # Mock the context to apply AutoDataParallel in with_autodiff.
-    class MockContext():
+    class MockContext:
         def __init__(self):
             self.enable_data_parallel = True
             self.zero_opt_level = 1
             self.size = 4
             self.rank = 3
+
     mock_get_context.return_value = MockContext()
     if opt_level == 2 and mnm.build.with_nccl() is None:
         pytest.skip("NCCL is not supported")
@@ -127,6 +142,7 @@ def test_basic(mock_get_context, opt_level, batch):
     elif batch == 7:
         # The first axis of all gradients are non-dividable.
         verify_ir(opt_level, ad_model, [m_dy, m_x, m_ytrue], 4, 1, 9, 9)
+
 
 if __name__ == "__main__":
     pytest.main([__file__])

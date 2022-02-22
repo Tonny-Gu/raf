@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2020 by Contributors
  * \file liveness_analysis.h
  * \brief A pass for analyzing tensor liveness.
  */
@@ -103,6 +121,23 @@ class LivenessAnalyzer {
       ret.push_back(var);
     }
     return ret;
+  }
+
+  /*! \brief Check if the variable is alive given the live dummy var set. */
+  bool IsAlive(const Var& var, const VSet& live_vars) {
+    if (live_vars.count(var)) {
+      return true;
+    }
+    // deal with the live dummy vars.
+    for (Var v : GetTensorVars(var)) {
+      if (v == var) {
+        continue;
+      }
+      if (live_vars.count(v) || IsAlive(v, live_vars)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /*! \brief Union-find Forest: Get root in Union-find Forest */
@@ -470,6 +505,15 @@ class LivenessAnalyzer::BackwardAnalyzer : public ExprVisitor {
   /*! \brief the analyzer it belongs to */
   LivenessAnalyzer* analyzer_;
 };
+
+/*! \brief Calculate the byte compact size of the given type. If the type is a tuple,
+ * then the size of each tensor in the tuple will be returned. Note that size 0 means
+ * a tensor with dynamic shape.
+ */
+std::vector<int64_t> CalcBytesCompactSizes(const Type& type);
+
+/*! \brief Dump liveness analysis result statistics. */
+void DumpLivenessStat(const MapVSet& live_in);
 
 }  // namespace liveness_analysis
 }  // namespace pass

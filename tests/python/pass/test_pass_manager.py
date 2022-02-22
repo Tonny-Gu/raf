@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 """Unit tests for relay pass manager."""
 # pylint: disable=missing-function-docstring, invalid-name, missing-class-docstring
 # pylint: disable=too-few-public-methods, unused-argument
@@ -54,8 +71,7 @@ def update_func(func):
 
         def visit_function(self, fn):
             new_body = self.visit(fn.body)
-            return relay.Function(list(fn.params), new_body, fn.ret_type,
-                                  fn.type_params, fn.attrs)
+            return relay.Function(list(fn.params), new_body, fn.ret_type, fn.type_params, fn.attrs)
 
     double_value = DoubleValues()
     return double_value.visit(func)
@@ -66,8 +82,10 @@ class OptTester:
 
     def __init__(self, mod):
         if not isinstance(mod, tvm.IRModule):
-            raise TypeError("mod is expected to be the type of \
-                            tvm.IRModule")
+            raise TypeError(
+                "mod is expected to be the type of \
+                            tvm.IRModule"
+            )
         self.mod = mod
 
     @staticmethod
@@ -100,8 +118,7 @@ def test_module_pass():
     def direct_transform(expr, dev):
         return opt_tester.transform(expr, dev)
 
-    mod_pass = module_pass(direct_transform, opt_level=3,
-                           name="module_pass_test")
+    mod_pass = module_pass(direct_transform, opt_level=3, name="module_pass_test")
     assert isinstance(mod_pass, ModulePass)
     pass_info = mod_pass.info
     assert pass_info.name == "module_pass_test"

@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2019 by Contributors
  * \file value.h
  * \brief Definition of MNM values
  */
@@ -11,6 +29,7 @@
 #include "./ir.h"
 #include "./tensor.h"
 #include "./memory_pool.h"
+#include "../3rdparty/tvm/src/relay/transforms/pattern_utils.h"
 
 namespace mnm {
 namespace op {
@@ -114,7 +133,16 @@ class IntValueObj : public ScalarValueObj {
     v->Visit("dtype", &dtype);
     v->Visit("value", &value);
   }
+  bool SEqualReduce(const IntValueObj* other, tvm::SEqualReducer equal) const {
+    return equal(dtype, other->dtype) && equal(value, other->value);
+  }
+  void SHashReduce(tvm::SHashReducer hash_reduce) const {
+    hash_reduce(dtype);
+    hash_reduce(value);
+  }
   static constexpr const char* _type_key = "mnm.value.IntValue";
+  static constexpr const bool _type_has_method_sequal_reduce = true;
+  static constexpr const bool _type_has_method_shash_reduce = true;
   MNM_FINAL_OBJECT(IntValueObj, ScalarValueObj);
 };
 
@@ -132,7 +160,16 @@ class FloatValueObj : public ScalarValueObj {
     v->Visit("dtype", &dtype);
     v->Visit("value", &value);
   }
+  bool SEqualReduce(const FloatValueObj* other, tvm::SEqualReducer equal) const {
+    return equal(dtype, other->dtype) && equal(value, other->value);
+  }
+  void SHashReduce(tvm::SHashReducer hash_reduce) const {
+    hash_reduce(dtype);
+    hash_reduce(value);
+  }
   static constexpr const char* _type_key = "mnm.value.FloatValue";
+  static constexpr const bool _type_has_method_sequal_reduce = true;
+  static constexpr const bool _type_has_method_shash_reduce = true;
   MNM_FINAL_OBJECT(FloatValueObj, ScalarValueObj);
 };
 
@@ -150,7 +187,16 @@ class BoolValueObj : public ScalarValueObj {
     v->Visit("dtype", &dtype);
     v->Visit("value", &value);
   }
+  bool SEqualReduce(const BoolValueObj* other, tvm::SEqualReducer equal) const {
+    return equal(dtype, other->dtype) && equal(value, other->value);
+  }
+  void SHashReduce(tvm::SHashReducer hash_reduce) const {
+    hash_reduce(dtype);
+    hash_reduce(value);
+  }
   static constexpr const char* _type_key = "mnm.value.BoolValue";
+  static constexpr const bool _type_has_method_sequal_reduce = true;
+  static constexpr const bool _type_has_method_shash_reduce = true;
   MNM_FINAL_OBJECT(BoolValueObj, ScalarValueObj);
 };
 
@@ -181,7 +227,18 @@ class TensorValueObj final : public BaseTensorValueObj {
   void VisitAttrs(tvm::AttrVisitor* v) {
     v->Visit("_tensor", &tensor);
   }
+  bool SEqualReduce(const TensorValueObj* other, tvm::SEqualReducer equal) const {
+    // TODO(@hgt312): pointer equal now
+    return this == other;
+  }
+  void SHashReduce(tvm::SHashReducer hash_reduce) const {
+    // TODO(@hgt312): pointer equal now
+    const void* ptr = reinterpret_cast<const void*>(this);
+    hash_reduce->SHashReduceHashedValue(std::hash<const void*>()(ptr));
+  }
   static constexpr const char* _type_key = "mnm.value.TensorValue";
+  static constexpr const bool _type_has_method_sequal_reduce = true;
+  static constexpr const bool _type_has_method_shash_reduce = true;
   MNM_FINAL_OBJECT(TensorValueObj, BaseTensorValueObj);
 };
 
@@ -209,7 +266,16 @@ class TensorTypeValueObj final : public BaseTensorValueObj {
   void VisitAttrs(tvm::AttrVisitor* v) {
     v->Visit("_type", &type);
   }
+  bool SEqualReduce(const TensorTypeValueObj* other, tvm::SEqualReducer equal) const {
+    return equal(type->shape, other->type->shape) && equal(type->dtype, other->type->dtype);
+  }
+  void SHashReduce(tvm::SHashReducer hash_reduce) const {
+    hash_reduce(type->shape);
+    hash_reduce(type->dtype);
+  }
   static constexpr const char* _type_key = "mnm.value.TensorTypeValue";
+  static constexpr const bool _type_has_method_sequal_reduce = true;
+  static constexpr const bool _type_has_method_shash_reduce = true;
   MNM_FINAL_OBJECT(TensorTypeValueObj, BaseTensorValueObj);
 };
 
@@ -226,7 +292,26 @@ class TupleValueObj final : public ValueObj {
   void VisitAttrs(tvm::AttrVisitor* v) {
     v->Visit("_fields", &fields);
   }
+  bool SEqualReduce(const TupleValueObj* other, tvm::SEqualReducer equal) const {
+    // Treat empty tuple as a constant node instead of a graph node.
+    if (fields.size() == other->fields.size() && fields.size() == 0) {
+      return true;
+    } else {
+      equal->MarkGraphNode();
+      return equal(fields, other->fields);
+    }
+  }
+  void SHashReduce(tvm::SHashReducer hash_reduce) const {
+    if (fields.size() != 0) {
+      hash_reduce->MarkGraphNode();
+      for (size_t i = 0; i < fields.size(); ++i) {
+        hash_reduce(fields[i]);
+      }
+    }
+  }
   static constexpr const char* _type_key = "mnm.value.TupleValue";
+  static constexpr const bool _type_has_method_sequal_reduce = true;
+  static constexpr const bool _type_has_method_shash_reduce = true;
   MNM_FINAL_OBJECT(TupleValueObj, ValueObj);
 };
 
@@ -239,8 +324,21 @@ class TupleValue final : public Value {
 /* ClosureValue */
 class ClosureValueObj final : public ValueObj {
  public:
+  /*! \brief The set of free variables in the closure.
+   *
+   * These are the captured variables which are required for
+   * evaluation when we call the closure.
+   */
   ir::Map<ir::Var, Value> env;
+  /*! \brief The function which implements the closure.
+   *
+   * \note May reference the variables contained in the env.
+   */
   ir::Function func;
+  /*! \brief variable the closure bind to, used when
+   * the function is a recursive function.
+   */
+  ir::Optional<ir::Var> bind;
   void VisitAttrs(tvm::AttrVisitor* v) {
     v->Visit("_env", &env);
     v->Visit("_func", &func);
@@ -251,7 +349,8 @@ class ClosureValueObj final : public ValueObj {
 
 class ClosureValue final : public Value {
  public:
-  static ClosureValue make(ir::Map<ir::Var, Value> env, ir::Function func);
+  static ClosureValue make(ir::Map<ir::Var, Value> env, ir::Function func,
+                           ir::Optional<ir::Var> bind = tvm::NullOpt);
   MNM_OBJECT_REF(ClosureValue, Value, ClosureValueObj);
 };
 
@@ -313,7 +412,15 @@ class StringValueObj : public ValueObj {
   void VisitAttrs(tvm::AttrVisitor* v) {
     v->Visit("value", &value);
   }
+  bool SEqualReduce(const StringValueObj* other, tvm::SEqualReducer equal) const {
+    return equal(value, other->value);
+  }
+  void SHashReduce(tvm::SHashReducer hash_reduce) const {
+    hash_reduce(value);
+  }
   static constexpr const char* _type_key = "mnm.value.StringValue";
+  static constexpr const bool _type_has_method_sequal_reduce = true;
+  static constexpr const bool _type_has_method_shash_reduce = true;
   MNM_FINAL_OBJECT(StringValueObj, ValueObj);
 };
 
@@ -328,7 +435,14 @@ class NoGradValueObj : public ValueObj {
  public:
   void VisitAttrs(tvm::AttrVisitor* v) {
   }
+  bool SEqualReduce(const NoGradValueObj* other, tvm::SEqualReducer equal) const {
+    return true;
+  }
+  void SHashReduce(tvm::SHashReducer hash_reduce) const {
+  }
   static constexpr const char* _type_key = "mnm.value.NoGradValue";
+  static constexpr const bool _type_has_method_sequal_reduce = true;
+  static constexpr const bool _type_has_method_shash_reduce = true;
   MNM_FINAL_OBJECT(NoGradValueObj, ValueObj);
 };
 
@@ -353,14 +467,48 @@ class VoidValue : public Value {
   MNM_OBJECT_REF(VoidValue, Value, VoidValueObj);
 };
 
-template <class T>
-T GetScalarValueData(const Value& value);
+template <typename T>
+T GetScalarValueData(const Value& value) {
+  using namespace tvm::runtime;
 
-template <>
-bool GetScalarValueData<bool>(const Value& value);
+  if (const auto* bvo = value.as<BoolValueObj>()) {
+    return bvo->value;
+  } else if (const auto* fvo = value.as<FloatValueObj>()) {
+    return fvo->value;
+  } else if (const auto* ivo = value.as<IntValueObj>()) {
+    return ivo->value;
+  } else if (const auto* tvo = value.as<TensorValueObj>()) {
+    tensor::Tensor tensor = tvo->tensor;
+    CHECK_EQ(tensor->ndim, 0U) << "Value is not a scalar";
 
-template <>
-float GetScalarValueData<float>(const Value& value);
+    DataType dtype = DataType(tensor->dtype);
+    NDArray nd_array;
+    if (tensor->device.device_type != kDLCPU) {
+      DLDevice cpu_dev;
+      cpu_dev.device_type = kDLCPU;
+      cpu_dev.device_id = 0;
+      nd_array = tensor.CopyTo(cpu_dev);
+    } else {
+      nd_array = tensor;
+    }
+    void* raw_data = nd_array->data;
+
+    T data;
+    TVM_DTYPE_DISPATCH(dtype, DType, {
+      if (dtype == DataType::Float(16)) {
+        // The storage of float16 is uint16_t. Here we convert it to float32.
+        data = __extendXfYf2__<uint16_t, uint16_t, 10, float, uint32_t, 23>(
+            reinterpret_cast<uint16_t*>(raw_data)[0]);
+      } else if (dtype == DataType::Bool()) {
+        data = reinterpret_cast<uint8_t*>(raw_data)[0];
+      } else {
+        data = static_cast<DType*>(raw_data)[0];
+      }
+    });
+    return data;
+  }
+  LOG(FATAL) << "Cannot convert to scalar value";
+}
 
 /*!
  * \brief Copy a value to specified device.
@@ -369,6 +517,13 @@ float GetScalarValueData<float>(const Value& value);
  * \return The copyed value.
  */
 Value CopyTo(Value src, const Device& dev);
+
+/*!
+ * \brief Copy a value to another value.
+ * \param src Value to be copyed.
+ * \param dst The destination.
+ */
+void CopyTo(Value src, Value dst);
 
 /*!
  * \brief Create a dummy value according to type.

@@ -1,32 +1,63 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 """The extended gemm operation. Origin: cutlass/tools/library/scripts/gemm_operation.py"""
 import gemm_operation
 from library import *
 from library_ext import *
 
+
 class GemmOperationExt(gemm_operation.GemmOperation):
     def core_name(self):
-        inst_shape = ''
-        inst_operation = ''
-        intermediate_type = ''
+        inst_shape = ""
+        inst_operation = ""
+        intermediate_type = ""
 
         math_operations_map = {
-            MathOperation.xor_popc: 'xor',
+            MathOperation.xor_popc: "xor",
         }
 
-        if self.tile_description.math_instruction.opcode_class == OpcodeClass.TensorOp or \
-        self.tile_description.math_instruction.opcode_class == OpcodeClass.WmmaTensorOp:
+        if (
+            self.tile_description.math_instruction.opcode_class == OpcodeClass.TensorOp
+            or self.tile_description.math_instruction.opcode_class == OpcodeClass.WmmaTensorOp
+        ):
 
             math_op = self.tile_description.math_instruction.math_operation
-            math_op_string = math_operations_map[math_op] if math_op in math_operations_map.keys() else ''
+            math_op_string = (
+                math_operations_map[math_op] if math_op in math_operations_map.keys() else ""
+            )
 
             inst_shape = "%d%d%d" % tuple(self.tile_description.math_instruction.instruction_shape)
             inst_shape += math_op_string
 
-            if self.tile_description.math_instruction.element_a != self.A.element and \
-                self.tile_description.math_instruction.element_a != self.tile_description.math_instruction.element_accumulator:
+            if (
+                self.tile_description.math_instruction.element_a != self.A.element
+                and self.tile_description.math_instruction.element_a
+                != self.tile_description.math_instruction.element_accumulator
+            ):
                 intermediate_type = DataTypeNames[self.tile_description.math_instruction.element_a]
 
-        return "%s%s%s%s%s" % (self.short_math_name(), inst_shape, intermediate_type, GemmKindNames[self.gemm_kind], EpilogueFunctorNames[self.epilogue_functor])
+        return "%s%s%s%s%s" % (
+            self.short_math_name(),
+            inst_shape,
+            intermediate_type,
+            GemmKindNames[self.gemm_kind],
+            EpilogueFunctorNames[self.epilogue_functor],
+        )
 
 
 class EmitGemmConfigurationLibraryExt(gemm_operation.EmitGemmConfigurationLibrary):
@@ -34,11 +65,11 @@ class EmitGemmConfigurationLibraryExt(gemm_operation.EmitGemmConfigurationLibrar
         super().__init__(operation_path, configuration_name)
 
         self.gemm_kind_wrappers = {
-            GemmKind.Gemm: 'GemmOperation',
-            GemmKind.Sparse: 'GemmSparseOperation',
-            GemmKind.Universal: 'GemmUniversalOperationExt',
-            GemmKind.PlanarComplex: 'GemmPlanarComplexOperation',
-            GemmKind.PlanarComplexArray: 'GemmPlanarComplexArrayOperation'
+            GemmKind.Gemm: "GemmOperation",
+            GemmKind.Sparse: "GemmSparseOperation",
+            GemmKind.Universal: "GemmUniversalOperationExt",
+            GemmKind.PlanarComplex: "GemmPlanarComplexOperation",
+            GemmKind.PlanarComplexArray: "GemmPlanarComplexArrayOperation",
         }
 
         self.header_template = """
@@ -66,8 +97,10 @@ def make_gemm_operation_ext(op):
         op.gemm_kind,
         op.arch,
         op.tile_description,
-        op.A, op.B, op.C,
+        op.A,
+        op.B,
+        op.C,
         op.element_epilogue,
         op.epilogue_functor,
-        op.swizzling_functor
+        op.swizzling_functor,
     )

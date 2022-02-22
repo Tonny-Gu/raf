@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 import numpy as np
 import pytest
 
@@ -21,17 +38,17 @@ def test_requires_grad():
 def test_mutation():
     a = mnm.array([1, 2, 3], dtype="float32")
     a[:] = np.array([4, 5, 6], dtype="float64")
-    assert a.shape == (3, )
+    assert a.shape == (3,)
     assert a.dtype == "float32"
-    np.testing.assert_allclose(np.array([4, 5, 6], dtype='float32'), a.numpy())
+    np.testing.assert_allclose(np.array([4, 5, 6], dtype="float32"), a.numpy())
 
 
 @pytest.mark.skipif(not mnm.build.with_cuda(), reason="CUDA is not enabled")
 def test_move_device():
-    a = mnm.array([1, 2, 3], dtype='float32')
-    a = a.to(device='cuda')
-    assert a.device.startswith('cuda')
-    np.testing.assert_allclose(np.array([1, 2, 3], dtype='float32'), a.numpy())
+    a = mnm.array([1, 2, 3], dtype="float32")
+    a = a.to(device="cuda")
+    assert a.device.startswith("cuda")
+    np.testing.assert_allclose(np.array([1, 2, 3], dtype="float32"), a.numpy())
 
 
 def test_bf16_ndarray():

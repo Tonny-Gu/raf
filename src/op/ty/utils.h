@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2020 by Contributors
  * \file src/op/ty/utils.h
  * \brief Typing utils
  */
@@ -96,6 +114,32 @@ tvm::Type GeneralDxInfer(const CallValues& value) {
   CHECK(args != nullptr);
   tvm::TensorType x = tvm::Downcast<tvm::TensorType>(GetType(args->x));
   return x;
+}
+
+inline Array<PrimExpr> BroadcastShape(const TensorType& x1, const TensorType& x2) {
+  size_t ndim_1 = x1->shape.size();
+  size_t ndim_2 = x2->shape.size();
+  size_t ndim = std::max(ndim_1, ndim_2);
+  Array<PrimExpr> oshape(ndim, 0);
+  for (size_t i = 0; i < ndim; ++i) {
+    PrimExpr lhs = (i < ndim_1) ? x1->shape[ndim_1 - 1 - i] : Integer(1);
+    PrimExpr rhs = (i < ndim_2) ? x2->shape[ndim_2 - 1 - i] : Integer(1);
+
+    if (tvm::tir::is_const_int(lhs, 1)) {
+      oshape.Set(ndim - 1 - i, rhs);
+    } else if (tvm::tir::is_const_int(rhs, 1)) {
+      oshape.Set(ndim - 1 - i, lhs);
+    } else if (lhs.as<AnyNode>()) {
+      oshape.Set(ndim - 1 - i, rhs);
+    } else if (rhs.as<AnyNode>()) {
+      oshape.Set(ndim - 1 - i, lhs);
+    } else if (TypeCheckCompare(lhs, rhs, std::equal_to<int>())) {
+      oshape.Set(ndim - 1 - i, lhs);
+    } else {
+      LOG(FATAL) << "Incompatible broadcast type " << x1 << " and " << x2;
+    }
+  }
+  return oshape;
 }
 
 }  // namespace op

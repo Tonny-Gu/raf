@@ -1,15 +1,30 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 import pytest
 import numpy as np
 import mnm
 from mnm._core.executor import VMExecutor
-from mnm.testing import check, compile_vm_model, run_vm_model, get_arr_addr, get_device_list, randn
+from mnm.testing import check, compile_vm_model, run_vm_model, get_arr_addr, randn
+from mnm.testing import get_testable_devices
 
 
-@pytest.mark.parametrize("device", get_device_list())
-@pytest.mark.parametrize("shape", [
-    [3, 3],
-    [4, 4]
-])
+@pytest.mark.parametrize("device", get_testable_devices())
+@pytest.mark.parametrize("shape", [[3, 3], [4, 4]])
 def test_vm(device, shape):
     # pylint: disable=protected-access
     class Model(mnm.Model):
@@ -34,7 +49,7 @@ def test_vm(device, shape):
 
     executable = executor.executable
     assert len(executable.globals) == 1
-    assert executable.globals[0] == 'main'
+    assert executable.globals[0] == "main"
 
     # execute 2nd time to reuse the op env
     m_z = executor.vm.run(m_x).numpy()
@@ -42,10 +57,7 @@ def test_vm(device, shape):
 
 
 @pytest.mark.skipif(not mnm.build.with_cuda(), reason="CUDA is not enabled")
-@pytest.mark.parametrize("shape", [
-    [3, 3],
-    [4, 4]
-])
+@pytest.mark.parametrize("shape", [[3, 3], [4, 4]])
 def test_cuda_graph(shape):
     # pylint: disable=protected-access
     class Model(mnm.Model):
@@ -76,14 +88,11 @@ def test_cuda_graph(shape):
 
     executable = executor.executable
     assert len(executable.globals) == 1
-    assert executable.globals[0] == 'main'
+    assert executable.globals[0] == "main"
 
 
-@pytest.mark.parametrize("device", get_device_list())
-@pytest.mark.parametrize("shape", [
-    [3, 3],
-    [4, 4]
-])
+@pytest.mark.parametrize("device", get_testable_devices())
+@pytest.mark.parametrize("shape", [[3, 3], [4, 4]])
 def test_tuple(device, shape):
     # pylint: disable=protected-access
     class Model(mnm.Model):
@@ -111,20 +120,18 @@ def test_tuple(device, shape):
 
     executable = executor.executable
     assert len(executable.globals) == 1
-    assert executable.globals[0] == 'main'
+    assert executable.globals[0] == "main"
 
 
-@pytest.mark.parametrize("device", get_device_list())
-@pytest.mark.parametrize("shape", [
-    [3, 3],
-    [4, 4]
-])
+@pytest.mark.parametrize("device", get_testable_devices())
+@pytest.mark.parametrize("shape", [[3, 3], [4, 4]])
 def test_memory(device, shape):
     # pylint: disable=protected-access
-    dtype = 'float32'
+    dtype = "float32"
     x = mnm.array(np.random.randn(*shape).astype(dtype), device=device)
     t_1 = mnm.array(np.ones(shape, dtype=dtype) * 3)
     t_2 = mnm.array(np.ones(shape, dtype=dtype) * 4)
+
     class Model(mnm.Model):
         def build(self):
             pass
@@ -143,11 +150,8 @@ def test_memory(device, shape):
     assert get_arr_addr(out) != get_arr_addr(y)
 
 
-@pytest.mark.parametrize("device", get_device_list())
-@pytest.mark.parametrize("shape", [
-    [3, 3],
-    [4, 4]
-])
+@pytest.mark.parametrize("device", get_testable_devices())
+@pytest.mark.parametrize("shape", [[3, 3], [4, 4]])
 def test_simple_fusion(device, shape):
     # pylint: disable=protected-access, attribute-defined-outside-init, no-self-use
     def check_e2e(model, device, args):
@@ -171,7 +175,7 @@ def test_simple_fusion(device, shape):
     check_e2e(model, device, [m_x])
 
 
-@pytest.mark.parametrize("device", get_device_list())
+@pytest.mark.parametrize("device", get_testable_devices())
 def test_split_fusion(device):
     # pylint: disable=protected-access, attribute-defined-outside-init, no-self-use
     shape = [3, 3]
@@ -195,6 +199,7 @@ def test_split_fusion(device):
     model = Model()
     m_x, _ = randn(shape, device=device)
     check_e2e(model, device, [m_x])
+
 
 def test_reshape():
     # pylint: disable=protected-access, attribute-defined-outside-init, no-self-use

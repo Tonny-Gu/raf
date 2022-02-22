@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2020 by Contributors
  * \file src/distributed/context.cc
  * \brief Context of Distributed Settings.
  */
@@ -44,6 +62,14 @@ void ZeroOpt(int opt_level) {
   DistContext::Global()->zero_opt_level = opt_level;
 }
 
+void SetGlobalRank(int rank) {
+  DistContext::Global()->rank = rank;
+}
+
+void SetGlobalSize(int size) {
+  DistContext::Global()->size = size;
+}
+
 void AutoDPProfilingStartIter(int auto_dp_profiling_start_iter) {
   DistContext::Global()->auto_dp_profiling_start_iter = auto_dp_profiling_start_iter;
 }
@@ -56,6 +82,8 @@ MNM_REGISTER_GLOBAL("mnm.distributed._make.DistContext").set_body_typed(DistCont
 MNM_REGISTER_GLOBAL("mnm.distributed.Global").set_body_typed(DistContext::Global);
 MNM_REGISTER_GLOBAL("mnm.distributed.EnableDataParallel").set_body_typed(EnableDataParallel);
 MNM_REGISTER_GLOBAL("mnm.distributed.ZeroOpt").set_body_typed(ZeroOpt);
+MNM_REGISTER_GLOBAL("mnm.distributed.SetGlobalRank").set_body_typed(SetGlobalRank);
+MNM_REGISTER_GLOBAL("mnm.distributed.SetGlobalSize").set_body_typed(SetGlobalSize);
 MNM_REGISTER_GLOBAL("mnm.distributed.AutoDPProfilingStartIter")
     .set_body_typed(AutoDPProfilingStartIter);
 MNM_REGISTER_GLOBAL("mnm.distributed.AutoDPProfilingEndIter")

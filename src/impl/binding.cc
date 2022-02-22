@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2019 by Contributors
  * \file src/impl/binding.cc
  * \brief Frontend-defined varioble-expression-value bindings
  */
@@ -259,10 +277,9 @@ Var LookupGrad(Var var) {
   return tape.defined() ? tape->grad : NullValue<Var>();
 }
 
-TensorValue MakeOnes(Device to_dev) {
+TensorValue MakeOnes(Device to_dev, DType dtype) {
   static float a[1] = {1.0};
   static int64_t b[1] = {1};
-  DType dtype = DType(DTypeCode::kFloat(), 32, 1);
   DLTensor tensor;
   tensor.data = a;
   tensor.device = Device(DevType::kCPU(), 0);
@@ -277,9 +294,11 @@ TensorValue MakeOnes(Device to_dev) {
 }
 
 void Backward(Var var, Var dy_var) {
-  Device y_dev = Downcast<TensorValue>(LookupBoundValue(var))->tensor->device;
+  auto y_tensor = Downcast<TensorValue>(LookupBoundValue(var))->tensor;
+  Device y_dev = y_tensor->device;
+  DType y_dtype = y_tensor->dtype;
   Value dy = dy_var.defined() ? Downcast<NDArrayBinding>(LookupBinding(dy_var.operator->()))->value
-                              : MakeOnes(y_dev);
+                              : MakeOnes(y_dev, y_dtype);
   GradTape tape = Downcast<NDArrayBinding>(LookupBinding(var.operator->()))->tape;
   if (!tape.defined()) {
     return;

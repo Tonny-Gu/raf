@@ -1,4 +1,21 @@
-# pylint: disable=invalid-name,protected-access,too-many-locals
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+# pylint: disable=invalid-name,protected-access,too-many-locals,attribute-defined-outside-init
 import numpy as np
 import pytest
 import mnm
@@ -7,10 +24,14 @@ from tvm import relay
 from mnm._ffi.pass_ import InferType, AutoDiff, FromRelay, LiftBranchBody
 from mnm._ffi.pass_ import LambdaLift, FlattenClosure, InlineBackward
 from mnm.ir import MNMSequential, ScopeBuilder
-from mnm.testing import get_device_list, randn, check, utils
+from mnm.model import BatchNorm
+from mnm.model.trace import _get_func_inputs
+from mnm.testing import get_testable_devices, randn, check, utils, one_hot_torch
 
 
-def ad_passes(mod):
+def ad_passes(mod, requires_grads=None):
+    if requires_grads is None:
+        requires_grads = []
     seq = MNMSequential(
         [
             InferType(),
@@ -20,20 +41,22 @@ def ad_passes(mod):
             InferType(),
             LiftBranchBody(),
             InferType(),
-            AutoDiff([]),
+            AutoDiff(requires_grads),
             InferType(),
         ]
     )
     return seq(mod)
 
 
-def vm_passes(mod):
-    mod = ad_passes(mod)
+def vm_passes(mod, requires_grads=None):
+    if requires_grads is None:
+        requires_grads = []
+    mod = ad_passes(mod, requires_grads)
     mod = InlineBackward()(mod)
     return mod
 
 
-@pytest.mark.parametrize("device", get_device_list())
+@pytest.mark.parametrize("device", get_testable_devices())
 @pytest.mark.parametrize("shape", [[3, 3], [4, 4]])
 def test_add_to(shape, device):
     class Add(mnm.Model):
@@ -54,7 +77,65 @@ def test_add_to(shape, device):
     check(m_dx, n_dx)
 
 
-@pytest.mark.parametrize("device", get_device_list())
+@pytest.mark.parametrize("device", get_testable_devices())
+@pytest.mark.parametrize("planes", [16])
+def test_batch_norm(device, planes):
+    class BatchNormLoss(mnm.Model):
+        def build(self, planes):
+            self.bn = BatchNorm(planes)
+
+        @mnm.model.trace
+        def forward(self, x, y_true):
+            out = self.bn(x)
+            y_pred = mnm.batch_flatten(out)
+            loss = mnm.nll_loss(y_true=y_true, y_pred=y_pred)
+            return loss
+
+    model = BatchNormLoss(planes)
+    m_x, _ = randn([5, planes, 32, 32], device=device)
+    m_x.requires_grad = True
+    m_ytrue, _ = one_hot_torch(5, num_classes=16384, device="cpu")
+    m_ytrue.requires_grad = False
+
+    record = model._internal(m_x, m_ytrue)
+    mod = record.mod
+    ad_mod = ad_passes(mod, record.requires_grads)
+
+    assert len(ad_mod.get_global_vars()) == 1
+    fwd_type = relay.TupleType(
+        [
+            relay.TensorType((1,)),
+            relay.TensorType((planes,)),
+            relay.TensorType((planes,)),
+        ]
+    )
+    bwd_type = relay.FuncType(
+        [fwd_type],
+        relay.TupleType(
+            [
+                relay.TensorType((5, planes, 32, 32), "float32"),
+                relay.TensorType((), "int64"),
+                relay.TensorType((planes,), "float32"),
+                relay.TensorType((), "int64"),
+                relay.TensorType((), "int64"),
+                relay.TensorType((planes,), "float32"),
+            ]
+        ),
+    )
+    ret_type = relay.TupleType([fwd_type, bwd_type])
+    assert ad_mod["main"].ret_type == ret_type
+
+    # Run via VM to ensure that the generated mod can be executed
+    m_dy_0 = mnm.array(np.array([1.0], dtype="float32"), device=device)
+    m_dy_1, _ = randn((planes,), device=device)
+    m_dy_2, _ = randn((planes,), device=device)
+    inputs = _get_func_inputs(record, [], {"x": m_x, "y_true": m_ytrue}, get_handle=False)
+    inputs += [(m_dy_0, m_dy_1, m_dy_2)]
+    vm_executor = utils.get_vm_executor(mod, device, pass_seq=vm_passes)
+    vm_executor(*inputs)
+
+
+@pytest.mark.parametrize("device", get_testable_devices())
 @pytest.mark.parametrize(
     "shape",
     [
@@ -108,7 +189,7 @@ def test_no_grad1(shape, device):
     check(m_dx, n_dx)
 
 
-@pytest.mark.parametrize("device", get_device_list())
+@pytest.mark.parametrize("device", get_testable_devices())
 def test_no_grad2(device):
     shape = [3, 2]
     dtype = "float32"
@@ -124,9 +205,7 @@ def test_no_grad2(device):
         ret = relay.var("ret")
         inner_let2 = relay.Let(
             x2,
-            relay.Tuple(
-                [x1, mnm._ffi.ir._make.Constant(mnm._core.value.NoGradValue())]
-            ),
+            relay.Tuple([x1, mnm._ffi.ir._make.Constant(mnm._core.value.NoGradValue())]),
             x2,
         )
         inner_let1 = relay.Let(x1, mnm.ir.op.matmul(dy, y), inner_let2)
@@ -162,7 +241,7 @@ def test_no_grad2(device):
     assert tvm.ir.structural_equal(m_mod["main"], expected())
 
 
-@pytest.mark.parametrize("device", get_device_list())
+@pytest.mark.parametrize("device", get_testable_devices())
 def test_basic(device):
     def get_mod():
         mod = tvm.IRModule()
@@ -190,13 +269,11 @@ def test_basic(device):
     # Run via VM to ensure that the generated mod can be executed
     m_x, _ = randn((1, 100), device=device)
     m_dy, _ = randn((1, 100), device=device)
-    vm_executor = utils.get_vm_executor(
-        mod, "cpu", pass_seq=vm_passes
-    )
+    vm_executor = utils.get_vm_executor(mod, "cpu", pass_seq=vm_passes)
     vm_executor(m_x, m_dy)
 
 
-@pytest.mark.parametrize("device", get_device_list())
+@pytest.mark.parametrize("device", get_testable_devices())
 def test_concatenate(device):
     def get_mod():
         mod = tvm.IRModule()
@@ -226,13 +303,11 @@ def test_concatenate(device):
     # Run via VM to ensure that the generated mod can be executed
     m_x, _ = randn((1, 100), device=device)
     m_dy, _ = randn((2, 100), device=device)
-    vm_executor = utils.get_vm_executor(
-        mod, "cpu", pass_seq=vm_passes
-    )
+    vm_executor = utils.get_vm_executor(mod, "cpu", pass_seq=vm_passes)
     vm_executor(m_x, m_dy)
 
 
-@pytest.mark.parametrize("device", get_device_list())
+@pytest.mark.parametrize("device", get_testable_devices())
 def test_split(device):
     def get_mod():
         mod = tvm.IRModule()
@@ -265,13 +340,11 @@ def test_split(device):
     # Run via VM to ensure that the generated mod can be executed
     m_x, _ = randn((1, 102), device=device)
     m_dy, _ = randn((1, 34), device=device)
-    vm_executor = utils.get_vm_executor(
-        mod, "cpu", pass_seq=vm_passes
-    )
+    vm_executor = utils.get_vm_executor(mod, "cpu", pass_seq=vm_passes)
     vm_executor(m_x, m_dy)
 
 
-@pytest.mark.parametrize("device", get_device_list())
+@pytest.mark.parametrize("device", get_testable_devices())
 def test_split_unused_output(device):
     def get_mod():
         mod = tvm.IRModule()
@@ -300,13 +373,11 @@ def test_split_unused_output(device):
     # Run via VM to ensure that the generated mod can be executed
     m_x, _ = randn((1, 100), device=device)
     m_dy, _ = randn((1, 50), device=device)
-    vm_executor = utils.get_vm_executor(
-        mod, "cpu", pass_seq=vm_passes
-    )
+    vm_executor = utils.get_vm_executor(mod, "cpu", pass_seq=vm_passes)
     vm_executor(m_x, m_dy)
 
 
-@pytest.mark.parametrize("device", get_device_list())
+@pytest.mark.parametrize("device", get_testable_devices())
 def test_fanout(device):
     def get_mod():
         mod = tvm.IRModule()
@@ -336,13 +407,11 @@ def test_fanout(device):
     # Run via VM to ensure that the generated mod can be executed
     m_x, _ = randn((1, 100), device=device)
     m_dy, _ = randn((1, 100), device=device)
-    vm_executor = utils.get_vm_executor(
-        mod, "cpu", pass_seq=vm_passes
-    )
+    vm_executor = utils.get_vm_executor(mod, "cpu", pass_seq=vm_passes)
     vm_executor(m_x, m_dy)
 
 
-@pytest.mark.parametrize("device", get_device_list())
+@pytest.mark.parametrize("device", get_testable_devices())
 def test_split_concat(device):
     def get_mod():
         mod = tvm.IRModule()
@@ -372,13 +441,11 @@ def test_split_concat(device):
     # Run via VM to ensure that the generated mod can be executed
     m_x, _ = randn((1, 100), device=device)
     m_dy, _ = randn((1, 100), device=device)
-    vm_executor = utils.get_vm_executor(
-        mod, "cpu", pass_seq=vm_passes
-    )
+    vm_executor = utils.get_vm_executor(mod, "cpu", pass_seq=vm_passes)
     vm_executor(m_x, m_dy)
 
 
-@pytest.mark.parametrize("device", get_device_list())
+@pytest.mark.parametrize("device", get_testable_devices())
 def test_split_with_fanout(device):
     def get_mod():
         mod = tvm.IRModule()
@@ -411,13 +478,11 @@ def test_split_with_fanout(device):
     # Run via VM to ensure that the generated mod can be executed
     m_x, _ = randn((1, 100), device=device)
     m_dy, _ = randn((1, 100), device=device)
-    vm_executor = utils.get_vm_executor(
-        mod, "cpu", pass_seq=vm_passes
-    )
+    vm_executor = utils.get_vm_executor(mod, "cpu", pass_seq=vm_passes)
     vm_executor(m_x, m_dy)
 
 
-@pytest.mark.parametrize("device", get_device_list())
+@pytest.mark.parametrize("device", get_testable_devices())
 def test_concatenate_fanout(device):
     def get_mod():
         mod = tvm.IRModule()
@@ -453,13 +518,11 @@ def test_concatenate_fanout(device):
     m_x, _ = randn((1, 100), device=device)
     m_y, _ = randn((1, 100), device=device)
     m_dy, _ = randn((1, 200), device=device)
-    vm_executor = utils.get_vm_executor(
-        mod, "cpu", pass_seq=vm_passes
-    )
+    vm_executor = utils.get_vm_executor(mod, "cpu", pass_seq=vm_passes)
     vm_executor(m_x, m_y, [m_dy, m_dy])
 
 
-@pytest.mark.parametrize("device", get_device_list())
+@pytest.mark.parametrize("device", get_testable_devices())
 def test_tuple_outputs(device):
     def get_mod():
         mod = tvm.IRModule()
@@ -488,9 +551,7 @@ def test_tuple_outputs(device):
     # Run via VM to ensure that the generated mod can be executed
     m_x, _ = randn((1, 100), device=device)
     m_dy, _ = randn((1, 100), device=device)
-    vm_executor = utils.get_vm_executor(
-        mod, "cpu", pass_seq=vm_passes
-    )
+    vm_executor = utils.get_vm_executor(mod, "cpu", pass_seq=vm_passes)
     vm_executor(m_x, [m_dy, m_dy])
 
 
@@ -828,7 +889,7 @@ def test_simplify_sum():
         x = relay.var("x", shape=(10, 100), dtype="float32")
         y = relay.var("y", shape=(1, 100), dtype="float32")
         out = relay.add(x, y)
-        mod['main'] = relay.Function([x, y], out)
+        mod["main"] = relay.Function([x, y], out)
         return mod
 
     tvm_mod = get_mod()
@@ -838,11 +899,8 @@ def test_simplify_sum():
 
     # Ensure that there is only one sum operator
     sum_ops = list()
-    find_sum = lambda x: sum_ops.append(
-        isinstance(x, tvm.relay.Call)
-        and x.op.name == "mnm.op.sum"
-    )
-    tvm.relay.analysis.post_order_visit(mod['main'], find_sum)
+    find_sum = lambda x: sum_ops.append(isinstance(x, tvm.relay.Call) and x.op.name == "mnm.op.sum")
+    tvm.relay.analysis.post_order_visit(mod["main"], find_sum)
     assert len(list(filter(lambda x: x, sum_ops))) == 1
 
 

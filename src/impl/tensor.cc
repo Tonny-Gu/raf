@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2019 by Contributors
  * \file src/impl/tensor.cc
  * \brief MNM Tensor underlying implementation
  */
@@ -7,6 +25,7 @@
 #include <mnm/registry.h>
 #include <mnm/tensor.h>
 #include <vector>
+#include "mnm/device_api.h"
 #include "../common/shape_utils.h"
 
 namespace mnm {
@@ -138,6 +157,31 @@ class Tensor::Impl {
     container->dl_tensor.data = data ? data : self->data;
     return ret;
   }
+
+  /*!
+   * \brief Function to copy data from one array to another.
+   * \param from The source array.
+   * \param to The target array.
+   */
+  static void CopyFromTo(const DLTensor* from, DLTensor* to) {
+    size_t from_size = tvm::runtime::GetDataSize(*from);
+    size_t to_size = tvm::runtime::GetDataSize(*to);
+    ICHECK_EQ(from_size, to_size) << "CopyFromTo: The size must exactly match";
+
+    ICHECK(from->device.device_type == to->device.device_type ||
+           from->device.device_type == kDLCPU || to->device.device_type == kDLCPU ||
+           from->device.device_type == kDLCUDAHost || to->device.device_type == kDLCUDAHost)
+        << "Can not copy across different device types directly. From device type: "
+        << from->device.device_type << " to device type: " << to->device.device_type;
+
+    // Use the device that is NOT CPU (or CUDA host) to get the correct device api manager.
+    Device dev = from->device;
+    if (from->device.device_type == kDLCPU || from->device.device_type == kDLCUDAHost) {
+      dev = to->device;
+    }
+    auto dapi = device_api::DeviceAPI::Get(dev->device_type);
+    dapi->CopyDataFromTo(const_cast<DLTensor*>(from), to, dapi->GetStream());
+  }
 };
 
 Tensor::Tensor(ir::ObjectPtr<ir::Object> data) : TSuper(data) {
@@ -158,6 +202,27 @@ Tensor Tensor::make(const Device& dev, const DType& dtype, const std::vector<int
 
 Tensor Tensor::FromDLPack(DLManagedTensor* tensor) {
   return Tensor::Impl::FromDLPack(tensor);
+}
+
+void Tensor::CopyTo(const Tensor& other) const {
+  ICHECK(data_ != nullptr);
+  ICHECK(other.data_ != nullptr);
+  Tensor::Impl::CopyFromTo(&(get_mutable()->dl_tensor), &(other.get_mutable()->dl_tensor));
+}
+
+void Tensor::CopyTo(DLTensor* other) const {
+  ICHECK(data_ != nullptr);
+  Tensor::Impl::CopyFromTo(&(get_mutable()->dl_tensor), other);
+}
+
+NDArray Tensor::CopyTo(const Device& dev) const {
+  // TODO: Support stream.
+  ICHECK(data_ != nullptr);
+  const DLTensor* dptr = operator->();
+  NDArray ret =
+      Empty(tvm::runtime::ShapeTuple(dptr->shape, dptr->shape + dptr->ndim), dptr->dtype, dev);
+  this->CopyTo(ret);
+  return ret;
 }
 
 DLManagedTensor* Tensor::ToDLPack() const {

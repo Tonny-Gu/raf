@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2021 by Contributors
  * \file to_dataflow.cc
  * \brief Convert A-normal form to dataflow graph.
  */
@@ -46,19 +64,27 @@ class GNFConverter : public MixedModeMutator {
   Expr VisitExpr_(const LetNode* ln) final {
     Expr body = GetRef<Let>(ln);
     std::vector<std::pair<Var, Expr>> scopes;
+
     // Iteratively visit let nodes to avoid stack overflow.
     while (body->IsInstance<LetNode>()) {
       Let let = Downcast<Let>(body);
+      auto var = let->var;
       auto new_value = VisitExpr(let->value);
-      if (new_value->IsInstance<RefCreateNode>() || new_value->IsInstance<RefReadNode>() ||
-          new_value->IsInstance<RefWriteNode>()) {
-        // Keep the Let for ref-related nodes as the order affects the correctness
-        // auto new_body = VisitExpr(let->body);
-        scopes.emplace_back(let->var, new_value);
+
+      // Check whether the let-binding var has shared memory (similar to ref-related ndoes).
+      bool has_may_share = false;
+      if (auto extended_var = var.as<ExtendedVarNode>()) {
+        has_may_share = extended_var->may_share.defined();
+      }
+
+      if (has_may_share || new_value->IsInstance<RefCreateNode>() ||
+          new_value->IsInstance<RefReadNode>() || new_value->IsInstance<RefWriteNode>()) {
+        // Keep the Let for ref-related nodes as the order affects the correctness.
+        scopes.emplace_back(var, new_value);
         body = let->body;
       } else {
-        new_value = WrapRec(let->var, new_value);
-        let_map_.emplace(let->var.get(), new_value);
+        new_value = WrapRec(var, new_value);
+        let_map_.emplace(var.get(), new_value);
         scopes.emplace_back(Var(), Expr());
         body = let->body;
       }

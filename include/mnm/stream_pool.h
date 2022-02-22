@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2019 by Contributors
  * \file stream_pool.h
  * \brief Stream pool API
  */
@@ -31,18 +49,18 @@ enum StreamTag {
   kCudaCompute = 1,
   kMemCpyCpuToCuda = 2,
   kMemCpyCudaToCpu = 3,
-  kMemCpyCudaToCuda = 4,
-  kCudaCommunicate = 5,
-  kReserved1 = 6,
-  kReserved2 = 7,
-  kReserved3 = 8,
-  kReserved4 = 9,
-  kReserved5 = 10,
-  kReserved6 = 11,
-  kReserved7 = 12,
-  kReserved8 = 13,
-  kReserved9 = 14,
-  kReserved10 = 15,
+  kCudaCommunicate = 4,
+  kMemCpyCudaToCuda1 = 5,
+  kMemCpyCudaToCuda2 = 6,
+  kReserved1 = 7,
+  kReserved2 = 8,
+  kReserved3 = 9,
+  kReserved4 = 10,
+  kReserved5 = 11,
+  kReserved6 = 12,
+  kReserved7 = 13,
+  kReserved8 = 14,
+  kReserved9 = 15,
 };
 
 class StreamTagEnum : public EnumBase<StreamTagEnum, 16, int32_t, StreamTag> {
@@ -54,21 +72,21 @@ class StreamTagEnum : public EnumBase<StreamTagEnum, 16, int32_t, StreamTag> {
                            "Memcopy from CPU to CUDA");
   ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 3, MemCpyCudaToCpu, kMemCpyCudaToCpu,
                            "Memcopy from CUDA to CPU");
-  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 4, MemCudaToCuda, kMemCpyCudaToCuda,
-                           "Memcopy from CUDA to CUDA");
-  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 5, CudaCommunicate, kCudaCommunicate,
+  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 4, CudaCommunicate, kCudaCommunicate,
                            "Communicate between Cuda devices");
-  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 6, Reserved1, kReserved1, "Reserved for other devices");
-  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 7, Reserved2, kReserved2, "Reserved for other devices");
-  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 8, Reserved3, kReserved3, "Reserved for other devices");
-  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 9, Reserved4, kReserved4, "Reserved for other devices");
-  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 10, Reserved5, kReserved5, "Reserved for other devices");
-  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 11, Reserved6, kReserved6, "Reserved for other devices");
-  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 12, Reserved7, kReserved7, "Reserved for other devices");
-  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 13, Reserved8, kReserved8, "Reserved for other devices");
-  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 14, Reserved9, kReserved9, "Reserved for other devices");
-  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 15, Reserved10, kReserved10,
-                           "Reserved for other devices");
+  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 5, MemCudaToCuda1, kMemCpyCudaToCuda1,
+                           "Memcopy from CUDA to CUDA");
+  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 6, MemCudaToCuda2, kMemCpyCudaToCuda2,
+                           "Memcopy from CUDA to CUDA");
+  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 7, Reserved1, kReserved1, "Reserved for other devices");
+  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 8, Reserved2, kReserved2, "Reserved for other devices");
+  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 9, Reserved3, kReserved3, "Reserved for other devices");
+  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 10, Reserved4, kReserved4, "Reserved for other devices");
+  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 11, Reserved5, kReserved5, "Reserved for other devices");
+  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 12, Reserved6, kReserved6, "Reserved for other devices");
+  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 13, Reserved7, kReserved7, "Reserved for other devices");
+  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 14, Reserved8, kReserved8, "Reserved for other devices");
+  ENUM_DEF_ENTRY_WITH_NAME(StreamTagEnum, 15, Reserved9, kReserved9, "Reserved for other devices");
 };
 
 class Stream;

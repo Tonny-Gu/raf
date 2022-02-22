@@ -1,8 +1,26 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # pylint: disable=attribute-defined-outside-init,invalid-name,protected-access
 # pylint: disable=too-many-locals,too-many-statements,too-many-arguments,no-self-use
 import numpy as np
 import pytest
 import mnm
+from mnm.ir import ScopeBuilder
 from mnm.model import Conv2d
 from mnm.model.trace import trace_mutate_attr
 from mnm.testing import run_infer_type, randn
@@ -59,7 +77,7 @@ def test_fuse_simple():
     mod = model._internal(m_x).mod
     mod = fuse_module(mod)
     func_expected = run_infer_type(expected((10, 20)))
-    assert tvm.ir.structural_equal(mod['main'], func_expected)
+    assert tvm.ir.structural_equal(mod["main"], func_expected)
 
 
 def test_conv2d():
@@ -146,12 +164,45 @@ def test_conv2d():
         w2 = mnm.ir.var("conv2.w", shape=(16, 16, 1, 1))
         w3 = mnm.ir.var("conv3.w", shape=(16, 16, 3, 3))
         y1 = relay.Call(add_op, [x, c, null, null])
-        y2 = relay.Call(f1, [y1, w1, v_one, v_one, v_one, konst1, konst_nchw,
-                             konst_oihw, konst_nchw, c, null, null, null, null])
-        y3 = relay.Call(conv2d_op, [y2, w3, v_one, v_one, v_one, konst1,
-                                    konst_nchw, konst_oihw, konst_nchw])
-        ret = relay.Call(f3, [y2, w2, v_one, v_zero, v_one, konst1,
-                              konst_nchw, konst_oihw, konst_nchw, y3, null, null])
+        y2 = relay.Call(
+            f1,
+            [
+                y1,
+                w1,
+                v_one,
+                v_one,
+                v_one,
+                konst1,
+                konst_nchw,
+                konst_oihw,
+                konst_nchw,
+                c,
+                null,
+                null,
+                null,
+                null,
+            ],
+        )
+        y3 = relay.Call(
+            conv2d_op, [y2, w3, v_one, v_one, v_one, konst1, konst_nchw, konst_oihw, konst_nchw]
+        )
+        ret = relay.Call(
+            f3,
+            [
+                y2,
+                w2,
+                v_one,
+                v_zero,
+                v_one,
+                konst1,
+                konst_nchw,
+                konst_oihw,
+                konst_nchw,
+                y3,
+                null,
+                null,
+            ],
+        )
         return relay.Function([x, c, w1, w2, w3], ret)
 
     model = Model()
@@ -159,7 +210,7 @@ def test_conv2d():
     mod = model._internal(m_x).mod
     mod = fuse_module(mod)
     func_expected = run_infer_type(expected())
-    assert tvm.ir.structural_equal(mod['main'], func_expected)
+    assert tvm.ir.structural_equal(mod["main"], func_expected)
 
 
 def test_concatenate():
@@ -200,8 +251,7 @@ def test_concatenate():
 
         x = mnm.ir.var("x", shape=shape)
         c = mnm.ir.var("c", shape=(1,))
-        y1 = relay.Call(max_pool2d_op, [x, konst3, konst1, konst1, konst1,
-                                        false, true, knchw])
+        y1 = relay.Call(max_pool2d_op, [x, konst3, konst1, konst1, konst1, false, true, knchw])
         y2 = relay.Call(f2, [y1, x, c, null, null])
         return relay.Function([x, c], y2)
 
@@ -210,7 +260,7 @@ def test_concatenate():
     before = model._internal(m_x).mod
     after = fuse_module(before)
     func_expected = run_infer_type(expected((1, 16, 64, 64)))
-    assert tvm.ir.structural_equal(after['main'], func_expected)
+    assert tvm.ir.structural_equal(after["main"], func_expected)
 
 
 def test_tuple_root_fuse():
@@ -237,8 +287,9 @@ def test_tuple_root_fuse():
         null = mnm.ir.const(None)
 
         p0 = mnm.ir.var("p0", shape=shape)
-        p1 = mnm.ir.var("p1", relay.TupleType(
-            (relay.TensorType((), "int32"), relay.TensorType((), "int32"))))
+        p1 = mnm.ir.var(
+            "p1", relay.TupleType((relay.TensorType((), "int32"), relay.TensorType((), "int32")))
+        )
         p2 = mnm.ir.var("p2", relay.TupleType((relay.TensorType((), "int64"),)))
         p3 = mnm.ir.var("p3", relay.TupleType((relay.TensorType((), "int64"),)))
         p4 = mnm.ir.var("p4", relay.TupleType((relay.TensorType((), "int64"),)))
@@ -257,8 +308,7 @@ def test_tuple_root_fuse():
 
         x = mnm.ir.var("x", shape=shape)
         c = mnm.ir.var("c", shape=(1,))
-        y = relay.Call(f, [x, v_three, v_one, v_one, v_one, false, true, knchw,
-                           c, null, null])
+        y = relay.Call(f, [x, v_three, v_one, v_one, v_one, false, true, knchw, c, null, null])
         y = relay.Tuple([y, x])
         return relay.Function([x, c], y)
 
@@ -268,7 +318,7 @@ def test_tuple_root_fuse():
     after = fuse_module(before)
     func_expected = expected((1, 16, 64, 64))
     func_expected = run_infer_type(func_expected)
-    assert tvm.ir.structural_equal(after['main'], func_expected)
+    assert tvm.ir.structural_equal(after["main"], func_expected)
 
 
 def test_tuple_root_no_fuse():
@@ -338,7 +388,9 @@ def test_fuse_with_dialect():
     class Model(mnm.Model):
         def build(self):
             self.c = rand
-            self.conv1 = Conv2d(16, 16, kernel_size=(3, 3), padding=1, bias=False)
+            self.conv1 = Conv2d(
+                16, 16, kernel_size=(3, 3), padding=1, bias=False, channel_mode="NHWC"
+            )
 
         @mnm.model.trace
         def forward(self, x):
@@ -352,16 +404,16 @@ def test_fuse_with_dialect():
         v_one = mnm.ir.const([1])
         konst1 = mnm.ir.const(1)
         null = mnm.ir.const(None)
-        konst_nchw = mnm.ir.const("NCHW")
-        konst_oihw = mnm.ir.const("OIHW")
+        konst_nhwc = mnm.ir.const("NHWC")
+        konst_ohwi = mnm.ir.const("OHWI")
         conv2d_op = mnm._ffi.op.GetOp("mnm.op.cutlass.conv2d")
         cutlass_add_op = mnm._ffi.op.GetOp("mnm.op.cutlass.add")
         tvm_add_op = mnm._ffi.op.GetOp("mnm.op.tvm.add")
         relu_op = mnm._ffi.op.GetOp("mnm.op.tvm.relu")
 
         # segment
-        x = mnm.ir.var("p", shape=(1, 16, 64, 64))
-        w = mnm.ir.var("p", shape=(16, 16, 3, 3))
+        x = mnm.ir.var("p", shape=(1, 64, 64, 16))
+        w = mnm.ir.var("p", shape=(16, 3, 3, 16))
         p2 = mnm.ir.var("p", relay.TupleType((relay.TensorType((), "int64"),)))
         p3 = mnm.ir.var("p", relay.TupleType((relay.TensorType((), "int64"),)))
         p4 = mnm.ir.var("p", relay.TupleType((relay.TensorType((), "int64"),)))
@@ -379,7 +431,7 @@ def test_fuse_with_dialect():
         f1 = f1.with_attr("Dialect", "cutlass")
         f1 = f1.with_attr("PatternName", "conv2d_fusion")
 
-        p0 = mnm.ir.var("p", shape=(1, 16, 64, 64))
+        p0 = mnm.ir.var("p", shape=(1, 64, 64, 16))
         p1 = mnm.ir.var("p", shape=(1,))
         p2 = mnm.ir.var("p", relay.TupleType(()))
         p3 = mnm.ir.var("p", relay.TupleType(()))
@@ -389,17 +441,19 @@ def test_fuse_with_dialect():
         f2 = f2.with_attr("Primitive", tvm.tir.IntImm("int32", 1))
         f2 = f2.with_attr("Dialect", "tvm")
 
-        x = mnm.ir.var("p0", shape=(1, 16, 64, 64))
-        w = mnm.ir.var("p1", shape=(16, 16, 3, 3))
+        x = mnm.ir.var("p0", shape=(1, 64, 64, 16))
+        w = mnm.ir.var("p1", shape=(16, 3, 3, 16))
         c = mnm.ir.var("c", shape=(1,))
-        y = relay.Call(f1, [x, w, v_one, v_one, v_one, konst1, konst_nchw,
-                            konst_oihw, konst_nchw, c, null, null])
+        y = relay.Call(
+            f1,
+            [x, w, v_one, v_one, v_one, konst1, konst_nhwc, konst_ohwi, konst_nhwc, c, null, null],
+        )
         out = relay.Call(f2, [y, c, null, null])
 
         return relay.Function([x, c, w], out)
 
     model = Model()
-    m_x, _ = randn((1, 16, 64, 64), device="cpu")
+    m_x, _ = randn((1, 64, 64, 16), device="cpu")
     mod = model._internal(m_x).mod
     with mnm.device("cuda"):
         mod = fuse_module(mod, True)
@@ -412,8 +466,9 @@ def test_fuse_with_dialect():
 @pytest.mark.xfail
 def test_sgd():
     shape = [2, 3, 4]
-    dtype = 'float32'
+    dtype = "float32"
     device = "llvm"
+
     class Model(mnm.Model):
         def build(self):
             self.reset()
@@ -485,7 +540,7 @@ def test_sgd():
     mod = fuse_module(mod)
     func_expected = expected()
     func_expected = run_infer_type(func_expected)
-    assert tvm.ir.structural_equal(mod['main'], func_expected)
+    assert tvm.ir.structural_equal(mod["main"], func_expected)
 
 
 def test_fuse_inplace():
@@ -534,9 +589,144 @@ def test_fuse_inplace():
     mod_before = model._internal(m_x, m_y).mod
     mod_after = fuse_module(mod_before)
     func_expected = run_infer_type(expected((10, 20)))
-    assert tvm.ir.structural_equal(mod_after['main'], func_expected)
+    assert tvm.ir.structural_equal(mod_after["main"], func_expected)
+
+
+def test_may_share():
+    """Use SGD optimizer updating logic to test the IR with may_share.
+    TODO(issue 758): Rewrite this testcase to directly use may_share API in frontend.
+    """
+    shape = (5, 2)
+
+    def before():
+        add_op = mnm._ffi.op.GetOp("mnm.op.add")
+        sub_op = mnm._ffi.op.GetOp("mnm.op.subtract")
+        mul_op = mnm._ffi.op.GetOp("mnm.op.multiply")
+
+        data_w = mnm.ir.var("w", shape=shape, dtype="float32")
+        data_v = mnm.ir.var("v", shape=shape, dtype="float32")
+        data_g = mnm.ir.var("g", shape=shape, dtype="float32")
+
+        const_m = mnm.ir.const(0.2, dtype="float32")
+        const_lr = mnm.ir.const(0.05, dtype="float32")
+        null = mnm.ir.const(None)
+
+        # Note that we do not use the "out" arguments in add and sub to represent may_share.
+        sb = ScopeBuilder()
+        a_1 = sb.let("a1", relay.Call(mul_op, [const_m, data_v]))
+        a_2 = sb.let("a2", relay.Call(add_op, [a_1, data_g, null, null]), may_share=data_v)
+        a_3 = sb.let("a3", relay.Call(mul_op, [const_lr, a_2]))
+        a_4 = sb.let("a4", relay.Call(sub_op, [data_w, a_3, null, null]), may_share=data_w)
+
+        sb.ret(a_4)
+        func = relay.Function([data_w, data_v, data_g], sb.get())
+        mod = tvm.IRModule.from_expr(func)
+        return mod
+
+    def expected():
+        add_op = mnm._ffi.op.GetOp("mnm.op.tvm.add")
+        sub_op = mnm._ffi.op.GetOp("mnm.op.tvm.subtract")
+        mul_op = mnm._ffi.op.GetOp("mnm.op.tvm.multiply")
+
+        # Fused 1
+        const_m = mnm.ir.const(0.2, dtype="float32")
+        p_0 = mnm.ir.var("p0", shape=shape, dtype="float32")
+        p_1 = mnm.ir.var("p1", shape=shape, dtype="float32")
+        p_2 = mnm.ir.var("p2", relay.TupleType(()))
+        out = relay.Call(mul_op, [const_m, p_0])
+        out = relay.Call(add_op, [out, p_1, p_2, p_2])
+        func1 = relay.Function([p_0, p_1, p_2], out)
+        func1 = func1.with_attr("Primitive", tvm.tir.IntImm("int32", 1))
+        func1 = func1.with_attr("Dialect", "tvm")
+
+        # Fuse 2
+        const_lr = mnm.ir.const(0.05, dtype="float32")
+        p_01 = mnm.ir.var("p01", shape=shape, dtype="float32")
+        p_11 = mnm.ir.var("p11", shape=shape, dtype="float32")
+        p_21 = mnm.ir.var("p2", relay.TupleType(()))
+        out = relay.Call(mul_op, [const_lr, p_11])
+        out = relay.Call(sub_op, [p_01, out, p_21, p_21])
+        func2 = relay.Function([p_01, p_11, p_21], out)
+        func2 = func2.with_attr("Primitive", tvm.tir.IntImm("int32", 1))
+        func2 = func2.with_attr("Dialect", "tvm")
+
+        # Main function
+        data_w = mnm.ir.var("w", shape=shape, dtype="float32")
+        data_v = mnm.ir.var("v", shape=shape, dtype="float32")
+        data_g = mnm.ir.var("g", shape=shape, dtype="float32")
+
+        const_m = mnm.ir.const(0.2, dtype="float32")
+        const_lr = mnm.ir.const(0.05, dtype="float32")
+        null = mnm.ir.const(None)
+
+        sb = ScopeBuilder()
+        a_2 = sb.let("a2", relay.Call(func1, [data_v, data_g, null]), may_share=data_v)
+        a_4 = sb.let("a4", relay.Call(func2, [data_w, a_2, null]), may_share=data_w)
+        sb.ret(a_4)
+
+        return relay.Function([data_w, data_v, data_g], sb.get())
+
+    mod_after = fuse_module(before())
+    func_expected = run_infer_type(expected())
+    assert tvm.ir.structural_equal(mod_after["main"], func_expected)
+
+
+def test_deduplicate():
+    shape = (5, 2)
+
+    def before():
+        add_op = mnm._ffi.op.GetOp("mnm.op.add")
+        mul_op = mnm._ffi.op.GetOp("mnm.op.multiply")
+
+        data_1 = mnm.ir.var("data1", shape=shape, dtype="float32")
+        data_2 = mnm.ir.var("data2", shape=shape, dtype="float32")
+        data_3 = mnm.ir.var("data3", shape=shape, dtype="float32")
+
+        const_1 = mnm.ir.const(0.2, dtype="float32")
+        const_2 = mnm.ir.const(0.2, dtype="float32")
+        null = mnm.ir.const(None)
+
+        # Use in-place update to prevent them from being fused to a single op.
+        sb = ScopeBuilder()
+        a_1 = sb.let("a1", relay.Call(mul_op, [const_1, data_1]))
+        a_2 = sb.let("a2", relay.Call(add_op, [a_1, data_2, data_2, null]))
+        a_3 = sb.let("a3", relay.Call(mul_op, [const_2, a_2]))
+        a_4 = sb.let("a4", relay.Call(add_op, [a_3, data_3, data_3, null]))
+
+        sb.ret(a_4)
+        func = relay.Function([data_1, data_2, data_3], sb.get())
+        mod = tvm.IRModule.from_expr(func)
+        return mod
+
+    def expected():
+        add_op = mnm._ffi.op.GetOp("mnm.op.tvm.add")
+        mul_op = mnm._ffi.op.GetOp("mnm.op.tvm.multiply")
+
+        # Fused function (should be reused)
+        const_m = mnm.ir.const(0.2, dtype="float32")
+        p_0 = mnm.ir.var("p0", shape=shape, dtype="float32")
+        p_1 = mnm.ir.var("p1", shape=shape, dtype="float32")
+        p_2 = mnm.ir.var("p2", relay.TupleType(()))
+        out = relay.Call(mul_op, [const_m, p_0])
+        out = relay.Call(add_op, [out, p_1, p_1, p_2])
+        func = relay.Function([p_0, p_1, p_2], out)
+        func = func.with_attr("Primitive", tvm.tir.IntImm("int32", 1))
+        func = func.with_attr("Dialect", "tvm")
+
+        # Main function
+        data_1 = mnm.ir.var("data1", shape=shape, dtype="float32")
+        data_2 = mnm.ir.var("data2", shape=shape, dtype="float32")
+        data_3 = mnm.ir.var("data3", shape=shape, dtype="float32")
+        null = mnm.ir.const(None)
+
+        out = relay.Call(func, [data_1, data_2, null])
+        out = relay.Call(func, [out, data_3, null])
+        return relay.Function([data_1, data_2, data_3], out)
+
+    mod_after = fuse_module(before())
+    func_expected = run_infer_type(expected())
+    assert tvm.ir.structural_equal(mod_after["main"], func_expected)
 
 
 if __name__ == "__main__":
-    test_fuse_with_dialect()
-    #pytest.main([__file__])
+    pytest.main([__file__])

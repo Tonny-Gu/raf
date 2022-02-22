@@ -1,10 +1,29 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2021 by Contributors
  * \file src/op/dialect/cudnn/conv.cc
  * \brief CUDNN conv2d operators.
  */
 #include <queue>
 #include "../../schema/nn.h"
+#include "../3rdparty/tvm/src/runtime/file_utils.h"
 #include "./cudnn_utils.h"
 #include "mnm/ir.h"
 #include "mnm/memory_pool.h"
@@ -20,6 +39,52 @@ using namespace mnm::memory_pool;
 using dmlc::BeginPtr;
 
 static auto fschema_index = ir::Op::GetAttrMap<op::FMNMSchemaFieldIndex>("FMNMSchemaFieldIndex");
+
+template <typename T>
+class CuDNNConvAlgoCacheEntry {
+ public:
+  CuDNNConvAlgoCacheEntry(T algo_perf) : algo_perf_(algo_perf) {
+  }
+
+  T Value() const {
+    return algo_perf_;
+  }
+
+  static CuDNNConvAlgoCacheEntry Load(const std::string& path) {
+    std::string data;
+    tvm::runtime::LoadBinaryFromFile(path + "/value.bin", &data);
+    dmlc::MemoryStringStream reader(&data);
+    dmlc::Stream* stream = &reader;
+
+    T algo_perf;
+    stream->Read(&algo_perf.algo);
+    stream->Read(&algo_perf.status);
+    stream->Read(&algo_perf.time);
+    stream->Read(&algo_perf.memory);
+    stream->Read(&algo_perf.determinism);
+    stream->Read(&algo_perf.mathType);
+    stream->Read(algo_perf.reserved);
+    return CuDNNConvAlgoCacheEntry(algo_perf);
+  }
+
+  bool Save(const std::string& path) {
+    std::string data;
+    dmlc::MemoryStringStream writer(&data);
+    dmlc::SeekStream* stream = &writer;
+    stream->Write(algo_perf_.algo);
+    stream->Write(algo_perf_.status);
+    stream->Write(algo_perf_.time);
+    stream->Write(algo_perf_.memory);
+    stream->Write(algo_perf_.determinism);
+    stream->Write(algo_perf_.mathType);
+    stream->Write(algo_perf_.reserved);
+    tvm::runtime::SaveBinaryToFile(path + "/value.bin", data);
+    return true;
+  }
+
+ private:
+  T algo_perf_;
+};
 
 template <class Algo, class F>
 void GetMaxWorkspaceSize(const Algo* algos, int n_algos, F fget_workspace, size_t* max_ws_size,
@@ -48,13 +113,15 @@ void GetMaxWorkspaceSize(const Algo* algos, int n_algos, F fget_workspace, size_
   CHECK(*memory != nullptr);
 }
 
-MetaCache<cudnnConvolutionFwdAlgoPerf_t> CacheForcudnnConvolutionFwdAlgoPerf_t;
+MetaPersistCache<CuDNNConvAlgoCacheEntry<cudnnConvolutionFwdAlgoPerf_t>> CacheCudnnConvFwdAlgoPerf(
+    "cudnn_conv_fwd_algo_perf");
+
 cudnnConvolutionFwdAlgoPerf_t FindcudnnConvolutionFwdAlgoPerf_tExWrapper(
     const std::vector<uint8_t>& key, const cudnnTensorDescriptor_t xDesc, const void* x,
     const cudnnFilterDescriptor_t wDesc, const void* w, const cudnnConvolutionDescriptor_t convDesc,
     const cudnnTensorDescriptor_t yDesc, void* y, const Device& device) {
-  if (auto* val = CacheForcudnnConvolutionFwdAlgoPerf_t.Get(key)) {
-    return *val;
+  if (auto* val = CacheCudnnConvFwdAlgoPerf.Get(key)) {
+    return val->Value();
   }
   static const cudnnConvolutionFwdAlgo_t algos[] = {
       CUDNN_CONVOLUTION_FWD_ALGO_GEMM,
@@ -89,7 +156,8 @@ cudnnConvolutionFwdAlgoPerf_t FindcudnnConvolutionFwdAlgoPerf_tExWrapper(
                << cudnnGetErrorString(res[0].status);
     throw;
   }
-  CacheForcudnnConvolutionFwdAlgoPerf_t.Set(key, res[0]);
+  CacheCudnnConvFwdAlgoPerf.Set(key,
+                                CuDNNConvAlgoCacheEntry<cudnnConvolutionFwdAlgoPerf_t>(res[0]));
   // debug information
   auto best_algo = res[0].algo;
   DLOG(INFO) << "CUDNN Found " << cnt << " conv2d algorithms, choosing "
@@ -104,14 +172,16 @@ cudnnConvolutionFwdAlgoPerf_t FindcudnnConvolutionFwdAlgoPerf_tExWrapper(
   return res[0];
 }
 
-MetaCache<cudnnConvolutionBwdDataAlgoPerf_t> CacheForcudnnConvolutionBwdDataAlgoPerf_t;
+MetaPersistCache<CuDNNConvAlgoCacheEntry<cudnnConvolutionBwdDataAlgoPerf_t>>
+    CacheCudnnConvBwdDataAlgoPerf("cudnn_conv_bwd_data_algo_perf");
+
 cudnnConvolutionBwdDataAlgoPerf_t FindcudnnConvolutionBwdDataAlgoPerf_tExWrapper(
     const std::vector<uint8_t>& key, const cudnnFilterDescriptor_t wDesc, const void* w,
     const cudnnTensorDescriptor_t dyDesc, const void* dy,
     const cudnnConvolutionDescriptor_t convDesc, const cudnnTensorDescriptor_t dxDesc, void* dx,
     const Device& device) {
-  if (auto* val = CacheForcudnnConvolutionBwdDataAlgoPerf_t.Get(key)) {
-    return *val;
+  if (auto* val = CacheCudnnConvBwdDataAlgoPerf.Get(key)) {
+    return val->Value();
   }
   static const cudnnConvolutionBwdDataAlgo_t algos[] = {
       CUDNN_CONVOLUTION_BWD_DATA_ALGO_0, CUDNN_CONVOLUTION_BWD_DATA_ALGO_1,
@@ -143,7 +213,8 @@ cudnnConvolutionBwdDataAlgoPerf_t FindcudnnConvolutionBwdDataAlgoPerf_tExWrapper
     throw;
   }
   auto best_algo = res[0].algo;
-  CacheForcudnnConvolutionBwdDataAlgoPerf_t.Set(key, res[0]);
+  CacheCudnnConvBwdDataAlgoPerf.Set(
+      key, CuDNNConvAlgoCacheEntry<cudnnConvolutionBwdDataAlgoPerf_t>(res[0]));
   // debug information
   DLOG(INFO) << "CUDNN Found " << cnt << " conv2d_dx algorithms , choosing "
              << conv2dBwdDataAlgoToString(best_algo);
@@ -157,14 +228,16 @@ cudnnConvolutionBwdDataAlgoPerf_t FindcudnnConvolutionBwdDataAlgoPerf_tExWrapper
   return res[0];
 }
 
-MetaCache<cudnnConvolutionBwdFilterAlgoPerf_t> CacheForcudnnConvolutionBwdFilterAlgoPerf_t;
+MetaPersistCache<CuDNNConvAlgoCacheEntry<cudnnConvolutionBwdFilterAlgoPerf_t>>
+    CacheCudnnConvBwdFilterAlgoPerf("cudnn_conv_bwd_filter_algo_perf");
+
 cudnnConvolutionBwdFilterAlgoPerf_t FindcudnnConvolutionBwdFilterAlgoPerf_tExWrapper(
     const std::vector<uint8_t>& key, const cudnnTensorDescriptor_t xDesc, const void* x,
     const cudnnTensorDescriptor_t dyDesc, const void* dy,
     const cudnnConvolutionDescriptor_t convDesc, const cudnnFilterDescriptor_t dwDesc, void* dw,
     const Device& device) {
-  if (auto* val = CacheForcudnnConvolutionBwdFilterAlgoPerf_t.Get(key)) {
-    return *val;
+  if (auto* val = CacheCudnnConvBwdFilterAlgoPerf.Get(key)) {
+    return val->Value();
   }
   static const cudnnConvolutionBwdFilterAlgo_t algos[] = {
       CUDNN_CONVOLUTION_BWD_FILTER_ALGO_0, CUDNN_CONVOLUTION_BWD_FILTER_ALGO_1,
@@ -195,7 +268,8 @@ cudnnConvolutionBwdFilterAlgoPerf_t FindcudnnConvolutionBwdFilterAlgoPerf_tExWra
                << cudnnGetErrorString(res[0].status);
     throw;
   }
-  CacheForcudnnConvolutionBwdFilterAlgoPerf_t.Set(key, res[0]);
+  CacheCudnnConvBwdFilterAlgoPerf.Set(
+      key, CuDNNConvAlgoCacheEntry<cudnnConvolutionBwdFilterAlgoPerf_t>(res[0]));
   // debug information
   auto best_algo = res[0].algo;
   DLOG(INFO) << "CUDNN Found " << cnt << " conv2d_dw algorithms , choosing "

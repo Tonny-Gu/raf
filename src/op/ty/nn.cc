@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2020 by Contributors
  * \file src/op/ty/unary.cc
  * \brief Typing relations of unary operators
  */
@@ -91,7 +109,7 @@ Type Conv2DTransInfer(const CallValues& value) {
 
   tvm::tir::BijectiveLayout data_layout_converter(args->layout, "NCHW");
   tvm::Array<tvm::PrimExpr> in_shape = x->shape;
-  tvm::tir::BijectiveLayout w_layout_converter(args->kernel_layout, "OIHW");
+  tvm::tir::BijectiveLayout w_layout_converter(args->kernel_layout, "IOHW");
   tvm::Array<tvm::PrimExpr> w_shape = w->shape;
 
   in_shape = data_layout_converter.ForwardShape(in_shape);
@@ -129,7 +147,7 @@ Type Conv2DTransInfer(const CallValues& value) {
 
   PrimExpr groups = Integer(args->groups);
   CHECK(TypeCheckCompare(c_in / groups, in, std::equal_to<int>()))
-      << "in nn.cc Unmatched input channel " << c_in << " and weight channel size" << in
+      << "in nn.cc Unmatched input channel " << c_in << " and weight channel size " << in
       << " with group size " << groups;
 
   tvm::tir::BijectiveLayout out_layout_converter(args->out_layout, "NCHW");

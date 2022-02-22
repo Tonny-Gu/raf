@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2019 by Contributors
  * \file src/op/regs/value2schema.h
  * \brief Converters from values to MNM operator schemas
  */
@@ -24,14 +42,13 @@ using mnm::ir::Array;
     return {};                   \
   }
 
-#define MNM_PRELUDE_DISALLOW_NULL(type)                                                       \
-  using namespace mnm::value;                                                                 \
-  using namespace mnm::ir;                                                                    \
-  if (!a.defined()) {                                                                         \
-    LOG(FATAL) << "TypeError: In operator \"{op}\", argument \"{arg}\" of type \""            \
-               << a->GetTypeKey() << "\" is undefined (NULL), but is required to be of type " \
-               << (type);                                                                     \
-    throw;                                                                                    \
+#define MNM_PRELUDE_DISALLOW_NULL(type)                                             \
+  using namespace mnm::value;                                                       \
+  using namespace mnm::ir;                                                          \
+  if (!a.defined()) {                                                               \
+    LOG(FATAL) << "TypeError: In operator \"{op}\", argument \"{arg}\""             \
+               << " is undefined (NULL), but is required to be of type " << (type); \
+    throw;                                                                          \
   }
 
 inline value::Value ArrayLike(const value::Value& a) {
@@ -87,7 +104,7 @@ inline bool Bool(const value::Value& a) {
     return v->value;
   }
   LOG(FATAL) << "TypeError: In operator \"{op}\", argument \"{arg}\" of type \"" << a->GetTypeKey()
-             << "\" is not an integer";
+             << "\" is not a bool value";
   throw;
 }
 inline double Double(const value::Value& a) {
@@ -99,7 +116,7 @@ inline double Double(const value::Value& a) {
     return v->value;
   }
   LOG(FATAL) << "TypeError: In operator \"{op}\", argument \"{arg}\" of type \"" << a->GetTypeKey()
-             << "\" is double";
+             << "\" is not a double";
   throw;
 }
 inline std::string String(const value::Value& a) {
@@ -108,7 +125,7 @@ inline std::string String(const value::Value& a) {
     return v->value;
   }
   LOG(FATAL) << "TypeError: In operator \"{op}\", argument \"{arg}\" of type \"" << a->GetTypeKey()
-             << "\" is a string";
+             << "\" is not a string";
   throw;
 }
 

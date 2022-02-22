@@ -1,5 +1,23 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 /*!
- * Copyright (c) 2021 by Contributors
  * \file src/op/dialect/cuda/nccl.cc
  * \brief Communication operators implmentated by NCCL
  */
@@ -111,10 +129,11 @@ class NCCLAllReduce : public mnm::op::OpEnv {
         CHECK(dtype_size == 0 || dtype_size == GetSizeInBytes(x->dtype))
             << "AllReduce requires tensors to be the same type.";
         dtype_size = GetSizeInBytes(x->dtype);
+        dtype = x->dtype;
       }
 
       // Allreduce
-      NCCL_CALL(ncclAllReduce(fused_data, fused_data, total_size / dtype_size, ncclFloat, compute,
+      NCCL_CALL(ncclAllReduce(fused_data, fused_data, total_size / dtype_size, dtype, compute,
                               (ncclComm_t)nccl_comm, (cudaStream_t)stream));
       // UnFuse Tensor
       value::TupleValue out = tvm::runtime::Downcast<value::TupleValue>(output);
@@ -240,15 +259,22 @@ class NCCLReduceScatter : public mnm::op::OpEnv {
     DType dtype;
 
     auto tv = Downcast<value::TupleValue>(inputs[0]);
-    for (int i = 0; i < tv->fields.size(); ++i) {
-      DLTensor* x = tv->fields[i];
-      void* buffer_data_at_offset = reinterpret_cast<uint8_t*>(in_buffer) + size_in_bytes * i;
-      cudaMemcpyAsync(buffer_data_at_offset, x->data, size_in_bytes, cudaMemcpyDeviceToDevice,
-                      (cudaStream_t)stream);
+    if (tv->fields.size() == 1) {
+      DLTensor* x = tv->fields[0];
       dtype = x->dtype;
+      NCCL_CALL(ncclReduceScatter(x->data, out->data, size, dtype, compute, (ncclComm_t)nccl_comm,
+                                  (cudaStream_t)stream));
+    } else {
+      for (int i = 0; i < tv->fields.size(); ++i) {
+        DLTensor* x = tv->fields[i];
+        void* buffer_data_at_offset = reinterpret_cast<uint8_t*>(in_buffer) + size_in_bytes * i;
+        cudaMemcpyAsync(buffer_data_at_offset, x->data, size_in_bytes, cudaMemcpyDeviceToDevice,
+                        (cudaStream_t)stream);
+        dtype = x->dtype;
+      }
+      NCCL_CALL(ncclReduceScatter(in_buffer, out->data, size, dtype, compute, (ncclComm_t)nccl_comm,
+                                  (cudaStream_t)stream));
     }
-    NCCL_CALL(ncclReduceScatter(in_buffer, out->data, size, dtype, compute, (ncclComm_t)nccl_comm,
-                                (cudaStream_t)stream));
   }
 
   static OpEnv* make(const CallValues& cv) {

@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # pylint: disable=attribute-defined-outside-init,invalid-name,protected-access,too-many-locals,no-self-use
 import pytest
 import mnm
@@ -17,29 +34,21 @@ def test_no_bind_tuple():
             zz = mnm.split(z, 2)
             return zz[0]
 
-    def expected():
-        x = relay.var("x", shape=(10, 20))
-        y = relay.var("y", shape=(10, 1))
-        z = mnm.ir.op.add(x, y)
-        z = mnm.ir.op.split(z, 2, 0)
-        z = relay.TupleGetItem(z, 0)
-        f = relay.Function([x, y], z)
-        return f
-
     model = Model()
     m_x, _ = randn((10, 20))
     m_y, _ = randn((10, 1))
     mod = model._internal(m_x, m_y).mod
-    mod_after = mnm._ffi.pass_.ToGraphNormalForm()(mod)
-    mod_after = mnm._ffi.pass_.ToBasicBlockNormalForm()(mod_after)
-    func_after = run_infer_type(mod_after)["main"]
-    func_expected = run_infer_type(expected())
+    mod_w_gnf = mnm._ffi.pass_.ToGraphNormalForm()(mod)
+    mod_w_bbnf = mnm._ffi.pass_.ToBasicBlockNormalForm()(mod_w_gnf)
+    func_after = run_infer_type(mod_w_bbnf)["main"]
+    func_expected = run_infer_type(mod_w_gnf)["main"]
     assert tvm.ir.structural_equal(func_after, func_expected)
     relay.analysis.check_basic_block_normal_form(func_after)
 
 
 def test_no_bind_diamond():
     konst, _ = randn((1,))
+
     class Model(mnm.Model):
         def build(self):
             self.c = konst
@@ -50,23 +59,14 @@ def test_no_bind_diamond():
             z2 = mnm.multiply(x, self.c)
             return mnm.relu(mnm.add(z1, z2))
 
-    def expected():
-        x = relay.var("x", shape=(10, 20))
-        y = relay.var("y", shape=(10, 1))
-        c = relay.var("c", shape=(1,))
-        z1 = mnm.ir.op.add(x, y)
-        z2 = mnm.ir.op.multiply(x, c)
-        z = mnm.ir.op.add(z1, z2)
-        z = mnm.ir.op.relu(z)
-        f = relay.Function([x, y, c], z)
-        return f
-
     model = Model()
     m_x, _ = randn((10, 20))
     m_y, _ = randn((10, 1))
     mod = model._internal(m_x, m_y).mod
-    func_after = run_infer_type(mnm._ffi.pass_.ToGraphNormalForm()(mod))["main"]
-    func_expected = run_infer_type(expected())
+    mod_w_gnf = mnm._ffi.pass_.ToGraphNormalForm()(mod)
+    mod_w_bbnf = mnm._ffi.pass_.ToBasicBlockNormalForm()(mod_w_gnf)
+    func_after = run_infer_type(mnm._ffi.pass_.ToGraphNormalForm()(mod_w_bbnf))["main"]
+    func_expected = run_infer_type(mod_w_gnf)["main"]
     assert tvm.ir.structural_equal(func_after, func_expected)
     relay.analysis.check_basic_block_normal_form(func_after)
 
@@ -127,8 +127,8 @@ def test_if():
 def test_top_level_nested_if():
     cond_t = mnm.ir.const(True)
     cond_f = mnm.ir.const(False)
-    one = mnm.ir.const(1., dtype="float32")
-    three = mnm.ir.const(3., dtype="float32")
+    one = mnm.ir.const(1.0, dtype="float32")
+    three = mnm.ir.const(3.0, dtype="float32")
 
     def nested_if():
         """
@@ -156,8 +156,7 @@ def test_top_level_nested_if():
         z = mnm.ir.var("z", shape=(), dtype="float32")
         y2 = mnm.ir.op.add(y, y)
         z2 = mnm.ir.op.add(z, z)
-        true_branch = relay.If(cond_t, mnm.ir.op.add(z2, y2),
-                               mnm.ir.op.add(three, y2))
+        true_branch = relay.If(cond_t, mnm.ir.op.add(z2, y2), mnm.ir.op.add(three, y2))
         false_branch = relay.If(cond_f, z2, one)
         body = relay.If(x, true_branch, false_branch)
         return relay.Function([x, y, z], body)
@@ -188,8 +187,7 @@ def test_top_level_nested_if():
         z = mnm.ir.var("z", shape=(), dtype="float32")
         y2 = relay.var("y2")
         z2 = relay.var("z2")
-        true_branch = relay.If(cond_t, mnm.ir.op.add(z2, y2),
-                               mnm.ir.op.add(three, y2))
+        true_branch = relay.If(cond_t, mnm.ir.op.add(z2, y2), mnm.ir.op.add(three, y2))
         true_branch = relay.Let(y2, mnm.ir.op.add(y, y), true_branch)
         false_branch = relay.If(cond_f, z2, one)
         body = relay.If(x, true_branch, false_branch)
@@ -209,9 +207,9 @@ def test_top_level_nested_if():
 def test_nested_if():
     cond_t = mnm.ir.const(True)
     cond_f = mnm.ir.const(False)
-    one = mnm.ir.const(1., dtype="float32")
-    two = mnm.ir.const(2., dtype="float32")
-    three = mnm.ir.const(3., dtype="float32")
+    one = mnm.ir.const(1.0, dtype="float32")
+    two = mnm.ir.const(2.0, dtype="float32")
+    three = mnm.ir.const(3.0, dtype="float32")
 
     def nested_if():
         """
@@ -275,6 +273,28 @@ def test_nested_if():
     func_after = run_infer_type(mod_after)["main"]
     func_expected = run_infer_type(expected())
     assert tvm.ir.structural_equal(func_after, func_expected)
+    relay.analysis.check_basic_block_normal_form(func_after)
+
+
+def test_may_share():
+    shape = (10, 10)
+    null = mnm.ir.const(None)
+
+    def before():
+        in0 = mnm.ir.var("in0", shape=shape)
+        in1 = mnm.ir.var("in1", shape=shape)
+        a_1 = mnm.ir.op.add(in0, in1, null, null)
+        v_0 = mnm.ir.var("a2", may_share=in0)
+        a_2 = relay.Let(v_0, mnm.ir.op.relu(a_1), v_0)
+        func = relay.Function([in0, in1], a_2)
+        return func
+
+    func = before()
+    mod = mnm.ir.IRModule()
+    mod["main"] = func
+    mod_after = mnm._ffi.pass_.ToBasicBlockNormalForm()(mod)
+    func_after = run_infer_type(mod_after)["main"]
+    assert tvm.ir.structural_equal(func_after, run_infer_type(mod)["main"])
     relay.analysis.check_basic_block_normal_form(func_after)
 
 
