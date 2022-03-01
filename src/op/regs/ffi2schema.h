@@ -13,7 +13,7 @@
 #include "raf/value.h"
 #include "raf/registry.h"
 #include "raf/binding.h"
->>>>>>> df572d227f9d201f32b474ea6750d954da81328b
+#include "raf/sharding.h"
 #include "./regs_utils.h"
 
 namespace raf {
