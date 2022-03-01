@@ -4,20 +4,20 @@
  * \brief Gradient operator input selection pass
  */
 #include <sstream>
-#include "mnm/op.h"
-#include "mnm/ir.h"
-#include "mnm/pass.h"
-#include "mnm/sharding.h"
+#include "raf/op.h"
+#include "raf/ir.h"
+#include "raf/pass.h"
+#include "raf/sharding.h"
 #include <string>
 #include <vector>
 
-namespace mnm {
+namespace raf {
 namespace pass {
 
-using namespace mnm::ir;
-using namespace mnm::op;
-using namespace mnm::value;
-using namespace mnm::sharding;
+using namespace raf::ir;
+using namespace raf::op;
+using namespace raf::value;
+using namespace raf::sharding;
 
 namespace shard_pass {
 
@@ -47,7 +47,7 @@ class ShardOpCallExpander : public ExprMutator {
   Expr VisitExpr_(const CallNode* node) override {
     const Expr& op = node->op;
     const Attrs& attrs = node->attrs;
-    const auto *f = tvm::runtime::Registry::Get("mnm.sharding._match_expansion_pattern");
+    const auto *f = tvm::runtime::Registry::Get("raf.sharding._match_expansion_pattern");
     if (attrs.defined() && op->IsInstance<OpNode>() && attrs->IsInstance<ShardOpCallAttrs>()) {
       auto call = GetRef<Call>(node);
       Expr new_expr = (*f)(call);
@@ -78,7 +78,7 @@ Pass SetShardOpCallAttrs(const Map<Expr, Attrs>& attrs_map) {
       0, "SetShardOpCallAttrs", {});
 }
 
-MNM_REGISTER_GLOBAL("mnm.pass_.SetShardOpCallAttrs").set_body_typed(SetShardOpCallAttrs);
+RAF_REGISTER_GLOBAL("raf.pass_.SetShardOpCallAttrs").set_body_typed(SetShardOpCallAttrs);
 
 Pass ExpandShardOpCall() {
   return CreateModulePass(
@@ -98,7 +98,7 @@ Pass ExpandShardOpCall() {
       0, "ExpandShardOpCall", {});
 }
 
-MNM_REGISTER_GLOBAL("mnm.pass_.ExpandShardOpCall").set_body_typed(ExpandShardOpCall);
+RAF_REGISTER_GLOBAL("raf.pass_.ExpandShardOpCall").set_body_typed(ExpandShardOpCall);
 
 }  // namespace pass
-}  // namespace mnm
+}  // namespace raf

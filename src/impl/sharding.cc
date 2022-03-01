@@ -1,16 +1,16 @@
 /*!
  * Copyright (c) 2021 by Contributors
  * \file src/impl/sharding.cc
- * \brief MNM Sharding System underlying implementation
+ * \brief RAF Sharding System underlying implementation
  */
 #include <tvm/runtime/data_type.h>
-#include "mnm/ir.h"
-#include "mnm/op.h"
-#include "mnm/op_utils.h"
-#include "mnm/type.h"
-#include "mnm/registry.h"
-#include "mnm/sharding.h"
-#include "mnm/dist_context.h"
+#include "raf/ir.h"
+#include "raf/op.h"
+#include "raf/op_utils.h"
+#include "raf/type.h"
+#include "raf/registry.h"
+#include "raf/sharding.h"
+#include "raf/dist_context.h"
 #include "../op/ty/utils.h"
 #include "../op/schema/ufunc.h"
 #include "../op/schema/sharding.h"
@@ -18,14 +18,14 @@
 #include "../op/dialect/tvm/tvm_attrs.h"
 #include <string>
 
-namespace mnm {
+namespace raf {
 namespace sharding {
 
-using namespace mnm::ir;
-using namespace mnm::op;
-using namespace mnm::op::schema;
-using namespace mnm::value;
-using namespace mnm::distributed;
+using namespace raf::ir;
+using namespace raf::op;
+using namespace raf::op::schema;
+using namespace raf::value;
+using namespace raf::distributed;
 
 ReplicatedSpec ReplicatedSpec::make(bool immutable) {
   auto n = make_object<ReplicatedSpecObj>();
@@ -104,7 +104,7 @@ void Reshard_R2S(const CallValues& call) {
   call->device = x->device;
 }
 
-MNM_OP_DECLARE("mnm.op._reshard_r2s", Reshard_R2S);
+RAF_OP_DECLARE("raf.op._reshard_r2s", Reshard_R2S);
 
 Type Reshard_R2S_Infer(const CallValues& call) {
   const auto* args = call->args.as<ShardUnaryArgs>();
@@ -124,17 +124,17 @@ Type Reshard_R2S_Infer(const CallValues& call) {
   return TensorType(oshape, data->dtype);
 }
 
-MNM_OP_TYPE("mnm.op._reshard_r2s", "Reshard_R2S", Reshard_R2S_Infer);
+RAF_OP_TYPE("raf.op._reshard_r2s", "Reshard_R2S", Reshard_R2S_Infer);
 
-MNM_REGISTER_GLOBAL("mnm.sharding._make.ReplicatedSpec").set_body_typed(ReplicatedSpec::make);
-MNM_REGISTER_GLOBAL("mnm.sharding._make.ShardSpec").set_body_typed(ShardSpec::make);
-MNM_REGISTER_GLOBAL("mnm.sharding._make.TupleShardSpec").set_body_typed(TupleShardSpec::make);
-MNM_REGISTER_GLOBAL("mnm.sharding._make.ShardOpCallAttrs").set_body_typed(ShardOpCallAttrs::make);
+RAF_REGISTER_GLOBAL("raf.sharding._make.ReplicatedSpec").set_body_typed(ReplicatedSpec::make);
+RAF_REGISTER_GLOBAL("raf.sharding._make.ShardSpec").set_body_typed(ShardSpec::make);
+RAF_REGISTER_GLOBAL("raf.sharding._make.TupleShardSpec").set_body_typed(TupleShardSpec::make);
+RAF_REGISTER_GLOBAL("raf.sharding._make.ShardOpCallAttrs").set_body_typed(ShardOpCallAttrs::make);
 
-MNM_REGISTER_OBJECT_NO_REFLECT(BaseShardSpecObj);
-MNM_REGISTER_OBJECT_REFLECT(ReplicatedSpecObj);
-MNM_REGISTER_OBJECT_REFLECT(ShardSpecObj);
-MNM_REGISTER_OBJECT_REFLECT(TupleShardSpecObj);
+RAF_REGISTER_OBJECT_NO_REFLECT(BaseShardSpecObj);
+RAF_REGISTER_OBJECT_REFLECT(ReplicatedSpecObj);
+RAF_REGISTER_OBJECT_REFLECT(ShardSpecObj);
+RAF_REGISTER_OBJECT_REFLECT(TupleShardSpecObj);
 
 using tvm::ReprPrinter;
 using tvm::runtime::ObjectRef;
@@ -210,16 +210,16 @@ TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
 TVM_REGISTER_NODE_TYPE(ShardOpCallAttrs);
 
 }  // namespace sharding
-}  // namespace mnm
+}  // namespace raf
 
-namespace mnm {
+namespace raf {
 namespace op {
 namespace tvm_dialect {
 
-using namespace mnm::ir;
-using namespace mnm::value;
-using namespace mnm::op::schema;
-using namespace mnm::sharding;
+using namespace raf::ir;
+using namespace raf::value;
+using namespace raf::op::schema;
+using namespace raf::sharding;
 
 std::vector<Value> ReshardSchema2Args(const ShardUnaryArgs* args) {
   return {args->x};
@@ -265,9 +265,9 @@ HashKey ReshardHasher(const std::vector<Type>& param_types, const Type& y_type,
   return key;
 }
 
-MNM_TVM(_reshard_r2s, Reshard_R2S, ShardUnaryArgs, ReshardSchema2Args, ReshardSchemaArgNames,
+RAF_TVM(_reshard_r2s, Reshard_R2S, ShardUnaryArgs, ReshardSchema2Args, ReshardSchemaArgNames,
         ReshardSchema2Attrs, ReshardHasher, kInjective);
 
 }  // namespace tvm_dialect
 }  // namespace op
-}  // namespace mnm
+}  // namespace raf

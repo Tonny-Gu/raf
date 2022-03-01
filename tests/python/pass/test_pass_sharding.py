@@ -1,34 +1,34 @@
 # pylint: disable=missing-function-docstring, missing-class-docstring, invalid-name, protected-access
 import pytest
-import mnm
-from mnm._core.core_utils import str2dev
-from mnm._core.executor import interpret
-from mnm.distributed.sharding import ShardSpec, ReplicatedSpec, TupleShardSpec, BaseShardSpec, ShardOpCallAttrs
-from mnm._ffi.pass_ import SetShardOpCallAttrs, ToGraphNormalForm, ExpandShardOpCall, InferType
-from mnm._ffi.device import Device
-from mnm._lib import relay
-from mnm.distributed.sharding.utils import get_dist_devices
-from mnm.testing import randn
-from mnm.hybrid.hybrid import _make_argument, _unwrap
-from mnm import distributed as dist
+import raf
+from raf._core.core_utils import str2dev
+from raf._core.executor import interpret
+from raf.distributed.sharding import ShardSpec, ReplicatedSpec, TupleShardSpec, BaseShardSpec, ShardOpCallAttrs
+from raf._ffi.pass_ import SetShardOpCallAttrs, ToGraphNormalForm, ExpandShardOpCall, InferType
+from raf._ffi.device import Device
+from raf._lib import relay
+from raf.distributed.sharding.utils import get_dist_devices
+from raf.testing import randn
+from raf.hybrid.hybrid import _make_argument, _unwrap
+from raf import distributed as dist
 from tvm.relay.analysis.analysis import post_order_visit
 
 def test_ShardOpCallAttrs():
 
-    class Model(mnm.Model):
+    class Model(raf.Model):
         def build(self):
             pass
 
-        @mnm.model.trace
+        @raf.model.trace
         def forward(self, x, y):
-            z = mnm.add(x, y)
+            z = raf.add(x, y)
             return z
 
     model = Model()
     # m_x, _ = randn((128, 128))
     # m_y, _ = randn((128, 128))
-    m_x = mnm.array([1, 2, 3, 4])
-    m_y = mnm.array([0, 0, 0, 0])
+    m_x = raf.array([1, 2, 3, 4])
+    m_y = raf.array([0, 0, 0, 0])
     record = model._internal(m_x, m_y)
     mod_before = record.mod
     mod_before = InferType()(mod_before)
@@ -45,7 +45,7 @@ def test_ShardOpCallAttrs():
     devices = get_dist_devices()
     attrs = ShardOpCallAttrs(TupleShardSpec([ReplicatedSpec(), ReplicatedSpec()]),
                              ShardSpec(devices, [4], [1]))
-    #a = mnm._reshard_r2s(m_x, ShardSpec(devices, [4, 4], [1, 2]))
+    #a = raf._reshard_r2s(m_x, ShardSpec(devices, [4, 4], [1, 2]))
     #print(a)
     call_list = []
     post_order_visit(mod_before["main"].body,
@@ -55,7 +55,7 @@ def test_ShardOpCallAttrs():
     mod0 = SetShardOpCallAttrs(attrs_map)(mod_before)
     mod1 = ToGraphNormalForm()(mod0)
     mod2 = ExpandShardOpCall()(mod1)
-    # print(mnm._ffi.ir.AsText(mod2))
+    # print(raf._ffi.ir.AsText(mod2))
     call = relay.Call(op=mod2["main"], args=[_make_argument(x) for x in (m_x, m_y)])
     result = _unwrap(interpret(call, mod2))
     print(result)
