@@ -1,19 +1,5 @@
-# Licensed to the Apache Software Foundation (ASF) under one
-# or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
-# regarding copyright ownership.  The ASF licenses this file
-# to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance
-# with the License.  You may obtain a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied.  See the License for the
-# specific language governing permissions and limitations
-# under the License.
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 from . import def_schema
 from .codegen_utils import Op
@@ -110,12 +96,12 @@ OPS = [
     Op(name="cross_entropy_dpred", schema_name="loss"),
     Op(name="cross_entropy_dtrue", schema_name="loss"),
     Op(name="reshape", schema_name="reshape"),
+    Op(name="reshape_like", schema_name="binary_like"),
     Op(name="resize2d", schema_name="resize2d"),
     Op(name="resize2d_dx", schema_name="resize2d_dx"),
     Op(name="ndarray_size", schema_name="unary"),
     Op(name="transpose", schema_name="transpose"),
-    Op(name="transpose_dx", schema_name="transpose_dx"),
-    Op(name="collapse_sum_like", schema_name="collapse_like"),
+    Op(name="transpose_dx", schema_name="transpose"),
     Op(name="sum", schema_name="sum"),
     Op(name="sum_dx", schema_name="sum_dx"),
     Op(name="cumsum", schema_name="cumsum"),
@@ -149,8 +135,9 @@ OPS = [
     Op(name="sequence_mask", schema_name="sequence_mask"),
     Op(name="reverse_sequence", schema_name="reverse_sequence"),
     Op(name="reverse", schema_name="reverse"),
-    Op(name="broadcast_to", schema_name="broadcast_to"),
-    Op(name="broadcast_to_like", schema_name="broadcast_to_like"),
+    Op(name="broadcast_to", schema_name="binary_to"),
+    Op(name="broadcast_to_like", schema_name="binary_like"),
+    Op(name="collapse_sum_like", schema_name="binary_like"),
     Op(name="concatenate", schema_name="concatenate"),
     Op(name="squeeze", schema_name="squeeze"),
     Op(name="stack", schema_name="stack"),
@@ -173,7 +160,7 @@ OPS = [
     Op(name="fuse_tensor", schema_name="fuse_tensor"),
     Op(name="defuse_tensor", schema_name="defuse_tensor"),
     Op(name="cast", schema_name="cast"),
-    Op(name="cast_like", schema_name="cast_like"),
+    Op(name="cast_like", schema_name="binary_like"),
     Op(name="gather", schema_name="gather"),
     Op(name="gather_dx", schema_name="gather_dx"),
     Op(name="gather_nd", schema_name="gather_nd"),
@@ -209,7 +196,7 @@ OPS = [
     Op(name="stream_barrier", schema_name="stream_barrier"),
     # Communication ops
     # Using underscore before the op name is because these ops won't be directly used in the
-    # frontend and the wrapper ops are defined in python/mnm/distributed/op.py
+    # frontend and the wrapper ops are defined in python/raf/distributed/op.py
     Op(name="_allreduce", schema_name="allreduce"),
     Op(name="_allgather", schema_name="allgather"),
     Op(name="_reduce", schema_name="comm_reduce"),

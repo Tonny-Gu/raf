@@ -1,19 +1,5 @@
-# Licensed to the Apache Software Foundation (ASF) under one
-# or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
-# regarding copyright ownership.  The ASF licenses this file
-# to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance
-# with the License.  You may obtain a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied.  See the License for the
-# specific language governing permissions and limitations
-# under the License.
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 from collections import defaultdict
 
@@ -178,7 +164,7 @@ SCHEMAS = {
         Arg(name="x_or_w", cxx_type="value::BaseTensorValue"),
         Arg(name="y", cxx_type=OptionalTensor),
         Arg(name="dy", cxx_type="value::BaseTensorValue"),
-        Arg(name="shape", cxx_type=OptionalIntArray, cxx_normalizer="IntArray"),
+        Arg(name="shape", cxx_type="value::Value"),
         Arg(name="stride", cxx_type="std::vector<int64_t>", cxx_normalizer="IntTuple"),
         Arg(name="padding", cxx_type="std::vector<int64_t>", cxx_normalizer="IntTuple"),
         Arg(name="dilation", cxx_type="std::vector<int64_t>", cxx_normalizer="IntTuple"),
@@ -188,7 +174,7 @@ SCHEMAS = {
         Arg(name="x_or_w", cxx_type="value::BaseTensorValue"),
         Arg(name="y", cxx_type=OptionalTensor),
         Arg(name="dy", cxx_type="value::BaseTensorValue"),
-        Arg(name="shape", cxx_type=OptionalIntArray, cxx_normalizer="IntArray"),
+        Arg(name="shape", cxx_type="value::Value"),
         Arg(name="stride", cxx_type="std::vector<int64_t>", cxx_normalizer="IntTuple"),
         Arg(name="padding", cxx_type="std::vector<int64_t>", cxx_normalizer="IntTuple"),
         Arg(name="output_padding", cxx_type="std::vector<int64_t>", cxx_normalizer="IntTuple"),
@@ -238,7 +224,7 @@ SCHEMAS = {
     "nn.h::embedding_dx": [
         Arg(name="dy", cxx_type="value::BaseTensorValue"),
         Arg(name="indices", cxx_type="value::BaseTensorValue"),
-        Arg(name="num_weight", cxx_type="std::vector<int64_t>", cxx_normalizer="IntTuple"),
+        Arg(name="num_weight", cxx_type="value::Value"),
     ],
     "nn.h::repeat": [
         Arg(name="x", cxx_type="value::BaseTensorValue"),
@@ -262,14 +248,6 @@ SCHEMAS = {
         Arg(name="sequence_length", cxx_type="value::BaseTensorValue"),
         Arg(name="seq_axis", cxx_type="int", cxx_default=1),
         Arg(name="batch_axis", cxx_type="int", cxx_default=0),
-    ],
-    "nn.h::broadcast_to": [
-        Arg(name="x", cxx_type="value::BaseTensorValue"),
-        Arg(name="shape", cxx_type="std::vector<int64_t>", cxx_normalizer="IntTuple"),
-    ],
-    "nn.h::broadcast_to_like": [
-        Arg(name="x", cxx_type="value::BaseTensorValue"),
-        Arg(name="broadcast_type", cxx_type="value::BaseTensorValue"),
     ],
     "nn.h::concatenate": [
         Arg(name="x", cxx_type="std::vector<value::BaseTensorValue>", cxx_normalizer="TensorTuple"),
@@ -378,9 +356,13 @@ SCHEMAS = {
         Arg(name="y", cxx_type="value::BaseTensorValue"),
         Arg(name="dy", cxx_type="value::BaseTensorValue"),
     ],
-    "likes.h::collapse_like": [
+    "likes.h::binary_to": [
         Arg(name="x", cxx_type="value::BaseTensorValue"),
         Arg(name="shape", cxx_type="std::vector<int64_t>", cxx_normalizer="IntTuple"),
+    ],
+    "likes.h::binary_like": [
+        Arg(name="x", cxx_type="value::BaseTensorValue"),
+        Arg(name="like_type", cxx_type="value::BaseTensorValue"),
     ],
     "likes.h::reshape": [
         Arg(name="x", cxx_type="value::BaseTensorValue"),
@@ -450,19 +432,13 @@ SCHEMAS = {
     ],
     "reduce.h::mean_dx": [
         Arg(name="dy", cxx_type="value::BaseTensorValue"),
+        Arg(name="shape", cxx_type="value::Value"),
         Arg(
             name="axis",
             cxx_type="std::vector<int64_t>",
             cxx_normalizer="IntTuple",
             cxx_default="{}",
             py_default=(),
-        ),
-        Arg(
-            name="x_shape",
-            cxx_type="std::vector<int64_t>",
-            cxx_normalizer="IntTuple",
-            cxx_default="{}",
-            py_default="None",
         ),
         Arg(name="keepdims", cxx_type="bool", cxx_default=False),
         Arg(name="exclude", cxx_type="bool", cxx_default=False),
@@ -518,23 +494,6 @@ SCHEMAS = {
             py_default="None",
         ),
     ],
-    "transform.h::transpose_dx": [
-        Arg(name="dy", cxx_type="value::BaseTensorValue"),
-        Arg(
-            name="axes",
-            cxx_type="std::vector<int64_t>",
-            cxx_normalizer="IntTuple",
-            cxx_default="{}",
-            py_default="None",
-        ),
-        Arg(
-            name="primal_shape",
-            cxx_type="std::vector<int64_t>",
-            cxx_normalizer="IntTuple",
-            cxx_default="{}",
-            py_default="None",
-        ),
-    ],
     "transform.h::swap_axis": [
         Arg(name="x", cxx_type="value::BaseTensorValue"),
         Arg(name="axis1", cxx_type="int"),
@@ -558,10 +517,6 @@ SCHEMAS = {
     "transform.h::cast": [
         Arg(name="data", cxx_type="value::BaseTensorValue"),
         Arg(name="dtype", cxx_type="std::string"),
-    ],
-    "transform.h::cast_like": [
-        Arg(name="data", cxx_type="value::BaseTensorValue"),
-        Arg(name="dtype_like", cxx_type="value::BaseTensorValue"),
     ],
     "transform.h::strided_slice": [
         Arg(name="x", cxx_type="value::BaseTensorValue"),
@@ -621,7 +576,7 @@ SCHEMAS = {
     ],
     "transform.h::strided_slice_dx": [
         Arg(name="dy", cxx_type="value::BaseTensorValue"),
-        Arg(name="primal_shape", cxx_type="std::vector<int64_t>", cxx_normalizer="IntTuple"),
+        Arg(name="shape", cxx_type="value::Value"),
         Arg(name="begin", cxx_type="std::vector<int64_t>", cxx_normalizer="IntTuple"),
         Arg(name="end", cxx_type="std::vector<int64_t>", cxx_normalizer="IntTuple"),
         Arg(

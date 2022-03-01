@@ -1,20 +1,6 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 /*!
@@ -22,9 +8,9 @@
  * \brief NN-related operators bridged from TVM.
  */
 #include <vector>
-#include <mnm/op_utils.h>
-#include <mnm/cache.h>
-#include <mnm/value.h>
+#include <raf/op_utils.h>
+#include <raf/cache.h>
+#include <raf/value.h>
 #include "./tvm_utils.h"
 #include "./tvm_attrs.h"
 #include "../../schema/transform.h"
@@ -32,13 +18,13 @@
 #include "../../schema/nn.h"
 #include "../../../common/shape_utils.h"
 
-namespace mnm {
+namespace raf {
 namespace op {
 namespace tvm_dialect {
 
-using namespace mnm::ir;
-using namespace mnm::value;
-using namespace mnm::op::schema;
+using namespace raf::ir;
+using namespace raf::value;
+using namespace raf::op::schema;
 
 Attrs ArangeSchema2Attrs(const ArangeArgs* args) {
   auto attrs = make_object<ArangeAttrs>();
@@ -70,7 +56,7 @@ HashKey ArangeHasher(const std::vector<Type>& param_types, const Type& y_type,
   return key;
 }
 
-MNM_TVM(arange, Arange, ArangeArgs, ArangeSchema2Args, ArangeSchemaArgNames, ArangeSchema2Attrs,
+RAF_TVM(arange, Arange, ArangeArgs, ArangeSchema2Args, ArangeSchemaArgNames, ArangeSchema2Attrs,
         ArangeHasher, kOpaque);
 
 std::vector<Value> AdvIndexSchema2Args(const AdvIndexArgs* args) {
@@ -85,7 +71,7 @@ std::vector<std::string> AdvIndexSchemaArgNames(const op::CallValues& call) {
   return {"inputs"};
 }
 
-MNM_TVM(adv_index, AdvIndex, AdvIndexArgs, AdvIndexSchema2Args, AdvIndexSchemaArgNames,
+RAF_TVM(adv_index, AdvIndex, AdvIndexArgs, AdvIndexSchema2Args, AdvIndexSchemaArgNames,
         GenericAttrs, GenericHasher, kOpaque);
 
 std::vector<Value> AdvIndexDxSchema2Args(const AdvIndexDxArgs* args) {
@@ -101,7 +87,7 @@ std::vector<std::string> AdvIndexDxSchemaArgNames(const op::CallValues& call) {
   return {"dy", "inputs"};
 }
 
-MNM_TVM(adv_index_dx, AdvIndexDx, AdvIndexDxArgs, AdvIndexDxSchema2Args, AdvIndexDxSchemaArgNames,
+RAF_TVM(adv_index_dx, AdvIndexDx, AdvIndexDxArgs, AdvIndexDxSchema2Args, AdvIndexDxSchemaArgNames,
         GenericAttrs, GenericHasher, kOpaque);
 
 std::vector<Value> RepeatSchema2Args(const RepeatArgs* args) {
@@ -137,7 +123,7 @@ HashKey RepeatHasher(const std::vector<Type>& param_types, const Type& y_type,
   return key;
 }
 
-MNM_TVM(repeat, Repeat, RepeatArgs, RepeatSchema2Args, RepeatSchemaArgNames, RepeatSchema2Attrs,
+RAF_TVM(repeat, Repeat, RepeatArgs, RepeatSchema2Args, RepeatSchemaArgNames, RepeatSchema2Attrs,
         RepeatHasher, kBroadcast);
 
 std::vector<Value> RepeatDxSchema2Args(const RepeatDxArgs* args) {
@@ -173,7 +159,7 @@ HashKey RepeatDxHasher(const std::vector<Type>& param_types, const Type& y_type,
   return key;
 }
 
-MNM_TVM(repeat_dx, RepeatDx, RepeatDxArgs, RepeatDxSchema2Args, RepeatDxSchemaArgNames,
+RAF_TVM(repeat_dx, RepeatDx, RepeatDxArgs, RepeatDxSchema2Args, RepeatDxSchemaArgNames,
         RepeatDxSchema2Attrs, RepeatDxHasher, kCommReduce);
 
 template <typename T>
@@ -210,10 +196,10 @@ HashKey TakeHasher(const std::vector<Type>& param_types, const Type& y_type, con
   return key;
 }
 
-MNM_TVM(take, Take, TakeArgs, TakeSchema2Args<TakeArgs>, TakeSchemaArgNames, TakeSchema2Attrs,
+RAF_TVM(take, Take, TakeArgs, TakeSchema2Args<TakeArgs>, TakeSchemaArgNames, TakeSchema2Attrs,
         TakeHasher, kInjective);
 
-MNM_TVM(embedding, Embedding, EmbeddingArgs, TakeSchema2Args<EmbeddingArgs>, TakeSchemaArgNames,
+RAF_TVM(embedding, Embedding, EmbeddingArgs, TakeSchema2Args<EmbeddingArgs>, TakeSchemaArgNames,
         GenericAttrs, GenericHasher, kInjective);
 
 std::vector<Value> TakeDxSchema2Args(const TakeDxArgs* args) {
@@ -249,7 +235,7 @@ HashKey TakeDxHasher(const std::vector<Type>& param_types, const Type& y_type,
   return key;
 }
 
-MNM_TVM(take_dx, TakeDx, TakeDxArgs, TakeDxSchema2Args, TakeDxSchemaArgNames, TakeDxSchema2Attrs,
+RAF_TVM(take_dx, TakeDx, TakeDxArgs, TakeDxSchema2Args, TakeDxSchemaArgNames, TakeDxSchema2Attrs,
         TakeDxHasher, kOpaque);
 
 std::vector<Value> EmbeddingDxSchema2Args(const EmbeddingDxArgs* args) {
@@ -262,23 +248,15 @@ std::vector<std::string> EmbeddingDxSchemaArgNames(const op::CallValues& call) {
 
 Attrs EmbeddingDxSchema2Attrs(const EmbeddingDxArgs* args) {
   auto attrs = make_object<DimAttrs>();
-  for (auto v : args->num_weight) {
+  auto num_weight = GetShapeVecFromValue(args->num_weight);
+  for (auto v : num_weight) {
     attrs->dims.push_back(Integer(v));
   }
   return Attrs(attrs);
 }
 
-HashKey EmbeddingDxHasher(const std::vector<Type>& param_types, const Type& y_type,
-                          const EmbeddingDxArgs* args) {
-  HashKey key = GenericHasher<nullptr_t>(param_types, y_type, nullptr);
-  for (auto v : args->num_weight) {
-    key << v;
-  }
-  return key;
-}
-
-MNM_TVM(embedding_dx, EmbeddingDx, EmbeddingDxArgs, EmbeddingDxSchema2Args,
-        EmbeddingDxSchemaArgNames, EmbeddingDxSchema2Attrs, EmbeddingDxHasher, kOpaque);
+RAF_TVM(embedding_dx, EmbeddingDx, EmbeddingDxArgs, EmbeddingDxSchema2Args,
+        EmbeddingDxSchemaArgNames, EmbeddingDxSchema2Attrs, GenericHasher, kOpaque);
 
 std::vector<Value> SequenceMaskSchema2Args(const SequenceMaskArgs* args) {
   return {args->x, args->sequence_length};
@@ -303,7 +281,7 @@ HashKey SequenceMaskHasher(const std::vector<Type>& param_types, const Type& y_t
   return key;
 }
 
-MNM_TVM(sequence_mask, SequenceMask, SequenceMaskArgs, SequenceMaskSchema2Args,
+RAF_TVM(sequence_mask, SequenceMask, SequenceMaskArgs, SequenceMaskSchema2Args,
         SequenceMaskSchemaArgNames, SequenceMaskSchema2Attrs, SequenceMaskHasher, kInjective);
 
 std::vector<Value> ReverseSchema2Args(const ReverseArgs* args) {
@@ -327,7 +305,7 @@ HashKey ReverseHasher(const std::vector<Type>& param_types, const Type& y_type,
   return key;
 }
 
-MNM_TVM(reverse, Reverse, ReverseArgs, ReverseSchema2Args, ReverseSchemaArgNames,
+RAF_TVM(reverse, Reverse, ReverseArgs, ReverseSchema2Args, ReverseSchemaArgNames,
         ReverseSchema2Attrs, ReverseHasher, kInjective);
 
 std::vector<Value> ReverseSequenceSchema2Args(const ReverseSequenceArgs* args) {
@@ -353,31 +331,20 @@ HashKey ReverseSequenceHasher(const std::vector<Type>& param_types, const Type& 
   return key;
 }
 
-MNM_TVM(reverse_sequence, ReverseSequence, ReverseSequenceArgs, ReverseSequenceSchema2Args,
+RAF_TVM(reverse_sequence, ReverseSequence, ReverseSequenceArgs, ReverseSequenceSchema2Args,
         ReverseSequenceSchemaArgNames, ReverseSequenceSchema2Attrs, ReverseSequenceHasher,
         kInjective);
 
-std::vector<Value> BroadcastToSchema2Args(const BroadcastToArgs* args) {
+std::vector<Value> BinaryToSchema2Args(const BinaryToArgs* args) {
   return {args->x};
 }
 
-std::vector<std::string> BroadcastToSchemaArgNames(const op::CallValues& call) {
+std::vector<std::string> BinaryToSchemaArgNames(const op::CallValues& call) {
   return {"x"};
 }
 
-Attrs BroadcastToSchema2Attrs(const BroadcastToArgs* args) {
-  auto attrs = make_object<InitOpAttrs>();
-  std::vector<IndexExpr> shape;
-  shape.reserve(args->shape.size());
-  for (size_t i = 0; i < args->shape.size(); ++i) {
-    shape.emplace_back(IntImm(ir::DataType::Int(32), args->shape[i]));
-  }
-  attrs->shape = Array<Integer>(shape.begin(), shape.end());
-  return Attrs(attrs);
-}
-
-MNM_TVM(broadcast_to, BroadcastTo, BroadcastToArgs, BroadcastToSchema2Args,
-        BroadcastToSchemaArgNames, BroadcastToSchema2Attrs, GenericHasher, kBroadcast);
+RAF_TVM(broadcast_to, BroadcastTo, BinaryToArgs, BinaryToSchema2Args, BinaryToSchemaArgNames,
+        GenericAttrs, GenericHasher, kBroadcast);
 
 std::vector<Value> TransposeSchema2Args(const TransposeArgs* args) {
   return {args->x};
@@ -405,53 +372,22 @@ HashKey TransposeHasher(const std::vector<Type>& param_types, const Type& y_type
   return key;
 }
 
-MNM_TVM(transpose, Transpose, TransposeArgs, TransposeSchema2Args, TransposeSchemaArgNames,
+RAF_TVM(transpose, Transpose, TransposeArgs, TransposeSchema2Args, TransposeSchemaArgNames,
         TransposeSchema2Attrs, TransposeHasher, kInjective);
 
-std::vector<Value> TransposeDxSchema2Args(const TransposeDxArgs* args) {
-  return {args->dy};
+RAF_TVM(transpose_dx, TransposeDx, TransposeArgs, TransposeSchema2Args, TransposeSchemaArgNames,
+        TransposeSchema2Attrs, TransposeHasher, kInjective);
+
+std::vector<Value> BinaryLikeSchema2Args(const BinaryLikeArgs* args) {
+  return {args->x, args->like_type};
 }
 
-std::vector<std::string> TransposeDxSchemaArgNames(const op::CallValues& call) {
-  return {"dy"};
+std::vector<std::string> BinaryLikeSchemaArgNames(const op::CallValues& call) {
+  return {"x", "like_type"};
 }
 
-Attrs TransposeDxSchema2Attrs(const TransposeDxArgs* args) {
-  auto attrs = make_object<TransposeAttrs>();
-  std::vector<Integer> axes;
-  axes.reserve(args->axes.size());
-  for (size_t i = 0; i < args->axes.size(); ++i) {
-    axes.emplace_back(args->axes[i]);
-  }
-  attrs->axes = Array<Integer>(axes.begin(), axes.end());
-  return Attrs(attrs);
-}
-
-HashKey TransposeDxHasher(const std::vector<Type>& param_types, const Type& y_type,
-                          const TransposeDxArgs* args) {
-  HashKey key = GenericHasher<nullptr_t>(param_types, y_type, nullptr);
-  key << args->axes;
-  return key;
-}
-
-MNM_TVM(transpose_dx, TransposeDx, TransposeDxArgs, TransposeDxSchema2Args,
-        TransposeDxSchemaArgNames, TransposeDxSchema2Attrs, TransposeDxHasher, kInjective);
-
-std::vector<Value> BroadcastToLikeSchema2Args(const BroadcastToLikeArgs* args) {
-  return {args->x, args->broadcast_type};
-}
-
-std::vector<std::string> BroadcastToLikeSchemaArgNames(const op::CallValues& call) {
-  return {"x", "broadcast_type"};
-}
-
-Attrs BroadcastToLikeSchema2Attrs(const BroadcastToLikeArgs* args) {
-  auto attrs = make_object<InitOpAttrs>();
-  return Attrs(attrs);
-}
-
-MNM_TVM(broadcast_to_like, BroadcastToLike, BroadcastToLikeArgs, BroadcastToLikeSchema2Args,
-        BroadcastToLikeSchemaArgNames, BroadcastToLikeSchema2Attrs, GenericHasher, kBroadcast);
+RAF_TVM(broadcast_to_like, BroadcastToLike, BinaryLikeArgs, BinaryLikeSchema2Args,
+        BinaryLikeSchemaArgNames, GenericAttrs, GenericHasher, kBroadcast);
 
 std::vector<Value> SplitSchema2Args(const SplitArgs* args) {
   return {args->x};
@@ -473,7 +409,7 @@ Attrs SplitSchema2Attrs(const SplitArgs* args) {
     for (auto field : tup->fields) {
       indices.push_back(GetScalarValueData<int64_t>(field));
     }
-    attrs->indices_or_sections = mnm::common::shape_utils::StdVector2Array(indices);
+    attrs->indices_or_sections = raf::common::shape_utils::StdVector2Array(indices);
   }
 
   attrs->axis = args->axis;
@@ -487,7 +423,7 @@ HashKey SplitHasher(const std::vector<Type>& param_types, const Type& y_type,
   return key;
 }
 
-MNM_TVM(split, Split, SplitArgs, SplitSchema2Args, SplitSchemaArgNames, SplitSchema2Attrs,
+RAF_TVM(split, Split, SplitArgs, SplitSchema2Args, SplitSchemaArgNames, SplitSchema2Attrs,
         SplitHasher, kInjective);
 
 std::vector<Value> ScatterSchema2Args(const ScatterArgs* args) {
@@ -521,7 +457,7 @@ HashKey ScatterHasher(const std::vector<Type>& param_types, const Type& y_type,
   return key;
 }
 
-MNM_TVM(scatter, Scatter, ScatterArgs, ScatterSchema2Args, ScatterSchemaArgNames,
+RAF_TVM(scatter, Scatter, ScatterArgs, ScatterSchema2Args, ScatterSchemaArgNames,
         ScatterSchema2Attrs, ScatterHasher, kInjective);
 
 std::vector<Value> ScatterDxSchema2Args(const ScatterDxArgs* args) {
@@ -555,7 +491,7 @@ HashKey ScatterDxHasher(const std::vector<Type>& param_types, const Type& y_type
   return key;
 }
 
-MNM_TVM(scatter_dx, ScatterDx, ScatterDxArgs, ScatterDxSchema2Args, ScatterDxSchemaArgNames,
+RAF_TVM(scatter_dx, ScatterDx, ScatterDxArgs, ScatterDxSchema2Args, ScatterDxSchemaArgNames,
         ScatterDxSchema2Attrs, ScatterDxHasher, kInjective);
 
 std::vector<Value> ConcatenateSchema2Args(const ConcatenateArgs* args) {
@@ -583,7 +519,7 @@ HashKey ConcatenateHasher(const std::vector<Type>& param_types, const Type& y_ty
   return key;
 }
 
-MNM_TVM(concatenate, Concatenate, ConcatenateArgs, ConcatenateSchema2Args,
+RAF_TVM(concatenate, Concatenate, ConcatenateArgs, ConcatenateSchema2Args,
         ConcatenateSchemaArgNames, ConcatenateSchema2Attrs, ConcatenateHasher, kInjective);
 
 std::vector<Value> MeshGridSchema2Args(const MeshGridArgs* args) {
@@ -598,7 +534,7 @@ std::vector<std::string> MeshGridSchemaArgNames(const op::CallValues& call) {
   return {"x"};
 }
 
-MNM_TVM(mesh_grid, MeshGrid, MeshGridArgs, MeshGridSchema2Args, MeshGridSchemaArgNames,
+RAF_TVM(mesh_grid, MeshGrid, MeshGridArgs, MeshGridSchema2Args, MeshGridSchemaArgNames,
         GenericAttrs, GenericHasher, kInjective);
 
 std::vector<Value> StackSchema2Args(const StackArgs* args) {
@@ -626,7 +562,7 @@ HashKey StackHasher(const std::vector<Type>& param_types, const Type& y_type,
   return key;
 }
 
-MNM_TVM(stack, Stack, StackArgs, StackSchema2Args, StackSchemaArgNames, StackSchema2Attrs,
+RAF_TVM(stack, Stack, StackArgs, StackSchema2Args, StackSchemaArgNames, StackSchema2Attrs,
         StackHasher, kInjective);
 
 std::vector<Value> ClipSchema2Args(const ClipArgs* args) {
@@ -651,7 +587,7 @@ HashKey ClipHasher(const std::vector<Type>& param_types, const Type& y_type, con
   return key;
 }
 
-MNM_TVM(clip, Clip, ClipArgs, ClipSchema2Args, ClipSchemaArgNames, ClipSchema2Attrs, ClipHasher,
+RAF_TVM(clip, Clip, ClipArgs, ClipSchema2Args, ClipSchemaArgNames, ClipSchema2Attrs, ClipHasher,
         kElemWise);
 
 std::vector<Value> ClipDxSchema2Args(const ClipDxArgs* args) {
@@ -677,7 +613,7 @@ HashKey ClipDxHasher(const std::vector<Type>& param_types, const Type& y_type,
   return key;
 }
 
-MNM_TVM(clip_dx, ClipDx, ClipDxArgs, ClipDxSchema2Args, ClipDxSchemaArgNames, ClipDxSchema2Attrs,
+RAF_TVM(clip_dx, ClipDx, ClipDxArgs, ClipDxSchema2Args, ClipDxSchemaArgNames, ClipDxSchema2Attrs,
         ClipDxHasher, kElemWise);
 
 std::vector<Value> CastSchema2Args(const CastArgs* args) {
@@ -700,18 +636,10 @@ HashKey CastHasher(const std::vector<Type>& param_types, const Type& y_type, con
   return key;
 }
 
-MNM_TVM(cast, Cast, CastArgs, CastSchema2Args, CastSchemaArgNames, CastSchema2Attrs, CastHasher,
+RAF_TVM(cast, Cast, CastArgs, CastSchema2Args, CastSchemaArgNames, CastSchema2Attrs, CastHasher,
         kElemWise);
 
-std::vector<Value> CastLikeSchema2Args(const CastLikeArgs* args) {
-  return {args->data, args->dtype_like};
-}
-
-std::vector<std::string> CastLikeSchemaArgNames(const op::CallValues& call) {
-  return {"data", "dtype_like"};
-}
-
-MNM_TVM(cast_like, CastLike, CastLikeArgs, CastLikeSchema2Args, CastLikeSchemaArgNames,
+RAF_TVM(cast_like, CastLike, BinaryLikeArgs, BinaryLikeSchema2Args, BinaryLikeSchemaArgNames,
         GenericAttrs, GenericHasher, kElemWise);
 
 std::vector<Value> GatherSchema2Args(const GatherArgs* args) {
@@ -735,7 +663,7 @@ HashKey GatherHasher(const std::vector<Type>& param_types, const Type& y_type,
   return key;
 }
 
-MNM_TVM(gather, Gather, GatherArgs, GatherSchema2Args, GatherSchemaArgNames, GatherSchema2Attrs,
+RAF_TVM(gather, Gather, GatherArgs, GatherSchema2Args, GatherSchemaArgNames, GatherSchema2Attrs,
         GatherHasher, kInjective);
 
 std::vector<Value> GatherDxSchema2Args(const GatherDxArgs* args) {
@@ -759,7 +687,7 @@ HashKey GatherDxHasher(const std::vector<Type>& param_types, const Type& y_type,
   return key;
 }
 
-MNM_TVM(gather_dx, GatherDx, GatherDxArgs, GatherDxSchema2Args, GatherDxSchemaArgNames,
+RAF_TVM(gather_dx, GatherDx, GatherDxArgs, GatherDxSchema2Args, GatherDxSchemaArgNames,
         GatherDxSchema2Attrs, GatherDxHasher, kInjective);
 
 std::vector<Value> GatherNdSchema2Args(const GatherNdArgs* args) {
@@ -777,7 +705,7 @@ Attrs GatherNdSchema2Attrs(const GatherNdArgs* args) {
   return Attrs(attrs);
 }
 
-MNM_TVM(gather_nd, GatherNd, GatherNdArgs, GatherNdSchema2Args, GatherNdSchemaArgNames,
+RAF_TVM(gather_nd, GatherNd, GatherNdArgs, GatherNdSchema2Args, GatherNdSchemaArgNames,
         GatherNdSchema2Attrs, GenericHasher, kInjective);
 
 std::vector<Value> GatherNdDxSchema2Args(const GatherNdDxArgs* args) {
@@ -788,7 +716,7 @@ std::vector<std::string> GatherNdDxSchemaArgNames(const op::CallValues& call) {
   return {"data", "indices", "dy"};
 }
 
-MNM_TVM(gather_nd_dx, GatherNdDx, GatherNdDxArgs, GatherNdDxSchema2Args, GatherNdDxSchemaArgNames,
+RAF_TVM(gather_nd_dx, GatherNdDx, GatherNdDxArgs, GatherNdDxSchema2Args, GatherNdDxSchemaArgNames,
         GenericAttrs, GenericHasher, kInjective);
 
 std::vector<Value> SqueezeSchema2Args(const SqueezeArgs* args) {
@@ -817,7 +745,7 @@ HashKey SqueezeHasher(const std::vector<Type>& param_types, const Type& y_type,
   return key;
 }
 
-MNM_TVM(squeeze, Squeeze, SqueezeArgs, SqueezeSchema2Args, SqueezeSchemaArgNames,
+RAF_TVM(squeeze, Squeeze, SqueezeArgs, SqueezeSchema2Args, SqueezeSchemaArgNames,
         SqueezeSchema2Attrs, SqueezeHasher, kInjective);
 
 std::vector<Value> ReshapeSchema2Args(const ReshapeArgs* args) {
@@ -851,7 +779,7 @@ HashKey ReshapeHasher(const std::vector<Type>& param_types, const Type& y_type,
   return key;
 }
 
-MNM_TVM(reshape, Reshape, ReshapeArgs, ReshapeSchema2Args, ReshapeSchemaArgNames,
+RAF_TVM(reshape, Reshape, ReshapeArgs, ReshapeSchema2Args, ReshapeSchemaArgNames,
         ReshapeSchema2Attrs, ReshapeHasher, kInjective);
 
 template <typename T>
@@ -899,7 +827,7 @@ HashKey ResizeHasher(const std::vector<Type>& param_types, const Type& y_type, c
   return key;
 }
 
-MNM_TVM(resize2d, Resize2D, Resize2DArgs, ResizeSchema2Args<Resize2DArgs>, ResizeSchemaArgNames,
+RAF_TVM(resize2d, Resize2D, Resize2DArgs, ResizeSchema2Args<Resize2DArgs>, ResizeSchemaArgNames,
         Resize2DSchema2Attrs, ResizeHasher<Resize2DArgs>, kInjective);
 
 std::vector<Value> Resize2DDxSchema2Args(const Resize2DDxArgs* args) {
@@ -947,7 +875,7 @@ HashKey Resize2DDxHasher(const std::vector<Type>& param_types, const Type& y_typ
   return key;
 }
 
-MNM_TVM(resize2d_dx, Resize2DDx, Resize2DDxArgs, Resize2DDxSchema2Args, Resize2DDxSchemaArgNames,
+RAF_TVM(resize2d_dx, Resize2DDx, Resize2DDxArgs, Resize2DDxSchema2Args, Resize2DDxSchemaArgNames,
         Resize2DDxSchema2Attrs, Resize2DDxHasher, kInjective);
 
 std::vector<Value> ExpandDimsSchema2Args(const ExpandDimsArgs* args) {
@@ -973,7 +901,7 @@ HashKey ExpandDimsHasher(const std::vector<Type>& param_types, const Type& y_typ
   return key;
 }
 
-MNM_TVM(expand_dims, ExpandDims, ExpandDimsArgs, ExpandDimsSchema2Args, ExpandDimsSchemaArgNames,
+RAF_TVM(expand_dims, ExpandDims, ExpandDimsArgs, ExpandDimsSchema2Args, ExpandDimsSchemaArgNames,
         ExpandDimsSchema2Attrs, ExpandDimsHasher, kBroadcast);
 
 std::vector<Value> FullSchema2Args(const FullArgs* args) {
@@ -1008,7 +936,7 @@ HashKey FullHasher(const std::vector<Type>& param_types, const Type& y_type, con
   return key;
 }
 
-MNM_TVM(full, Full, FullArgs, FullSchema2Args, FullSchemaArgNames, FullSchema2Attrs, FullHasher,
+RAF_TVM(full, Full, FullArgs, FullSchema2Args, FullSchemaArgNames, FullSchema2Attrs, FullHasher,
         kInjective);
 
 std::vector<Value> FullLikeSchema2Args(const FullLikeArgs* args) {
@@ -1032,7 +960,7 @@ HashKey FullLikeHasher(const std::vector<Type>& param_types, const Type& y_type,
   return key;
 }
 
-MNM_TVM(full_like, FullLike, FullLikeArgs, FullLikeSchema2Args, FullLikeSchemaArgNames,
+RAF_TVM(full_like, FullLike, FullLikeArgs, FullLikeSchema2Args, FullLikeSchemaArgNames,
         FullLikeSchema2Attrs, FullLikeHasher, kInjective);
 
 std::vector<Value> StridedSliceSchema2Args(const StridedSliceArgs* args) {
@@ -1072,7 +1000,7 @@ HashKey StridedSliceHasher(const std::vector<Type>& param_types, const Type& y_t
   return key;
 }
 
-MNM_TVM(strided_slice, StridedSlice, StridedSliceArgs, StridedSliceSchema2Args,
+RAF_TVM(strided_slice, StridedSlice, StridedSliceArgs, StridedSliceSchema2Args,
         StridedSliceSchemaArgNames, StridedSliceSchema2Attrs, StridedSliceHasher, kInjective);
 
 std::vector<Value> StridedSliceDxSchema2Args(const StridedSliceDxArgs* args) {
@@ -1093,8 +1021,9 @@ Attrs StridedSliceDxSchema2Attrs(const StridedSliceDxArgs* args) {
     end.emplace_back(args->end[i]);
     strides.emplace_back(args->strides[i]);
   }
-  for (int i = 0; i < args->primal_shape.size(); ++i) {
-    primal_shape.emplace_back(args->primal_shape[i]);
+  std::vector<int64_t> shape = GetShapeVecFromValue(args->shape);
+  for (int i = 0; i < shape.size(); ++i) {
+    primal_shape.emplace_back(shape[i]);
   }
   attrs->primal_shape = Array<Integer>(primal_shape.begin(), primal_shape.end());
   attrs->begin = Array<Integer>(begin.begin(), begin.end());
@@ -1114,7 +1043,7 @@ HashKey StridedSliceDxHasher(const std::vector<Type>& param_types, const Type& y
   return key;
 }
 
-MNM_TVM(strided_slice_dx, StridedSliceDx, StridedSliceDxArgs, StridedSliceDxSchema2Args,
+RAF_TVM(strided_slice_dx, StridedSliceDx, StridedSliceDxArgs, StridedSliceDxSchema2Args,
         StridedSliceDxSchemaArgNames, StridedSliceDxSchema2Attrs, StridedSliceDxHasher, kInjective);
 
 std::vector<Value> WhereSchema2Args(const WhereArgs* args) {
@@ -1141,7 +1070,7 @@ HashKey WhereHasher(const std::vector<Type>& param_types, const Type& y_type,
 
 // FIXME: where should be kBroadcast, but it might be super slow when fused with other ops
 // such as sum. We should change it back to kBroadcast after resolving this issue.
-MNM_TVM(where, Where, WhereArgs, WhereSchema2Args, WhereSchemaArgNames, GenericAttrs, GenericHasher,
+RAF_TVM(where, Where, WhereArgs, WhereSchema2Args, WhereSchemaArgNames, GenericAttrs, GenericHasher,
         kOutEWiseFusable);
 
 std::vector<Value> SwapAxisSchema2Args(const SwapAxisArgs* args) {
@@ -1167,7 +1096,7 @@ HashKey SwapAxisHasher(const std::vector<Type>& param_types, const Type& y_type,
   return key;
 }
 
-MNM_TVM(swap_axis, SwapAxis, SwapAxisArgs, SwapAxisSchema2Args, SwapAxisSchemaArgNames,
+RAF_TVM(swap_axis, SwapAxis, SwapAxisArgs, SwapAxisSchema2Args, SwapAxisSchemaArgNames,
         SwapAxisSchema2Attrs, SwapAxisHasher, kInjective);
 
 std::vector<Value> ArgwhereSchema2Args(const ArgwhereArgs* args) {
@@ -1178,7 +1107,7 @@ std::vector<std::string> ArgwhereSchemaArgNames(const op::CallValues& call) {
   return {"condition"};
 }
 
-MNM_TVM(upper_bound.argwhere, Argwhere, ArgwhereArgs, ArgwhereSchema2Args, ArgwhereSchemaArgNames,
+RAF_TVM(upper_bound.argwhere, Argwhere, ArgwhereArgs, ArgwhereSchema2Args, ArgwhereSchemaArgNames,
         GenericAttrs, GenericHasher, kOpaque);
 
 std::vector<Value> CumsumSchema2Args(const CumsumArgs* args) {
@@ -1206,9 +1135,12 @@ HashKey CumsumHasher(const std::vector<Type>& param_types, const Type& ret_type,
   return key;
 }
 
-MNM_TVM(cumsum, Cumsum, CumsumArgs, CumsumSchema2Args, CumsumSchemaArgNames, CumsumSchema2Attrs,
+RAF_TVM(cumsum, Cumsum, CumsumArgs, CumsumSchema2Args, CumsumSchemaArgNames, CumsumSchema2Attrs,
         CumsumHasher, kOpaque);
+
+RAF_TVM(collapse_sum_like, CollapseSumLike, BinaryLikeArgs, BinaryLikeSchema2Args,
+        BinaryLikeSchemaArgNames, GenericAttrs, GenericHasher, kCommReduce);
 
 }  // namespace tvm_dialect
 }  // namespace op
-}  // namespace mnm
+}  // namespace raf
