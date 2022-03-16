@@ -33,10 +33,8 @@ ReplicatedSpec ReplicatedSpec::make(bool immutable) {
   return ReplicatedSpec(n);
 }
 
-ShardSpec ShardSpec::make(bool immutable,
-                          Array<Device> assigned_devices,
-                          Array<Integer> partition_shape,
-                          Array<Integer> subgroup_sizes) {
+ShardSpec ShardSpec::make(bool immutable, Array<Device> assigned_devices,
+                          Array<Integer> partition_shape, Array<Integer> subgroup_sizes) {
   auto ndim = partition_shape.size();
   CHECK_EQ(ndim, subgroup_sizes.size());
   auto n = make_object<ShardSpecObj>();
@@ -49,7 +47,7 @@ ShardSpec ShardSpec::make(bool immutable,
       device_rank = i;
       break;
     }
-  } // perhaps it is improper to calculate runtime data here
+  }  // perhaps it is improper to calculate runtime data here
 
   for (int64_t i = ndim - 1; i >= 0; --i) {
     grid_shape[i] = partition_shape[i]->value / subgroup_sizes[i]->value;
@@ -61,13 +59,13 @@ ShardSpec ShardSpec::make(bool immutable,
   n->assigned_devices = std::move(assigned_devices);
   n->grid_shape = Array<Integer>(grid_shape.begin(), grid_shape.end());
   n->subgroup_sizes = std::move(subgroup_sizes);
-  n->_subgroup_idx = (device_rank != -1) ? Array<Integer>(_subgroup_idx.begin(), _subgroup_idx.end()) : 
-                                          NullValue<Array<Integer>>();
+  n->_subgroup_idx = (device_rank != -1)
+                         ? Array<Integer>(_subgroup_idx.begin(), _subgroup_idx.end())
+                         : NullValue<Array<Integer>>();
   return ShardSpec(n);
 }
 
-TupleShardSpec TupleShardSpec::make(bool immutable,
-                                    Array<BaseShardSpec> tuple_elem) {
+TupleShardSpec TupleShardSpec::make(bool immutable, Array<BaseShardSpec> tuple_elem) {
   auto n = make_object<TupleShardSpecObj>();
   n->immutable = immutable;
   n->tuple_elem = tuple_elem;
@@ -90,7 +88,7 @@ void Reshard_R2S(const CallValues& call) {
   if (spec->_subgroup_idx.defined()) {
     for (int64_t i = 0; i < x->ndim; ++i) {
       auto grid_dim_size = spec->grid_shape[i]->value;
-      CHECK_EQ(x->shape[i] % grid_dim_size , 0) << "Currently automaic padding is unsupported.";
+      CHECK_EQ(x->shape[i] % grid_dim_size, 0) << "Currently automaic padding is unsupported.";
       shape[i] /= grid_dim_size;
     }
     call->out = TensorValue::Assemble(/*dev=*/x->device,
@@ -170,17 +168,14 @@ void PrintAllocTable(const ObjectRef& ref, ReprPrinter* p) {
 TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
     .set_dispatch<ReplicatedSpecObj>([](const ObjectRef& ref, ReprPrinter* p) {
       auto r = Downcast<ReplicatedSpec>(ref);
-      p->stream << "ReplicatedSpec"
-                << (r->immutable ? "(Immut)" : "");
+      p->stream << "ReplicatedSpec" << (r->immutable ? "(Immut)" : "");
     });
 
 TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
     .set_dispatch<ShardSpecObj>([](const ObjectRef& ref, ReprPrinter* p) {
       auto r = Downcast<ShardSpec>(ref);
       auto ndim = r->grid_shape.size();
-      p->stream << "ShardSpec("
-                << (r->immutable ? "Immut " : "")
-                << "[";
+      p->stream << "ShardSpec(" << (r->immutable ? "Immut " : "") << "[";
       for (size_t i = 0; i < ndim; ++i) {
         auto grid_dim_size = r->grid_shape[i]->value;
         auto subgroup_size = r->subgroup_sizes[i]->value;
@@ -194,17 +189,14 @@ TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
 TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
     .set_dispatch<TupleShardSpecObj>([](const ObjectRef& ref, ReprPrinter* p) {
       auto r = Downcast<TupleShardSpec>(ref);
-      p->stream << "TupleShardSpec" 
-                << (r->immutable ? "(Immut)" : "");
+      p->stream << "TupleShardSpec" << (r->immutable ? "(Immut)" : "");
     });
 
 TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
     .set_dispatch<ShardOpCallAttrs>([](const ObjectRef& ref, ReprPrinter* p) {
       const auto* n = static_cast<const ShardOpCallAttrs*>(ref.get());
       p->stream << "ShardOpCallAttrs("
-                << "in=" << n->shard_in
-                << " out=" << n->shard_out
-                << ")";
+                << "in=" << n->shard_in << " out=" << n->shard_out << ")";
     });
 
 TVM_REGISTER_NODE_TYPE(ShardOpCallAttrs);
@@ -252,8 +244,7 @@ HashKey ReshardHasher(const std::vector<Type>& param_types, const Type& y_type,
   HashKey key = GenericHasher<nullptr_t>(param_types, y_type, nullptr);
   auto spec = Downcast<ShardSpec>(args->spec);
   for (auto i : spec->assigned_devices) {
-    key << i->device_id
-        << i->device_type.operator int();
+    key << i->device_id << i->device_type.operator int();
   }
   for (auto i : spec->grid_shape) {
     key << i->value;

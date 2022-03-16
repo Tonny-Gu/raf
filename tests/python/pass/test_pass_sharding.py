@@ -3,7 +3,13 @@ import pytest
 import raf
 from raf._core.core_utils import str2dev
 from raf._core.executor import interpret
-from raf.distributed.sharding import ShardSpec, ReplicatedSpec, TupleShardSpec, BaseShardSpec, ShardOpCallAttrs
+from raf.distributed.sharding import (
+    ShardSpec,
+    ReplicatedSpec,
+    TupleShardSpec,
+    BaseShardSpec,
+    ShardOpCallAttrs,
+)
 from raf._ffi.pass_ import SetShardOpCallAttrs, ToGraphNormalForm, ExpandShardOpCall, InferType
 from raf._ffi.device import Device
 from raf._lib import relay
@@ -13,8 +19,8 @@ from raf.hybrid.hybrid import _make_argument, _unwrap
 from raf import distributed as dist
 from tvm.relay.analysis.analysis import post_order_visit
 
-def test_ShardOpCallAttrs():
 
+def test_ShardOpCallAttrs():
     class Model(raf.Model):
         def build(self):
             pass
@@ -38,19 +44,26 @@ def test_ShardOpCallAttrs():
         dctx = dist.get_context()
         local_id = 6
         local_id -= 1
-        dev_array = [Device(dev_type_id, i) for i in range(1, local_id)] + \
-                    [dctx.local_device] + [Device(dev_type_id, i) for i in range(local_id, 16)]
+        dev_array = (
+            [Device(dev_type_id, i) for i in range(1, local_id)]
+            + [dctx.local_device]
+            + [Device(dev_type_id, i) for i in range(local_id, 16)]
+        )
         return dev_array
+
     # devices = get_global_device_list()
     devices = get_dist_devices()
-    attrs = ShardOpCallAttrs(TupleShardSpec([ReplicatedSpec(), ReplicatedSpec()]),
-                             ShardSpec(devices, [4], [1]))
-    #a = raf._reshard_r2s(m_x, ShardSpec(devices, [4, 4], [1, 2]))
-    #print(a)
+    attrs = ShardOpCallAttrs(
+        TupleShardSpec([ReplicatedSpec(), ReplicatedSpec()]), ShardSpec(devices, [4], [1])
+    )
+    # a = raf._reshard_r2s(m_x, ShardSpec(devices, [4, 4], [1, 2]))
+    # print(a)
     call_list = []
-    post_order_visit(mod_before["main"].body,
-                     lambda op: call_list.append(op) if isinstance(op, relay.Call) else None)
-    attrs_map = {call_list[0] : attrs}
+    post_order_visit(
+        mod_before["main"].body,
+        lambda op: call_list.append(op) if isinstance(op, relay.Call) else None,
+    )
+    attrs_map = {call_list[0]: attrs}
 
     mod0 = SetShardOpCallAttrs(attrs_map)(mod_before)
     mod1 = ToGraphNormalForm()(mod0)
@@ -59,6 +72,7 @@ def test_ShardOpCallAttrs():
     call = relay.Call(op=mod2["main"], args=[_make_argument(x) for x in (m_x, m_y)])
     result = _unwrap(interpret(call, mod2))
     print(result)
+
 
 if __name__ == "__main__":
     # pytest.main([__file__])

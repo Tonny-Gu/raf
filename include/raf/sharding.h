@@ -52,8 +52,8 @@ class ShardSpecObj final : public BaseShardSpecObj {
   Array<Device> assigned_devices;
   Array<Integer> grid_shape;
   Array<Integer> subgroup_sizes;
-  Array<Integer> _subgroup_idx; // consider put it in ShardLocalContext
-  
+  Array<Integer> _subgroup_idx;  // consider put it in ShardLocalContext
+
   void VisitAttrs(tvm::AttrVisitor* v) {
     v->Visit("immutable", &immutable);
     v->Visit("assigned_devices", &assigned_devices);
@@ -68,10 +68,8 @@ class ShardSpecObj final : public BaseShardSpecObj {
 
 class ShardSpec final : public BaseShardSpec {
  public:
-  static ShardSpec make(bool immutable,
-                        Array<Device> assigned_devices,
-                        Array<Integer> partition_shape,
-                        Array<Integer> subgroup_sizes);
+  static ShardSpec make(bool immutable, Array<Device> assigned_devices,
+                        Array<Integer> partition_shape, Array<Integer> subgroup_sizes);
   RAF_OBJECT_REF(ShardSpec, BaseShardSpec, ShardSpecObj);
 };
 
@@ -89,8 +87,7 @@ class TupleShardSpecObj final : public BaseShardSpecObj {
 
 class TupleShardSpec final : public BaseShardSpec {
  public:
-  static TupleShardSpec make(bool immutable,
-                              Array<BaseShardSpec> tuple_elem);
+  static TupleShardSpec make(bool immutable, Array<BaseShardSpec> tuple_elem);
   RAF_OBJECT_REF(TupleShardSpec, BaseShardSpec, TupleShardSpecObj);
 };
 
@@ -98,10 +95,12 @@ struct ShardOpCallAttrs : public tvm::AttrsNode<ShardOpCallAttrs> {
   static Attrs make(BaseShardSpec shard_in, BaseShardSpec shard_out);
   BaseShardSpec shard_in, shard_out;
   TVM_DECLARE_ATTRS(ShardOpCallAttrs, "raf.attrs.ShardOpCallAttrs") {
-    TVM_ATTR_FIELD(shard_in).set_default(NullValue<BaseShardSpec>())
-                             .describe("Sharding Specifications of inputs");
-    TVM_ATTR_FIELD(shard_out).set_default(NullValue<BaseShardSpec>())
-                             .describe("Sharding Specifications of outputs");
+    TVM_ATTR_FIELD(shard_in)
+        .set_default(NullValue<BaseShardSpec>())
+        .describe("Sharding Specifications of inputs");
+    TVM_ATTR_FIELD(shard_out)
+        .set_default(NullValue<BaseShardSpec>())
+        .describe("Sharding Specifications of outputs");
   }
 };
 

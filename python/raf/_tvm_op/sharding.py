@@ -15,10 +15,12 @@ from .._lib import random
 
 _topi = _tvm.topi  # pylint: disable=invalid-name,no-member
 
+
 @register_compute("raf.op.tvm._reshard_r2s")
 def compute_reshard_r2s(attr, inputs, output_type):
     # pylint: disable=unused-argument
     x = inputs[0]
     return [_topi.strided_slice(x, attr.begin, attr.end)]
+
 
 _reg.register_injective_schedule("raf.op.tvm._reshard_r2s")
