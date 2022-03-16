@@ -29,8 +29,6 @@ class DistContextObj : public ir::Object {
   int zero_opt_level = 0;
   int auto_dp_profiling_start_iter = 2;
   int auto_dp_profiling_end_iter = 4;
-  Array<Device> dist_devices;
-  Device local_device;
 
   void VisitAttrs(tvm::AttrVisitor* v) {
     v->Visit("root_rank", &root_rank);
@@ -42,8 +40,6 @@ class DistContextObj : public ir::Object {
     v->Visit("zero_opt_level", &zero_opt_level);
     v->Visit("auto_dp_profiling_start_iter", &auto_dp_profiling_start_iter);
     v->Visit("auto_dp_profiling_end_iter", &auto_dp_profiling_end_iter);
-    v->Visit("dist_devices", &dist_devices);
-    v->Visit("local_device", &local_device);
   }
 
  public:
