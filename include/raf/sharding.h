@@ -49,17 +49,21 @@ class ReplicatedSpec final : public BaseShardSpec {
 /* ShardSpec */
 class ShardSpecObj final : public BaseShardSpecObj {
  public:
-  Array<Device> assigned_devices;
-  Array<Integer> grid_shape;
-  Array<Integer> subgroup_sizes;
-  Array<Integer> _subgroup_idx;  // consider put it in ShardLocalContext
+  Array<Integer> ranks;
+  Array<Integer> replicas;
+  Array<Integer> logic_shape;
+  Array<Integer> logic_index;
+  Array<Integer> real_shape;
+  Array<Integer> real_index;
 
   void VisitAttrs(tvm::AttrVisitor* v) {
     v->Visit("immutable", &immutable);
-    v->Visit("assigned_devices", &assigned_devices);
-    v->Visit("grid_shape", &grid_shape);
-    v->Visit("subgroup_sizes", &subgroup_sizes);
-    v->Visit("_subgroup_idx", &_subgroup_idx);
+    v->Visit("ranks", &ranks);
+    v->Visit("replicas", &replicas);
+    v->Visit("logic_shape", &logic_shape);
+    v->Visit("logic_index", &logic_index);
+    v->Visit("real_shape", &real_shape);
+    v->Visit("real_index", &real_index);
   }
 
   static constexpr const char* _type_key = "raf.sharding.ShardSpec";
@@ -68,8 +72,8 @@ class ShardSpecObj final : public BaseShardSpecObj {
 
 class ShardSpec final : public BaseShardSpec {
  public:
-  static ShardSpec make(bool immutable, Array<Device> assigned_devices,
-                        Array<Integer> partition_shape, Array<Integer> subgroup_sizes);
+  static ShardSpec make(bool immutable, Array<Integer> ranks, Array<Integer> partition_shape,
+                        Array<Integer> replicas);
   RAF_OBJECT_REF(ShardSpec, BaseShardSpec, ShardSpecObj);
 };
 

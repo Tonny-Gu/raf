@@ -33,35 +33,43 @@ ReplicatedSpec ReplicatedSpec::make(bool immutable) {
   return ReplicatedSpec(n);
 }
 
-ShardSpec ShardSpec::make(bool immutable, Array<Device> assigned_devices,
-                          Array<Integer> partition_shape, Array<Integer> subgroup_sizes) {
-  auto ndim = partition_shape.size();
-  CHECK_EQ(ndim, subgroup_sizes.size());
+ShardSpec ShardSpec::make(bool immutable, Array<Integer> ranks, Array<Integer> real_shape,
+                          Array<Integer> replicas) {
+  auto ndim = real_shape.size();
+  CHECK_EQ(ndim, replicas.size());
   auto n = make_object<ShardSpecObj>();
-  auto _subgroup_idx = std::vector<Integer>(ndim);
-  auto grid_shape = std::vector<Integer>(ndim);
+  auto real_index = std::vector<Integer>(ndim);
+  auto logic_index = std::vector<Integer>(ndim);
+  auto logic_shape = std::vector<Integer>(ndim);
 
-  int64_t device_rank = -1;
-  for (int64_t i = 0; i < assigned_devices.size(); ++i) {
-    if (DistContext::Global()->local_device.same_as(assigned_devices[i])) {
-      device_rank = i;
+  int64_t rank_idx = -1;
+  for (int64_t i = 0; i < ranks.size(); ++i) {
+    if (DistContext::Global()->rank == ranks[i]->value) {
+      rank_idx = i;
       break;
     }
-  }  // perhaps it is improper to calculate runtime data here
+  }
 
   for (int64_t i = ndim - 1; i >= 0; --i) {
-    grid_shape[i] = partition_shape[i]->value / subgroup_sizes[i]->value;
-    _subgroup_idx[i] = device_rank % grid_shape[i]->value;
-    device_rank /= grid_shape[i]->value;
+    logic_shape[i] = real_shape[i]->value / replicas[i]->value;
+    real_index[i] = rank_idx % real_shape[i]->value;
+    logic_index[i] = real_index[i]->value / replicas[i]->value;
+    rank_idx /= real_shape[i]->value;
   }
 
   n->immutable = immutable;
-  n->assigned_devices = std::move(assigned_devices);
-  n->grid_shape = Array<Integer>(grid_shape.begin(), grid_shape.end());
-  n->subgroup_sizes = std::move(subgroup_sizes);
-  n->_subgroup_idx = (device_rank != -1)
-                         ? Array<Integer>(_subgroup_idx.begin(), _subgroup_idx.end())
-                         : NullValue<Array<Integer>>();
+  n->ranks = std::move(ranks);
+  n->replicas = std::move(replicas);
+  n->real_shape = std::move(real_shape);
+  n->logic_shape = Array<Integer>(logic_shape);
+  if (rank_idx == -1) {
+    n->real_index = NullValue<Array<Integer>>();
+    n->logic_index = NullValue<Array<Integer>>();
+  } else {
+    n->real_index = Array<Integer>(real_index);
+    n->logic_index = Array<Integer>(logic_index);
+  }
+
   return ShardSpec(n);
 }
 
@@ -85,9 +93,9 @@ void Reshard_R2S(const CallValues& call) {
   const DLTensor* x = args->x;
   std::vector<int64_t> shape(x->shape, x->shape + x->ndim);
   auto spec = Downcast<ShardSpec>(args->spec);
-  if (spec->_subgroup_idx.defined()) {
+  if (spec->real_index.defined()) {
     for (int64_t i = 0; i < x->ndim; ++i) {
-      auto grid_dim_size = spec->grid_shape[i]->value;
+      auto grid_dim_size = spec->real_shape[i]->value;
       CHECK_EQ(x->shape[i] % grid_dim_size, 0) << "Currently automaic padding is unsupported.";
       shape[i] /= grid_dim_size;
     }
@@ -112,9 +120,9 @@ Type Reshard_R2S_Infer(const CallValues& call) {
   Array<PrimExpr> dshape = data->shape;
   size_t ndim = dshape.size();
   std::vector<PrimExpr> oshape(ndim);
-  CHECK(spec->_subgroup_idx.defined());
+  CHECK(spec->real_index.defined());
   for (int64_t i = 0; i < ndim; ++i) {
-    auto grid_dim_size = spec->grid_shape[i]->value;
+    auto grid_dim_size = spec->real_shape[i]->value;
     auto dim_size = Downcast<IntImm>(dshape[i])->value;
     CHECK_EQ(dim_size % grid_dim_size, 0) << "Currently automaic padding is unsupported.";
     oshape[i] = Integer(dim_size / grid_dim_size);
@@ -140,22 +148,22 @@ using tvm::runtime::ObjectRef;
 void PrintAllocTable(const ObjectRef& ref, ReprPrinter* p) {
   /*size_t dev_idx = 0;
   const auto obj = Downcast<ShardSpec>(ref);
-  const auto num_dim = obj->grid_shape.size();
+  const auto num_dim = obj->real_shape.size();
   static thread_local size_t *indices = new size_t[num_dim];
   std::function<void(int)> _print_alloc_table;
   _print_alloc_table = [&](int depth) {
     if (depth == num_dim) {
       p->stream << (dev_idx != 0 ? " [" : "[");
       for (size_t i = 0; i < num_dim; ++i) {
-        auto num_devices = obj->grid_shape[i]->value;
+        auto num_devices = obj->real_shape[i]->value;
         auto index = std::to_string(indices[i]);
         p->stream << (num_devices == 1 ? ":" : index)
                   << (i != num_dim - 1 ? ", " : "");
       }
-      auto dev_info = obj->assigned_devices[dev_idx++].c_str();
+      auto dev_info = obj->ranks[dev_idx++].c_str();
       p->stream << "]@" << dev_info;
     } else {
-      auto subgroup_num = obj->grid_shape[depth]->value;
+      auto subgroup_num = obj->real_shape[depth]->value;
       for (size_t i = 0; i < subgroup_num; ++i) {
         indices[depth] = i;
         _print_alloc_table(depth + 1);
@@ -174,11 +182,11 @@ TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
 TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
     .set_dispatch<ShardSpecObj>([](const ObjectRef& ref, ReprPrinter* p) {
       auto r = Downcast<ShardSpec>(ref);
-      auto ndim = r->grid_shape.size();
+      auto ndim = r->real_shape.size();
       p->stream << "ShardSpec(" << (r->immutable ? "Immut " : "") << "[";
       for (size_t i = 0; i < ndim; ++i) {
-        auto grid_dim_size = r->grid_shape[i]->value;
-        auto subgroup_size = r->subgroup_sizes[i]->value;
+        auto grid_dim_size = r->real_shape[i]->value;
+        auto subgroup_size = r->replicas[i]->value;
         p->stream << (grid_dim_size == 1 ? ":" : std::to_string(grid_dim_size))
                   << (subgroup_size == 1 ? "" : "(x" + std::to_string(subgroup_size) + ")")
                   << (i != ndim - 1 ? ", " : "");
@@ -227,10 +235,10 @@ Attrs ReshardSchema2Attrs(const ShardUnaryArgs* args) {
   const DLTensor* x = args->x;
   std::vector<Integer> begin(x->ndim);
   std::vector<Integer> end(x->ndim);
-  CHECK(spec->_subgroup_idx.defined());
+  CHECK(spec->real_index.defined());
   for (int i = 0; i < x->ndim; ++i) {
-    auto idx = spec->_subgroup_idx[i]->value;
-    auto size = spec->grid_shape[i]->value;
+    auto idx = spec->real_index[i]->value;
+    auto size = spec->real_shape[i]->value;
     begin[i] = Integer((x->shape[i] / size) * idx);
     end[i] = Integer((x->shape[i] / size) * (idx + 1));
   }
@@ -243,14 +251,10 @@ HashKey ReshardHasher(const std::vector<Type>& param_types, const Type& y_type,
                       const ShardUnaryArgs* args) {
   HashKey key = GenericHasher<nullptr_t>(param_types, y_type, nullptr);
   auto spec = Downcast<ShardSpec>(args->spec);
-  for (auto i : spec->assigned_devices) {
-    key << i->device_id << i->device_type.operator int();
-  }
-  for (auto i : spec->grid_shape) {
-    key << i->value;
-  }
-  for (auto i : spec->subgroup_sizes) {
-    key << i->value;
+  for (auto array : {spec->ranks, spec->real_shape, spec->replicas}) {
+    for (auto i : array) {
+      key << i->value;
+    }
   }
 
   return key;

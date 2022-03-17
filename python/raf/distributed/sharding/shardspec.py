@@ -13,7 +13,7 @@ class BaseShardSpec(Value):
 
 @register_node("raf.sharding.ReplicatedSpec")
 class ReplicatedSpec(BaseShardSpec):
-    """Annotation denoting every node has a copy of the data"""
+    """Annotation denoting every rank has a full copy of this tensor"""
 
     def __init__(self, immutable=False):
         self.__init_handle_by_constructor__(_make.ReplicatedSpec, immutable)
@@ -21,8 +21,7 @@ class ReplicatedSpec(BaseShardSpec):
 
 @register_node("raf.sharding.TupleShardSpec")
 class TupleShardSpec(BaseShardSpec):
-    """Annotation of a tuple that will usually be used
-    when having multiple input or output tensors"""
+    """Denote a OpCall with multiple input or output shards"""
 
     def __init__(self, tuple_elem, immutable=False):
         assert isinstance(tuple_elem, list)
@@ -37,9 +36,7 @@ class TupleShardSpec(BaseShardSpec):
 
 @register_node("raf.sharding.ShardSpec")
 class ShardSpec(BaseShardSpec):
-    """Generic annotation of Sharding Specifications"""
+    """Annotation of Sharding Specifications"""
 
-    def __init__(self, devices_in_grid, grid_shape, subgroup_sizes, immutable=False):
-        self.__init_handle_by_constructor__(
-            _make.ShardSpec, immutable, devices_in_grid, grid_shape, subgroup_sizes
-        )
+    def __init__(self, ranks, real_shape, replicas, immutable=False):
+        self.__init_handle_by_constructor__(_make.ShardSpec, immutable, ranks, real_shape, replicas)
