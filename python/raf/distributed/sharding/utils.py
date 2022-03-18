@@ -19,18 +19,7 @@ pattern_map = {
     7: "kTuple",
     8: "kOpaque",
 }
-# TODO: this pattern map is replicated mulitple times in source code
-
-
-def get_dist_devices():
-    """Return all available devices in the cluster as a list of Device Objects.
-
-    Returns
-    -------
-    ret: list
-        List of Device Objects
-    """
-    return dist.get_context().dist_devices
+# TODO: this pattern map is replicated multiple times in source code
 
 
 def always_apply(call: relay.Call):

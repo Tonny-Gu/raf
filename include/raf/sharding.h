@@ -53,8 +53,8 @@ class ShardSpecObj final : public BaseShardSpecObj {
   Array<Integer> replicas;
   Array<Integer> logic_shape;
   Array<Integer> logic_index;
-  Array<Integer> real_shape;
-  Array<Integer> real_index;
+  Array<Integer> phy_shape;
+  Array<Integer> phy_index;
 
   void VisitAttrs(tvm::AttrVisitor* v) {
     v->Visit("immutable", &immutable);
@@ -62,8 +62,8 @@ class ShardSpecObj final : public BaseShardSpecObj {
     v->Visit("replicas", &replicas);
     v->Visit("logic_shape", &logic_shape);
     v->Visit("logic_index", &logic_index);
-    v->Visit("real_shape", &real_shape);
-    v->Visit("real_index", &real_index);
+    v->Visit("phy_shape", &phy_shape);
+    v->Visit("phy_index", &phy_index);
   }
 
   static constexpr const char* _type_key = "raf.sharding.ShardSpec";

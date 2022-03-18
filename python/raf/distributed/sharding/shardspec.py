@@ -38,5 +38,5 @@ class TupleShardSpec(BaseShardSpec):
 class ShardSpec(BaseShardSpec):
     """Annotation of Sharding Specifications"""
 
-    def __init__(self, ranks, real_shape, replicas, immutable=False):
-        self.__init_handle_by_constructor__(_make.ShardSpec, immutable, ranks, real_shape, replicas)
+    def __init__(self, ranks, phy_shape, replicas, immutable=False):
+        self.__init_handle_by_constructor__(_make.ShardSpec, immutable, ranks, phy_shape, replicas)
