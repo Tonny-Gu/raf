@@ -2,13 +2,15 @@
 """RAF sharding system utilities"""
 import functools
 from queue import PriorityQueue
+from typing import Callable, List, Tuple
 from raf._ffi.sharding._make import ShardOpCallAttrs
 from raf._ffi.op import GetOp
 from raf._lib import _register_func, relay
-from raf.distributed.sharding.shardspec import ReplicatedSpec, ShardSpec, TupleShardSpec
+from raf.distributed.sharding.shardspec import BaseShardSpec, ReplicatedSpec, ShardSpec, TupleShardSpec
 from raf._core.value import Value
 from raf import distributed as dist
-from tvm.relay import Call
+from tvm.relay import Call, Expr
+from tvm.ir import Op
 
 pattern_map = {
     0: "kElemWise",
@@ -27,7 +29,7 @@ def always_apply(call: relay.Call):
     return True
 
 
-def expand_when(cond, priority=1):
+def expand_when(cond: Callable, priority=1):
     """Specify the priority and the condition when this expansion pattern should be used.
 
     Parameters
@@ -77,7 +79,7 @@ def register_expansion_pattern(op_name):
     return decorator
 
 
-def extract_shardOpCall(call):
+def extract_shardOpCall(call: relay.Call) -> Tuple[Op, List[Expr], BaseShardSpec, BaseShardSpec]:
     """Return some frequently-used object attributes as a tuple"""
     assert isinstance(call, relay.Call)
     return (call.op, call.args, call.attrs.shard_in, call.attrs.shard_out)

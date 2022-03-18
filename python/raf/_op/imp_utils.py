@@ -29,6 +29,8 @@ def to_tensor(a):
         return a._ndarray__handle  # pylint: disable=protected-access
     if a is None:
         return None
+    if isinstance(a, BaseShardSpec):
+        return Value.as_const_expr(a)
     if not isinstance(a, np.ndarray):
         a = np.array(a)
     # TODO(@junrushao1994): save this FFI call

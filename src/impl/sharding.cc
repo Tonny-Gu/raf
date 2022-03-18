@@ -120,6 +120,7 @@ Type Reshard_R2S_Infer(const CallValues& call) {
   Array<PrimExpr> dshape = data->shape;
   size_t ndim = dshape.size();
   std::vector<PrimExpr> oshape(ndim);
+  CHECK(spec.defined());
   CHECK(spec->logic_index.defined());
   for (int64_t i = 0; i < ndim; ++i) {
     auto shard_dim_size = spec->logic_shape[i]->value;

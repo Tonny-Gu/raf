@@ -28,14 +28,15 @@ class ShardOpCallAttrsSetter : public ExprMutator {
 
   Expr VisitExpr_(const CallNode* node) override {
     const Expr& callee = node->op;
-    static auto default_spec = ReplicatedSpec::make(false);
-    static auto default_attrs =
-        ShardOpCallAttrs::make(BaseShardSpec(default_spec), BaseShardSpec(default_spec));
+    // static auto default_spec = ReplicatedSpec::make(false);
+    // static auto default_attrs =
+    //     ShardOpCallAttrs::make(BaseShardSpec(default_spec), BaseShardSpec(default_spec));
     if (callee->IsInstance<OpNode>()) {
       auto ref = GetRef<Expr>(node);
-      auto new_expr = Call(node->op, node->args,
-                           Attrs(_attrs_map.count(ref) ? _attrs_map[ref] : default_attrs));
-      return ExprMutator::VisitExpr_(new_expr.as<CallNode>());
+      if (_attrs_map.count(ref)) {
+        auto new_expr = Call(node->op, node->args, Attrs(_attrs_map[ref]));
+        return ExprMutator::VisitExpr_(new_expr.as<CallNode>());
+      }
     }
     return ExprMutator::VisitExpr_(node);
   }
