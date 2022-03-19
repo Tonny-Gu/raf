@@ -1,6 +1,6 @@
 """RAF sharding system"""
 from raf._ffi.sharding._make import ShardOpCallAttrs
-from .shardspec import BaseShardSpec, ReplicatedSpec, TupleShardSpec, ShardSpec
+from .shardspec import BaseSpecValue, ReplicatedSpecValue, TupleSpecValue, ShardSpecValue
 from .utils import (
     expand_when,
     always_apply,

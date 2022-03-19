@@ -28,9 +28,9 @@ class ShardOpCallAttrsSetter : public ExprMutator {
 
   Expr VisitExpr_(const CallNode* node) override {
     const Expr& callee = node->op;
-    // static auto default_spec = ReplicatedSpec::make(false);
+    // static auto default_spec = ReplicatedSpecValue::make(false);
     // static auto default_attrs =
-    //     ShardOpCallAttrs::make(BaseShardSpec(default_spec), BaseShardSpec(default_spec));
+    //     ShardOpCallAttrs::make(BaseSpecValue(default_spec), BaseSpecValue(default_spec));
     if (callee->IsInstance<OpNode>()) {
       auto ref = GetRef<Expr>(node);
       if (_attrs_map.count(ref)) {

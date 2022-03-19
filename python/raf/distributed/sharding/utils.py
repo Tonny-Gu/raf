@@ -1,12 +1,15 @@
 # pylint: disable=invalid-name, unused-argument
 """RAF sharding system utilities"""
+from ctypes import Union
 import functools
 from queue import PriorityQueue
 from typing import Callable, List, Tuple
+
+from numpy import isin
 from raf._ffi.sharding._make import ShardOpCallAttrs
 from raf._ffi.op import GetOp
 from raf._lib import _register_func, relay
-from raf.distributed.sharding.shardspec import BaseShardSpec, ReplicatedSpec, ShardSpec, TupleShardSpec
+from raf.distributed.sharding.shardspec import BaseSpecValue, ReplicatedSpecValue, ShardSpecValue, TupleSpecValue
 from raf._core.value import Value
 from raf import distributed as dist
 from tvm.relay import Call, Expr
@@ -79,7 +82,7 @@ def register_expansion_pattern(op_name):
     return decorator
 
 
-def extract_shardOpCall(call: relay.Call) -> Tuple[Op, List[Expr], BaseShardSpec, BaseShardSpec]:
+def extract_shardOpCall(call: relay.Call) -> Tuple[Op, List[Expr], BaseSpecValue, BaseSpecValue]:
     """Return some frequently-used object attributes as a tuple"""
     assert isinstance(call, relay.Call)
     return (call.op, call.args, call.attrs.shard_in, call.attrs.shard_out)
@@ -97,8 +100,8 @@ def expand_shardOpCall(call: relay.Call):
 
 
 @expand_when(
-    lambda call: isinstance(call.attrs.shard_in, ReplicatedSpec)
-    and isinstance(call.attrs.shard_out, ShardSpec),
+    lambda call: isinstance(call.attrs.shard_in, ReplicatedSpecValue)
+    and isinstance(call.attrs.shard_out, ShardSpecValue),
     priority=1,
 )
 @register_expansion_pattern("raf.op._reshard")
@@ -110,8 +113,8 @@ def reshard_replicated_to_sharded(call: relay.Call):
 
 
 @expand_when(
-    lambda call: isinstance(call.attrs.shard_in, ShardSpec)
-    and isinstance(call.attrs.shard_out, ReplicatedSpec),
+    lambda call: isinstance(call.attrs.shard_in, ShardSpecValue)
+    and isinstance(call.attrs.shard_out, ReplicatedSpecValue),
     priority=1,
 )
 @register_expansion_pattern("raf.op._reshard")
@@ -141,17 +144,27 @@ def add_or_sub(call: relay.Call):
     return relay.Call(op, args)
 
 
-@expand_when(always_apply)
-@register_expansion_pattern("_fallback")
-def fallback_reshard_to_replicated(call: relay.Call):
-    """Gather partitioned tensors for op without matched patterns"""
-    op, args, attrs = call.op, call.args, call.attrs
-    if (
-        len(args) != 1
-        or isinstance(attrs.shard_in, TupleShardSpec)
-        or isinstance(attrs.shard_out, TupleShardSpec)
-    ):
-        raise NotImplementedError("Currently coverting multiple args is not supported")
-    new_attrs = ShardOpCallAttrs(attrs.shard_in, ReplicatedSpec())
-    new_args = [relay.Call(GetOp("raf.op._reshard"), args, new_attrs)]
-    return relay.Call(op, new_args)
+def matmul_algor1_cond(call: relay.Call):
+    op, arg, sin, sout = extract_shardOpCall(call)
+    if not (isinstance(sin, TupleSpecValue)
+        and isinstance(sin[0], ShardSpecValue)
+        and isinstance(sin[1], ShardSpecValue)
+        and isinstance(sout, ReplicatedSpecValue)):
+        return False
+    
+    
+
+# @expand_when(always_apply)
+# @register_expansion_pattern("_fallback")
+# def fallback_reshard_to_replicated(call: relay.Call):
+#     """Gather partitioned tensors for op without matched patterns"""
+#     op, args, attrs = call.op, call.args, call.attrs
+#     if (
+#         len(args) != 1
+#         or isinstance(attrs.shard_in, TupleSpecValue)
+#         or isinstance(attrs.shard_out, TupleSpecValue)
+#     ):
+#         raise NotImplementedError("Currently coverting multiple args is not supported")
+#     new_attrs = ShardOpCallAttrs(attrs.shard_in, ReplicatedSpecValue())
+#     new_args = [relay.Call(GetOp("raf.op._reshard"), args, new_attrs)]
+#     return relay.Call(op, new_args)

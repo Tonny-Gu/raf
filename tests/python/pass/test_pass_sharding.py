@@ -6,10 +6,10 @@ from raf._core.core_utils import str2dev
 from raf._core.executor import interpret
 from raf._op.imp import matmul
 from raf.distributed.sharding import (
-    ShardSpec,
-    ReplicatedSpec,
-    TupleShardSpec,
-    BaseShardSpec,
+    ShardSpecValue,
+    ReplicatedSpecValue,
+    TupleSpecValue,
+    BaseSpecValue,
     ShardOpCallAttrs,
 )
 from raf._ffi.pass_ import SetShardOpCallAttrs, ToGraphNormalForm, ExpandShardOpCall, InferType
@@ -39,7 +39,7 @@ def test_shard_add():
     mod_before = InferType()(mod_before)
 
     attrs = ShardOpCallAttrs(
-        TupleShardSpec([ReplicatedSpec(), ReplicatedSpec()]), ShardSpec([3, 2, 1, 0], [2, 2], [1, 2])
+        TupleSpecValue([ReplicatedSpecValue(), ReplicatedSpecValue()]), ShardSpecValue([3, 2, 1, 0], [2, 2], [1, 2])
     )
 
     print(m_x)
@@ -69,7 +69,7 @@ def test_reshard_r2s():
             return z
     n_x = np.arange(16).reshape((4, 4))
     m_x = raf.array(n_x)
-    m_y = raf._reshard_r2s(m_x, ShardSpec([0, 1, 2, 3], [2, 2], [1, 2]))
+    m_y = raf._reshard_r2s(m_x, ShardSpecValue([0, 1, 2, 3], [2, 2], [1, 2]))
     print(m_x)
     print(m_y)
     
@@ -80,8 +80,8 @@ def test_shard_matmul():
 
         @raf.model.trace
         def forward(self, x, y):
-            s_x = raf._reshard_r2s(x, ShardSpec([0, 1, 2, 3], [1, 4], [1, 1]))
-            s_y = raf._reshard_r2s(y, ShardSpec([0, 1, 2, 3], [4, 1], [1, 1]))
+            s_x = raf._reshard_r2s(x, ShardSpecValue([0, 1, 2, 3], [1, 4], [1, 1]))
+            s_y = raf._reshard_r2s(y, ShardSpecValue([0, 1, 2, 3], [4, 1], [1, 1]))
             s_z = raf.matmul(s_x, s_y)
             z = raf.allreduce([s_z], "sum")
             return z
@@ -100,7 +100,7 @@ def test_shard_matmul():
 
     mod_before = record.mod
     # attrs = ShardOpCallAttrs(
-    #     TupleShardSpec([ReplicatedSpec(), ReplicatedSpec()]), ShardSpec([3, 2, 1, 0], [2, 2], [1, 2])
+    #     TupleSpecValue([ReplicatedSpecValue(), ReplicatedSpecValue()]), ShardSpecValue([3, 2, 1, 0], [2, 2], [1, 2])
     # )
 
     # call_list = []

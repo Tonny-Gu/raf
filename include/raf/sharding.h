@@ -13,41 +13,41 @@ namespace sharding {
 using namespace raf::ir;
 using namespace raf::value;
 
-/* BaseShardSpec */
-class BaseShardSpecObj : public ValueObj {
+/* BaseSpecValue */
+class BaseSpecValueObj : public ValueObj {
  public:
   bool immutable;
   void VisitAttrs(tvm::AttrVisitor* v) {
     v->Visit("immutable", &immutable);
   }
   static constexpr const uint32_t _type_index = ir::TypeIndex::kDynamic;
-  static constexpr const char* _type_key = "raf.sharding.BaseShardSpec";
-  RAF_BASE_OBJECT(BaseShardSpecObj, ValueObj);
+  static constexpr const char* _type_key = "raf.sharding.BaseSpecValue";
+  RAF_BASE_OBJECT(BaseSpecValueObj, ValueObj);
 };
 
-class BaseShardSpec : public Value {
+class BaseSpecValue : public Value {
  public:
-  RAF_OBJECT_REF(BaseShardSpec, Value, BaseShardSpecObj);
+  RAF_OBJECT_REF(BaseSpecValue, Value, BaseSpecValueObj);
 };
 
-/* ReplicatedSpec */
-class ReplicatedSpecObj final : public BaseShardSpecObj {
+/* ReplicatedSpecValue */
+class ReplicatedSpecValueObj final : public BaseSpecValueObj {
  public:
   void VisitAttrs(tvm::AttrVisitor* v) {
     v->Visit("immutable", &immutable);
   }
-  static constexpr const char* _type_key = "raf.sharding.ReplicatedSpec";
-  RAF_FINAL_OBJECT(ReplicatedSpecObj, BaseShardSpecObj);
+  static constexpr const char* _type_key = "raf.sharding.ReplicatedSpecValue";
+  RAF_FINAL_OBJECT(ReplicatedSpecValueObj, BaseSpecValueObj);
 };
 
-class ReplicatedSpec final : public BaseShardSpec {
+class ReplicatedSpecValue final : public BaseSpecValue {
  public:
-  static ReplicatedSpec make(bool immutable);
-  RAF_OBJECT_REF(ReplicatedSpec, BaseShardSpec, ReplicatedSpecObj);
+  static ReplicatedSpecValue make(bool immutable);
+  RAF_OBJECT_REF(ReplicatedSpecValue, BaseSpecValue, ReplicatedSpecValueObj);
 };
 
-/* ShardSpec */
-class ShardSpecObj final : public BaseShardSpecObj {
+/* ShardSpecValue */
+class ShardSpecValueObj final : public BaseSpecValueObj {
  public:
   Array<Integer> ranks;
   Array<Integer> replicas;
@@ -66,44 +66,44 @@ class ShardSpecObj final : public BaseShardSpecObj {
     v->Visit("phy_index", &phy_index);
   }
 
-  static constexpr const char* _type_key = "raf.sharding.ShardSpec";
-  RAF_FINAL_OBJECT(ShardSpecObj, BaseShardSpecObj);
+  static constexpr const char* _type_key = "raf.sharding.ShardSpecValue";
+  RAF_FINAL_OBJECT(ShardSpecValueObj, BaseSpecValueObj);
 };
 
-class ShardSpec final : public BaseShardSpec {
+class ShardSpecValue final : public BaseSpecValue {
  public:
-  static ShardSpec make(bool immutable, Array<Integer> ranks, Array<Integer> partition_shape,
+  static ShardSpecValue make(bool immutable, Array<Integer> ranks, Array<Integer> partition_shape,
                         Array<Integer> replicas);
-  RAF_OBJECT_REF(ShardSpec, BaseShardSpec, ShardSpecObj);
+  RAF_OBJECT_REF(ShardSpecValue, BaseSpecValue, ShardSpecValueObj);
 };
 
-/* TupleShardSpec */
-class TupleShardSpecObj final : public BaseShardSpecObj {
+/* TupleSpecValue */
+class TupleSpecValueObj final : public BaseSpecValueObj {
  public:
-  Array<BaseShardSpec> tuple_elem;
+  Array<BaseSpecValue> tuple_elem;
   void VisitAttrs(tvm::AttrVisitor* v) {
     v->Visit("immutable", &immutable);
     v->Visit("tuple_elem", &tuple_elem);
   }
-  static constexpr const char* _type_key = "raf.sharding.TupleShardSpec";
-  RAF_FINAL_OBJECT(TupleShardSpecObj, BaseShardSpecObj);
+  static constexpr const char* _type_key = "raf.sharding.TupleSpecValue";
+  RAF_FINAL_OBJECT(TupleSpecValueObj, BaseSpecValueObj);
 };
 
-class TupleShardSpec final : public BaseShardSpec {
+class TupleSpecValue final : public BaseSpecValue {
  public:
-  static TupleShardSpec make(bool immutable, Array<BaseShardSpec> tuple_elem);
-  RAF_OBJECT_REF(TupleShardSpec, BaseShardSpec, TupleShardSpecObj);
+  static TupleSpecValue make(bool immutable, Array<BaseSpecValue> tuple_elem);
+  RAF_OBJECT_REF(TupleSpecValue, BaseSpecValue, TupleSpecValueObj);
 };
 
 struct ShardOpCallAttrs : public tvm::AttrsNode<ShardOpCallAttrs> {
-  static Attrs make(BaseShardSpec shard_in, BaseShardSpec shard_out);
-  BaseShardSpec shard_in, shard_out;
+  static Attrs make(BaseSpecValue shard_in, BaseSpecValue shard_out);
+  BaseSpecValue shard_in, shard_out;
   TVM_DECLARE_ATTRS(ShardOpCallAttrs, "raf.attrs.ShardOpCallAttrs") {
     TVM_ATTR_FIELD(shard_in)
-        .set_default(NullValue<BaseShardSpec>())
+        .set_default(NullValue<BaseSpecValue>())
         .describe("Sharding Specifications of inputs");
     TVM_ATTR_FIELD(shard_out)
-        .set_default(NullValue<BaseShardSpec>())
+        .set_default(NullValue<BaseSpecValue>())
         .describe("Sharding Specifications of outputs");
   }
 };
