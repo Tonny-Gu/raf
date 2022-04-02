@@ -2,16 +2,19 @@
 """RAF sharding system utilities"""
 from ctypes import Union
 import functools
+import numpy as np
+import raf
+import tvm
 from queue import PriorityQueue
 from typing import Callable, List, Tuple
 
-from numpy import isin
 from raf._ffi.sharding._make import ShardOpCallAttrs
 from raf._ffi.op import GetOp
 from raf._lib import _register_func, relay
 from raf.distributed.sharding.shardspec import BaseSpecValue, ReplicatedSpecValue, ShardSpecValue, TupleSpecValue
 from raf._core.value import Value
 from raf import distributed as dist
+from raf.ir.anf_builder import ANFBuilder
 from tvm.relay import Call, Expr
 from tvm.ir import Op
 
@@ -151,6 +154,15 @@ def matmul_algor1_cond(call: relay.Call):
         and isinstance(sin[1], ShardSpecValue)
         and isinstance(sout, ReplicatedSpecValue)):
         return False
+    return True
+
+@expand_when(matmul_algor1_cond)
+@register_expansion_pattern(["raf.op.matmul"])
+def matmul_algor1(call: relay.Call):
+    op, args, sin, sout = extract_shardOpCall(call)
+    y_1 = relay.Call(op, args)
+    y_2 = tvm.relay.Tuple([y_1])
+    return relay.Call(GetOp("raf.op._allreduce"), [y_2, raf.ir.const("sum"), raf.ir.const(None)])
     
     
 

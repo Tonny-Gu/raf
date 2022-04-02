@@ -80,11 +80,11 @@ def test_shard_matmul():
 
         @raf.model.trace
         def forward(self, x, y):
-            s_x = raf._reshard_r2s(x, ShardSpecValue([0, 1, 2, 3], [1, 4], [1, 1]))
-            s_y = raf._reshard_r2s(y, ShardSpecValue([0, 1, 2, 3], [4, 1], [1, 1]))
+            # s_x = raf._reshard_r2s(x, ShardSpecValue([0, 1, 2, 3], [1, 4], [1, 1]))
+            # s_y = raf._reshard_r2s(y, ShardSpecValue([0, 1, 2, 3], [4, 1], [1, 1]))
             s_z = raf.matmul(s_x, s_y)
-            z = raf.allreduce([s_z], "sum")
-            return z
+            # z = raf.allreduce([s_z], "sum")
+            return s_z
     
     dctx = raf.distributed.get_context()
     device = "cuda(%s)" % dctx.local_rank
@@ -92,25 +92,24 @@ def test_shard_matmul():
     model.to(device=device)
     m_x = raf.array(np.arange(16, dtype="float32").reshape((4, 4)), device=device)
     m_y = raf.array(np.ones(16, dtype="float32").reshape((4, 4)), device=device)
-    # print(model(m_x, m_y))
-    # exit(0)
     print(m_x)
     print(m_y)
     record = model._internal(m_x, m_y)
 
     mod_before = record.mod
-    # attrs = ShardOpCallAttrs(
-    #     TupleSpecValue([ReplicatedSpecValue(), ReplicatedSpecValue()]), ShardSpecValue([3, 2, 1, 0], [2, 2], [1, 2])
-    # )
 
-    # call_list = []
-    # post_order_visit(
-    #     mod_before["main"].body,
-    #     lambda op: call_list.append(op) if isinstance(op, relay.Call) else None,
-    # )
-    # print(call_list)
-    # exit(0)
-    attrs_map = {} # {call_list[0]: attrs}
+    attrs = ShardOpCallAttrs(
+        TupleSpecValue([ShardSpecValue([0, 1, 2, 3], [1, 4], [1, 1]), ShardSpecValue([0, 1, 2, 3], [4, 1], [1, 1])]),
+        ReplicatedSpecValue()
+    )
+
+    call_list = []
+    post_order_visit(
+        mod_before["main"].body,
+        lambda op: call_list.append(op) if isinstance(op, relay.Call) else None,
+    )
+    
+    attrs_map = {call_list[2]: attrs}
 
     mod0 = SetShardOpCallAttrs(attrs_map)(mod_before)
     mod1 = ToGraphNormalForm()(mod0)
@@ -118,6 +117,7 @@ def test_shard_matmul():
     mod3 = InferType()(mod2)
 
     print(raf._ffi.ir.AsText(mod3))
+
     call = relay.Call(op=mod3["main"], args=[_make_argument(x) for x in (m_x, m_y)])
     result = _unwrap(interpret(call, mod3))
     print(result)
