@@ -2,6 +2,8 @@
 import pytest
 import raf
 import numpy as np
+from raf.model.model import trace_memory, get_peak_memory
+from raf.testing import get_transformer_model, randint, randn_torch
 from raf._core.core_utils import str2dev
 from raf._core.executor import interpret
 from raf._op.imp import matmul
@@ -19,7 +21,6 @@ from raf.hybrid.hybrid import _make_argument, _unwrap
 from raf.testing.common import get_dist_info
 from tvm.relay.analysis.analysis import post_order_visit
 from tvm.runtime.ndarray import device
-
 
 def test_shard_add():
     class Model(raf.Model):
@@ -126,7 +127,15 @@ if __name__ == "__main__":
     # pytest.main([__file__])
     # test_shard_add()
     # test_reshard_r2s()
-    test_shard_matmul()
+    # test_shard_matmul()
+
+    model, _ = get_transformer_model("bert-base-uncased", batch_size=32, seq_length=128, dtype="float32")
+    model.train_mode() 
+
+    r_x, _ = randint((32, 128), low=0, high=10000, dtype="int64")
+    
+
+    
 
     # a = np.arange(4, dtype="float").reshape((4, 1))
     # b = np.arange(4, dtype="float").reshape((1, 4))
