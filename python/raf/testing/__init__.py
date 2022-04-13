@@ -3,6 +3,8 @@
 
 """Utilities for testing and benchmarks"""
 from .common import *
+from .pt_models import *
 from .utils import *
+from .topi import *
 from . import resnet
 from . import resnet_cifar10

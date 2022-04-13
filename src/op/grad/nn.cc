@@ -362,9 +362,8 @@ Array<Expr> SoftmaxGradImpl(const Expr& orig_call, const Array<Expr> orig_args, 
                             const Expr& dy) {
   static auto op_dx = Op::Get(GradOp);
   const CallNode* call = orig_call.as<CallNode>();
-  const Expr& x = call->args[0];
   const Expr& axis = call->args[1];
-  return {Call(op_dx, {x, y, dy, axis})};
+  return {Call(op_dx, {y, dy, axis})};
 }
 
 const char SOFTMAX_DX[] = "raf.op.softmax_dx";
@@ -374,18 +373,17 @@ RAF_OP_GRAD("raf.op.softmax", SoftmaxGrad);
 Array<Expr> LogSoftmaxGrad(const Expr& orig_call, const Array<Expr> orig_args, const Var& y,
                            const Expr& dy) {
   using namespace raf::value;
-  static auto op_softmax = Op::Get("raf.op.softmax");
+  static auto op_exp = Op::Get("raf.op.exp");
   static auto op_sum = Op::Get("raf.op.sum");
   static auto op_multiply = Op::Get("raf.op.multiply");
   static auto op_subtract = Op::Get("raf.op.subtract");
-  static auto op_divide = Op::Get("raf.op.divide");
+
   const CallNode* call = orig_call.as<CallNode>();
-  const Expr& x = call->args[0];
   const Expr& axis = call->args[1];
-  Expr softmax = Call(op_softmax, {x, axis});
   Expr keep_dims = MakeConstant(ScalarValue::make((int64_t)1));
+
   Expr e_1 = Call(op_sum, {dy, axis, keep_dims, MakeConstant(BoolValue::make(false))});
-  Expr e_2 = Call(op_multiply, {e_1, softmax});
+  Expr e_2 = Call(op_multiply, {Call(op_exp, {y}), e_1});
   Expr e_3 = Call(op_subtract, {dy, e_2, MakeNull(), MakeNull()});
   return {e_3};
 }
@@ -427,6 +425,30 @@ Array<Expr> ThresholdGrad(const Expr& orig_call, const Array<Expr> orig_args, co
 }
 
 RAF_OP_GRAD("raf.op.threshold", ThresholdGrad);
+
+Array<Expr> LayerNormTrainGrad(const Expr& orig_call, const Array<Expr> orig_args, const Var& y,
+                               const Expr& dymv) {
+  static auto op_dx = Op::Get("raf.op.layer_norm_train_dx");
+  const CallNode* call = orig_call.as<CallNode>();
+  CHECK(call != nullptr);
+  const Expr& dy = AsTupleExpr(dymv, 3)[0];
+  const Expr& x = call->args[0];
+  const Expr& scale = call->args[1];
+  const Expr& axis = call->args[3];
+  const Expr& eps = call->args[4];
+  auto mean = TupleGetItem(y, 1);
+  auto invvar = TupleGetItem(y, 2);
+  const Expr& ret = Call(op_dx, {x, scale, dy, mean, invvar, axis, eps});
+  const auto* kscale = scale.as<tvm::relay::ConstantNode>();
+  if (kscale && !static_cast<const ConstantNode*>(kscale)->value.defined()) {
+    // scale and bias are not learnable parameters.
+    return {ret, NullValue<Expr>(), NullValue<Expr>()};
+  }
+  return {TupleGetItem(ret, 0), TupleGetItem(ret, 1), TupleGetItem(ret, 2), NullValue<Expr>(),
+          NullValue<Expr>()};
+}
+
+RAF_OP_GRAD("raf.op.layer_norm_train", LayerNormTrainGrad);
 
 }  // namespace grad
 }  // namespace op

@@ -339,8 +339,21 @@ RAF_OP_DECLARE("raf.op.max_pool2d_dx", DeclareGeneralDx<PoolDxArgs>);
 RAF_OP_DECLARE("raf.op.avg_pool2d_dx", DeclareGeneralDx<PoolDxArgs>);
 RAF_OP_DECLARE("raf.op.adaptive_max_pool2d_dx", DeclareGeneralDx<AdaptivePoolDxArgs>);
 RAF_OP_DECLARE("raf.op.adaptive_avg_pool2d_dx", DeclareGeneralDx<AdaptivePoolDxArgs>);
-RAF_OP_DECLARE("raf.op.softmax_dx", DeclareGeneralDx<SoftmaxDxArgs>);
-RAF_OP_DECLARE("raf.op.log_softmax_dx", DeclareGeneralDx<SoftmaxDxArgs>);
+
+inline void DeclareSoftmaxDx(const CallValues& call) {
+  using namespace raf::value;
+  const auto* args = call->args.as<SoftmaxDxArgs>();
+  CHECK(args != nullptr);
+  const DLTensor* y = args->y;
+  std::vector<int64_t> shape(y->shape, y->shape + y->ndim);
+  call->out = TensorValue::Assemble(/*dev=*/y->device,
+                                    /*dtype=*/y->dtype,
+                                    /*shape=*/shape);
+  call->device = y->device;
+}
+
+RAF_OP_DECLARE("raf.op.softmax_dx", DeclareSoftmaxDx);
+RAF_OP_DECLARE("raf.op.log_softmax_dx", DeclareSoftmaxDx);
 
 RAF_OP_DECLARE("raf.op.batch_norm_train_dxwb", [](const CallValues& call) {
   const auto* args = call->args.as<BatchNormTrainDxwbArgs>();
@@ -548,6 +561,66 @@ void Pad(const CallValues& call) {
   call->device = data->device;
 }
 RAF_OP_DECLARE("raf.op.pad", Pad);
+
+void LayerNormTrainDx(const CallValues& call) {
+  const auto* args = call->args.as<LayerNormTrainDxArgs>();
+  CHECK(args != nullptr);
+  const DLTensor* x = args->x;
+  std::vector<int64_t> xshape(x->shape, x->shape + x->ndim);
+  TensorValue dx = TensorValue::Assemble(/*dev=*/x->device,
+                                         /*dtype=*/x->dtype,
+                                         /*shape=*/xshape);
+  if (args->scale.defined()) {
+    const DLTensor* w = args->scale.value();
+    std::vector<int64_t> wshape(w->shape, w->shape + w->ndim);
+
+    TensorValue dw = TensorValue::Assemble(/*dev=*/w->device,
+                                           /*dtype=*/w->dtype,
+                                           /*shape=*/wshape);
+    TensorValue db = TensorValue::Assemble(/*dev=*/w->device,
+                                           /*dtype=*/w->dtype,
+                                           /*shape=*/wshape);
+    call->out = TupleValue::make(tvm::Array<Value>({dx, dw, db}));
+  } else {
+    call->out = dx;
+  }
+  call->device = x->device;
+}
+
+RAF_OP_DECLARE("raf.op.layer_norm_train_dx", LayerNormTrainDx);
+
+void LayerNormTrain(const CallValues& call) {
+  const auto* args = call->args.as<LayerNormArgs>();
+  CHECK(args != nullptr);
+  const DLTensor* x = args->x;
+  std::vector<int64_t> shape(x->shape, x->shape + x->ndim);
+
+  TensorValue y = TensorValue::Assemble(/*dev=*/x->device,
+                                        /*dtype=*/x->dtype,
+                                        /*shape=*/shape);
+  int idiff;
+  if (args->scale.defined()) {
+    const DLTensor* scale = args->scale.value();
+    idiff = x->ndim - scale->ndim;
+  } else {
+    idiff = x->ndim - 1;
+  }
+
+  int64_t n = 1;
+  for (int i = 0; i < idiff; ++i) {
+    n *= x->shape[i];
+  }
+  TensorValue mean = TensorValue::Assemble(/*dev=*/x->device,
+                                           /*dtype=*/String2DLDataType("float32"),
+                                           /*shape=*/{n});
+
+  TensorValue invvar = TensorValue::Assemble(/*dev=*/x->device,
+                                             /*dtype=*/String2DLDataType("float32"),
+                                             /*shape=*/{n});
+  call->device = x->device;
+  call->out = TupleValue::make(tvm::Array<Value>({y, mean, invvar}));
+}
+RAF_OP_DECLARE("raf.op.layer_norm_train", LayerNormTrain);
 
 }  // namespace declare
 }  // namespace op

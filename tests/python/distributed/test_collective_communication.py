@@ -166,7 +166,7 @@ def test_allreduce_with_subcomm(dtype, rank_list):
     y = model(x)
     vx = np.ones(shape=(4, 4), dtype="float32") * (rank + 1)
     vx = raf.array(vx, device=device)
-    run_vm_model(model, device, [vx])
+    run_model(model, [vx], device)
     check(y, vx)
     for group in rank_list:
         if rank in group:

@@ -12,7 +12,15 @@ import pytest
 import torch
 import mxnet as mx
 import raf
-from raf.testing import get_testable_devices, randn, randn_torch, randint, check, run_vm_model
+from raf.testing import (
+    get_testable_devices,
+    randn,
+    randn_torch,
+    randint,
+    check,
+    run_vm_model,
+    scatter_strided_slice_python,
+)
 import tvm.topi.testing as npx  # pylint: disable=no-name-in-module
 
 
@@ -222,6 +230,34 @@ def test_scatter(shape, axis, device):
     t_y.backward(t_dy)
     m_y.backward(m_dy)
     check(m_x.grad, t_x.grad)
+
+
+@pytest.mark.parametrize("device", get_testable_devices())
+@pytest.mark.parametrize(
+    "params",
+    [
+        ((3, 4, 3), [0, 0, 0], [4, -5, 4], [1, -1, 2]),
+        ((3, 4, 3), [1, -1, 0], [2, -3, 3], [1, -1, 1]),
+        ((7, 4, 3), [1], [3], [1]),
+    ],
+)
+@pytest.mark.parametrize("dtype", ["float16", "float32"])
+def test_scatter_strided_slice(device, params, dtype):
+    # Skip float16 tests on CPU since it may not be supported and not much performance benefit.
+    if dtype == "float16" and device == "cpu":
+        pytest.skip("float16 is not supported on CPU")
+    shape, begin, end, strides = params
+    m_x, n_x = randn(shape, device=device, dtype=dtype)
+    n_slice = npx.strided_slice_python(n_x, begin, end, strides)
+    m_src, n_src = randn(n_slice.shape, device=device, dtype=dtype)
+
+    model = TestModel(raf._op.sym.scatter_strided_slice, begin=begin, end=end, strides=strides)
+    m_y = model(m_x, m_src)
+    n_y = scatter_strided_slice_python(n_x, n_src, begin, end, strides)
+    v_y = run_vm_model(model, device, [m_x, m_src])
+
+    check(m_y, n_y)
+    check(v_y, n_y)
 
 
 @pytest.mark.parametrize(
@@ -897,7 +933,7 @@ def test_where(shape, device, broadcast):
             return raf.where(condition, x, y)
 
     m_model = WhereModel()
-    m_condition, n_condition = randint(shape, low=0, high=1, device=device, dtype="bool")
+    m_condition, n_condition = randint(shape, low=0, high=2, device=device, dtype="bool")
     t_condition = torch.tensor(n_condition, device=device)
     m_x, t_x = randn_torch(shape, device=device, requires_grad=True)
     if broadcast:
@@ -905,8 +941,12 @@ def test_where(shape, device, broadcast):
     else:
         m_y, t_y = randn_torch(shape, device=device, requires_grad=True)
     m_res = m_model(m_condition, m_x, m_y)
+    v_res = run_vm_model(m_model, device, [m_condition, m_x, m_y])
+    check(m_res, v_res)
+
     t_res = torch.where(t_condition, t_x, t_y)
     check(m_res, t_res)
+
     m_dy, t_dy = randn_torch(m_res.shape, device=device)
     m_res.backward(m_dy)
     t_res.backward(t_dy)

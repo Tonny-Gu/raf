@@ -265,10 +265,16 @@ Type GeneralAxisInfer(const CallValues& value) {
   return x;
 }
 
+tvm::Type SoftmaxDxInfer(const CallValues& value) {
+  const auto* args = value->args.as<SoftmaxDxArgs>();
+  CHECK(args != nullptr);
+  return tvm::Downcast<tvm::TensorType>(GetType(args->y));
+}
+
 RAF_OP_TYPE("raf.op.softmax", "Softmax", GeneralAxisInfer<SoftmaxArgs>);
 RAF_OP_TYPE("raf.op.log_softmax", "LogSoftmax", GeneralAxisInfer<SoftmaxArgs>);
-RAF_OP_TYPE("raf.op.softmax_dx", "SoftmaxDx", GeneralDxInfer<SoftmaxDxArgs>);
-RAF_OP_TYPE("raf.op.log_softmax_dx", "LogSoftmaxDx", GeneralDxInfer<SoftmaxDxArgs>);
+RAF_OP_TYPE("raf.op.softmax_dx", "SoftmaxDx", SoftmaxDxInfer);
+RAF_OP_TYPE("raf.op.log_softmax_dx", "LogSoftmaxDx", SoftmaxDxInfer);
 
 Type BatchNormTrainDxwbInfer(const CallValues& value) {
   const auto* args = value->args.as<BatchNormTrainDxwbArgs>();
@@ -400,6 +406,49 @@ Type PadInfer(const CallValues& value) {
 }
 
 RAF_OP_TYPE("raf.op.pad", "Pad", PadInfer);
+
+Type LayerNormTrainInfer(const CallValues& value) {
+  const auto* args = value->args.as<LayerNormArgs>();
+  CHECK(args != nullptr);
+  Array<Type> res;
+  TensorType x = Downcast<TensorType>(GetType(args->x));
+  int idiff;
+  if (args->scale.defined()) {
+    TensorType scale = Downcast<TensorType>(GetType(args->scale.value()));
+    idiff = x->shape.size() - scale->shape.size();
+  } else {
+    idiff = x->shape.size() - 1;
+  }
+  PrimExpr n = Integer(1);
+  for (int i = 0; i < idiff; ++i) {
+    n *= x->shape[i];
+  }
+
+  TensorType mean = TensorType({n}, DataType(ir::String2DLDataType("float32")));
+  TensorType invvar = TensorType({n}, DataType(ir::String2DLDataType("float32")));
+
+  return TupleType({x, mean, invvar});
+}
+
+RAF_OP_TYPE("raf.op.layer_norm_train", "LayerNormTrain", LayerNormTrainInfer);
+
+Type LayerNormTrainDxbInfer(const CallValues& value) {
+  const auto* args = value->args.as<LayerNormTrainDxArgs>();
+  CHECK(args != nullptr);
+  TensorType dx = Downcast<TensorType>(GetType(args->x));
+  if (args->scale.defined()) {
+    TensorType dw = Downcast<TensorType>(GetType(args->scale.value()));
+    Array<Type> res;
+    res.push_back(dx);
+    res.push_back(dw);
+    res.push_back(dw);
+    return TupleType(res);
+  } else {
+    return dx;
+  }
+}
+
+RAF_OP_TYPE("raf.op.layer_norm_train_dx", "LayerNormTrainDx", LayerNormTrainDxbInfer);
 
 }  // namespace op
 }  // namespace raf
