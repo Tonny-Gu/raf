@@ -13,97 +13,158 @@ namespace sharding {
 using namespace raf::ir;
 using namespace raf::value;
 
-/* BaseSpecValue */
-class BaseSpecValueObj : public ValueObj {
+class BaseSpecObj : public ValueObj {
  public:
-  bool immutable;
-  void VisitAttrs(tvm::AttrVisitor* v) {
-    v->Visit("immutable", &immutable);
-  }
+  void VisitAttrs(tvm::AttrVisitor* v) {}
   static constexpr const uint32_t _type_index = ir::TypeIndex::kDynamic;
-  static constexpr const char* _type_key = "raf.sharding.BaseSpecValue";
-  RAF_BASE_OBJECT(BaseSpecValueObj, ValueObj);
+  static constexpr const char* _type_key = "raf.sharding.BaseSpec";
+  RAF_BASE_OBJECT(BaseSpecObj, ValueObj);
 };
 
-class BaseSpecValue : public Value {
+class BaseSpec : public Value {
  public:
-  RAF_OBJECT_REF(BaseSpecValue, Value, BaseSpecValueObj);
+  RAF_OBJECT_REF(BaseSpec, Value, BaseSpecObj);
 };
 
-/* ReplicatedSpecValue */
-class ReplicatedSpecValueObj final : public BaseSpecValueObj {
- public:
-  void VisitAttrs(tvm::AttrVisitor* v) {
-    v->Visit("immutable", &immutable);
-  }
-  static constexpr const char* _type_key = "raf.sharding.ReplicatedSpecValue";
-  RAF_FINAL_OBJECT(ReplicatedSpecValueObj, BaseSpecValueObj);
-};
-
-class ReplicatedSpecValue final : public BaseSpecValue {
- public:
-  static ReplicatedSpecValue make(bool immutable);
-  RAF_OBJECT_REF(ReplicatedSpecValue, BaseSpecValue, ReplicatedSpecValueObj);
-};
-
-/* ShardSpecValue */
-class ShardSpecValueObj final : public BaseSpecValueObj {
+class BaseShardSpecObj : public BaseSpecObj {
  public:
   Array<Integer> ranks;
-  Array<Integer> replicas;
-  Array<Integer> logic_shape;
-  Array<Integer> logic_index;
-  Array<Integer> phy_shape;
-  Array<Integer> phy_index;
+  Integer ndim;
 
   void VisitAttrs(tvm::AttrVisitor* v) {
-    v->Visit("immutable", &immutable);
     v->Visit("ranks", &ranks);
-    v->Visit("replicas", &replicas);
-    v->Visit("logic_shape", &logic_shape);
-    v->Visit("logic_index", &logic_index);
-    v->Visit("phy_shape", &phy_shape);
-    v->Visit("phy_index", &phy_index);
+    v->Visit("ndim", &ndim);
   }
 
-  static constexpr const char* _type_key = "raf.sharding.ShardSpecValue";
-  RAF_FINAL_OBJECT(ShardSpecValueObj, BaseSpecValueObj);
+  static constexpr const uint32_t _type_index = ir::TypeIndex::kDynamic;
+  static constexpr const char* _type_key = "raf.sharding.BaseShardSpec";
+  RAF_BASE_OBJECT(BaseShardSpecObj, BaseSpecObj);
 };
 
-class ShardSpecValue final : public BaseSpecValue {
+class BaseShardSpec : public BaseSpec {
  public:
-  static ShardSpecValue make(bool immutable, Array<Integer> ranks, Array<Integer> partition_shape,
-                        Array<Integer> replicas);
-  RAF_OBJECT_REF(ShardSpecValue, BaseSpecValue, ShardSpecValueObj);
+  RAF_OBJECT_REF(BaseShardSpec, BaseSpec, BaseShardSpecObj);
 };
 
-/* TupleSpecValue */
-class TupleSpecValueObj final : public BaseSpecValueObj {
+class TupleSpecObj final : public BaseSpecObj {
  public:
-  Array<BaseSpecValue> tuple_elem;
+  Array<BaseShardSpec> tuple_elem;
   void VisitAttrs(tvm::AttrVisitor* v) {
-    v->Visit("immutable", &immutable);
     v->Visit("tuple_elem", &tuple_elem);
   }
-  static constexpr const char* _type_key = "raf.sharding.TupleSpecValue";
-  RAF_FINAL_OBJECT(TupleSpecValueObj, BaseSpecValueObj);
+  static constexpr const char* _type_key = "raf.sharding.TupleSpec";
+  RAF_FINAL_OBJECT(TupleSpecObj, BaseSpecObj);
 };
 
-class TupleSpecValue final : public BaseSpecValue {
+class TupleSpec final : public BaseSpec {
  public:
-  static TupleSpecValue make(bool immutable, Array<BaseSpecValue> tuple_elem);
-  RAF_OBJECT_REF(TupleSpecValue, BaseSpecValue, TupleSpecValueObj);
+  static TupleSpec make(Array<BaseShardSpec> tuple_elem) {
+    auto n = make_object<TupleSpecObj>();
+    n->tuple_elem = tuple_elem;
+    return TupleSpec(n);
+  }
+  RAF_OBJECT_REF(TupleSpec, BaseSpec, TupleSpecObj);
+};
+
+class MirroredSpecObj final : public BaseShardSpecObj {
+ public:
+  void VisitAttrs(tvm::AttrVisitor* v) {
+    v->Visit("ranks", &ranks);
+    v->Visit("ndim", &ndim);
+  }
+  static constexpr const char* _type_key = "raf.sharding.MirroredSpec";
+  RAF_FINAL_OBJECT(MirroredSpecObj, BaseShardSpecObj);
+};
+
+class MirroredSpec final : public BaseShardSpec {
+ public:
+  static MirroredSpec make(Array<Integer> ranks, Integer ndim) {
+    auto n = make_object<MirroredSpecObj>();
+    n->ranks = ranks;
+    n->ndim = ndim;
+    return MirroredSpec(n);
+  }
+
+  RAF_OBJECT_REF(MirroredSpec, BaseShardSpec, MirroredSpecObj);
+};
+
+class AnyShardSpecObj final : public BaseShardSpecObj {
+ public:
+  void VisitAttrs(tvm::AttrVisitor* v) {
+    v->Visit("ranks", &ranks);
+    v->Visit("ndim", &ndim);
+  }
+  static constexpr const char* _type_key = "raf.sharding.AnyShardSpec";
+  RAF_FINAL_OBJECT(AnyShardSpecObj, BaseShardSpecObj);
+};
+
+class AnyShardSpec final : public BaseShardSpec {
+ public:
+  static AnyShardSpec make(Array<Integer> ranks, Integer ndim) {
+    auto n = make_object<AnyShardSpecObj>();
+    n->ranks = ranks;
+    n->ndim = ndim;
+    return AnyShardSpec(n);
+  }
+
+  RAF_OBJECT_REF(AnyShardSpec, BaseShardSpec, AnyShardSpecObj);
+};
+
+class ShardSpecObj : public BaseShardSpecObj {
+ public:
+  Array<Integer> logic_shape;
+  Array<Integer> logic_index_;
+
+  void VisitAttrs(tvm::AttrVisitor* v) {
+    v->Visit("ranks", &ranks);
+    v->Visit("ndim", &ndim);
+    v->Visit("logic_shape", &logic_shape);
+    v->Visit("logic_index", &logic_index_);
+  }
+
+  static constexpr const char* _type_key = "raf.sharding.ShardSpec";
+  RAF_FINAL_OBJECT(ShardSpecObj, BaseShardSpecObj);
+};
+
+class ShardSpec : public BaseShardSpec {
+ public:
+  static ShardSpec make(Array<Integer> ranks, Array<Integer> shape);
+  static int64_t GetRankIdx(Array<Integer> ranks);
+  RAF_OBJECT_REF(ShardSpec, BaseShardSpec, ShardSpecObj);
+};
+
+class ReplicaSpecObj final : public ShardSpecObj {
+ public:
+  Array<Integer> replicas;
+  Array<Integer> phy_shape;
+  Array<Integer> phy_index_;
+
+ void VisitAttrs(tvm::AttrVisitor* v) {
+    v->Visit("ranks", &ranks);
+    v->Visit("ndim", &ndim);
+    v->Visit("replicas", &replicas);
+    v->Visit("logic_shape", &logic_shape);
+    v->Visit("logic_index", &logic_index_);
+    v->Visit("phy_shape", &phy_shape);
+    v->Visit("phy_index", &phy_index_);
+  }
+};
+
+class ReplicaSpec : public ShardSpec {
+ public:
+  static ReplicaSpec make(Array<Integer> ranks, Array<Integer> replicas, Array<Integer> phy_shape);
+  RAF_OBJECT_REF(ReplicaSpec, ShardSpec, ReplicaSpecObj);
 };
 
 struct ShardOpCallAttrs : public tvm::AttrsNode<ShardOpCallAttrs> {
-  static Attrs make(BaseSpecValue shard_in, BaseSpecValue shard_out);
-  BaseSpecValue shard_in, shard_out;
+  static Attrs make(BaseSpec shard_in, BaseSpec shard_out);
+  BaseSpec shard_in, shard_out;
   TVM_DECLARE_ATTRS(ShardOpCallAttrs, "raf.attrs.ShardOpCallAttrs") {
     TVM_ATTR_FIELD(shard_in)
-        .set_default(NullValue<BaseSpecValue>())
+        .set_default(NullValue<BaseSpec>())
         .describe("Sharding Specifications of inputs");
     TVM_ATTR_FIELD(shard_out)
-        .set_default(NullValue<BaseSpecValue>())
+        .set_default(NullValue<BaseSpec>())
         .describe("Sharding Specifications of outputs");
   }
 };

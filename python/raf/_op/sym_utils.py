@@ -9,7 +9,7 @@ import numpy as np
 
 from raf._core.ndarray import Symbol, ndarray
 from raf._core.value import TensorValue, Value
-from raf.distributed.sharding import BaseSpecValue
+from raf.distributed.sharding import BaseSpec
 
 
 def to_any(a):
@@ -41,7 +41,7 @@ def to_tensor(a):
     if isinstance(a, ndarray):
         return a._ndarray__handle  # pylint: disable=protected-access
     
-    if isinstance(a, BaseSpecValue):
+    if isinstance(a, BaseSpec):
         return Value.as_const_expr(a)
 
     if not isinstance(a, np.ndarray):

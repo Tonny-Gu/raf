@@ -9,7 +9,7 @@ import numpy as np
 from raf._core.ndarray import ndarray
 from raf._core.value import BoolValue, FloatValue, IntValue, StringValue, TensorValue, Value
 from raf._lib import Array, relay
-from raf.distributed.sharding.shardspec import BaseSpecValue
+from raf.distributed.sharding.shardspec import BaseSpec
 
 
 def to_any(a):
@@ -19,7 +19,7 @@ def to_any(a):
         return None
     if isinstance(a, (list, tuple)):
         return to_int_tuple(a)
-    if isinstance(a, (Number, str, BaseSpecValue)):
+    if isinstance(a, (Number, str, BaseSpec)):
         return a
     return to_tensor(a)
 
@@ -29,7 +29,7 @@ def to_tensor(a):
         return a._ndarray__handle  # pylint: disable=protected-access
     if a is None:
         return None
-    if isinstance(a, BaseSpecValue):
+    if isinstance(a, BaseSpec):
         return Value.as_const_expr(a)
     if not isinstance(a, np.ndarray):
         a = np.array(a)

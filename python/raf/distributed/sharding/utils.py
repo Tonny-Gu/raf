@@ -11,7 +11,7 @@ from typing import Callable, List, Tuple
 from raf._ffi.sharding._make import ShardOpCallAttrs
 from raf._ffi.op import GetOp
 from raf._lib import _register_func, relay
-from raf.distributed.sharding.shardspec import BaseSpecValue, ReplicatedSpecValue, ShardSpecValue, TupleSpecValue
+from raf.distributed.sharding.shardspec import BaseSpec, MirroredSpec, ShardSpec, TupleSpec
 from raf._core.value import Value
 from raf import distributed as dist
 from raf.ir.anf_builder import ANFBuilder
@@ -85,7 +85,7 @@ def register_expansion_pattern(op_name):
     return decorator
 
 
-def extract_shardOpCall(call: relay.Call) -> Tuple[Op, List[Expr], BaseSpecValue, BaseSpecValue]:
+def extract_shardOpCall(call: relay.Call) -> Tuple[Op, List[Expr], BaseSpec, BaseSpec]:
     """Return some frequently-used object attributes as a tuple"""
     assert isinstance(call, relay.Call)
     return (call.op, call.args, call.attrs.shard_in, call.attrs.shard_out)
@@ -103,8 +103,8 @@ def expand_shardOpCall(call: relay.Call):
 
 
 @expand_when(
-    lambda call: isinstance(call.attrs.shard_in, ReplicatedSpecValue)
-    and isinstance(call.attrs.shard_out, ShardSpecValue),
+    lambda call: isinstance(call.attrs.shard_in, MirroredSpec)
+    and isinstance(call.attrs.shard_out, ShardSpec),
     priority=1,
 )
 @register_expansion_pattern("raf.op._reshard")
@@ -116,8 +116,8 @@ def reshard_replicated_to_sharded(call: relay.Call):
 
 
 @expand_when(
-    lambda call: isinstance(call.attrs.shard_in, ShardSpecValue)
-    and isinstance(call.attrs.shard_out, ReplicatedSpecValue),
+    lambda call: isinstance(call.attrs.shard_in, ShardSpec)
+    and isinstance(call.attrs.shard_out, MirroredSpec),
     priority=1,
 )
 @register_expansion_pattern("raf.op._reshard")
@@ -149,10 +149,10 @@ def add_or_sub(call: relay.Call):
 
 def matmul_algor1_cond(call: relay.Call):
     op, arg, sin, sout = extract_shardOpCall(call)
-    if not (isinstance(sin, TupleSpecValue)
-        and isinstance(sin[0], ShardSpecValue)
-        and isinstance(sin[1], ShardSpecValue)
-        and isinstance(sout, ReplicatedSpecValue)):
+    if not (isinstance(sin, TupleSpec)
+        and isinstance(sin[0], ShardSpec)
+        and isinstance(sin[1], ShardSpec)
+        and isinstance(sout, MirroredSpec)):
         return False
     return True
 
@@ -173,10 +173,10 @@ def matmul_algor1(call: relay.Call):
 #     op, args, attrs = call.op, call.args, call.attrs
 #     if (
 #         len(args) != 1
-#         or isinstance(attrs.shard_in, TupleSpecValue)
-#         or isinstance(attrs.shard_out, TupleSpecValue)
+#         or isinstance(attrs.shard_in, TupleSpec)
+#         or isinstance(attrs.shard_out, TupleSpec)
 #     ):
 #         raise NotImplementedError("Currently coverting multiple args is not supported")
-#     new_attrs = ShardOpCallAttrs(attrs.shard_in, ReplicatedSpecValue())
+#     new_attrs = ShardOpCallAttrs(attrs.shard_in, MirroredSpec())
 #     new_args = [relay.Call(GetOp("raf.op._reshard"), args, new_attrs)]
 #     return relay.Call(op, new_args)

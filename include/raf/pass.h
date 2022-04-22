@@ -341,7 +341,7 @@ Pass ASAPStreamSchedule();
  *
  * \return The created pass.
  */
-Pass SetShardOpCallAttrs(const ir::Map<ir::Expr, ir::Attrs>& attrs_map);
+Pass AnnotateShardOpCall(const ir::Map<ir::Expr, ir::Attrs>& attrs_map);
 
 /*!
  * \brief Expand Op Call with ShardOpCallAttrs to a series of expressions

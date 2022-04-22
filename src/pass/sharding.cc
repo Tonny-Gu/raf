@@ -28,9 +28,9 @@ class ShardOpCallAttrsSetter : public ExprMutator {
 
   Expr VisitExpr_(const CallNode* node) override {
     const Expr& callee = node->op;
-    // static auto default_spec = ReplicatedSpecValue::make(false);
+    // static auto default_spec = MirroredSpec::make(false);
     // static auto default_attrs =
-    //     ShardOpCallAttrs::make(BaseSpecValue(default_spec), BaseSpecValue(default_spec));
+    //     ShardOpCallAttrs::make(BaseSpec(default_spec), BaseSpec(default_spec));
     if (callee->IsInstance<OpNode>()) {
       auto ref = GetRef<Expr>(node);
       if (_attrs_map.count(ref)) {
@@ -62,10 +62,10 @@ class ShardOpCallExpander : public ExprMutator {
 
 }  // namespace shard_pass
 
-Pass SetShardOpCallAttrs(const Map<Expr, Attrs>& attrs_map) {
+Pass AnnotateShardOpCall(const Map<Expr, Attrs>& attrs_map) {
   return CreateModulePass(
       [=](IRModule mod, const PassContext& pass_ctx) {
-        DLOG(INFO) << "pass::SetShardOpCallAttrs";
+        DLOG(INFO) << "pass::AnnotateShardOpCall";
         IRModule updated_mod = IRModule(mod->functions);
         for (auto kv : updated_mod->functions) {
           if (kv.second.as<FunctionNode>()) {
@@ -76,10 +76,10 @@ Pass SetShardOpCallAttrs(const Map<Expr, Attrs>& attrs_map) {
         }
         return updated_mod;
       },
-      0, "SetShardOpCallAttrs", {});
+      0, "AnnotateShardOpCall", {});
 }
 
-RAF_REGISTER_GLOBAL("raf.pass_.SetShardOpCallAttrs").set_body_typed(SetShardOpCallAttrs);
+RAF_REGISTER_GLOBAL("raf.pass_.AnnotateShardOpCall").set_body_typed(AnnotateShardOpCall);
 
 Pass ExpandShardOpCall() {
   return CreateModulePass(
