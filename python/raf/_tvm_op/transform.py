@@ -435,3 +435,12 @@ def embedding_dx_compute(attrs, inputs, output_type):
 _reg.register_injective_schedule("raf.op.tvm.embedding_dx")
 
 _reg.register_strategy("raf.op.tvm.cumsum", strategy.cumsum_strategy)
+
+
+@register_compute("raf.op.tvm.group_cast")
+def group_cast_compute(attrs, inputs, output_type):
+    dtype = attrs.dtype
+    return [_topi.cast(item, dtype) for item in inputs]
+
+
+_reg.register_injective_schedule("raf.op.tvm.group_cast")

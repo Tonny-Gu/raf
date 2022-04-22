@@ -4,7 +4,7 @@
 # pylint: disable=protected-access, invalid-name
 """Collective communication operators"""
 from .._op import sym
-from .context import get_context
+from .communicator import get_communicator
 
 
 def allreduce(x, computation="sum", rank_list=None):
@@ -43,16 +43,16 @@ def allgather(x, axis, rank_list=None):
 
     is_list = isinstance(x, (tuple, list))
 
-    dctx = get_context()
+    comm = get_communicator()
     if rank_list:
         for group in rank_list:
-            if dctx.rank in group:
+            if comm.rank in group:
                 size = len(group)
                 break
         else:
             size = 1
     else:
-        size = dctx.size
+        size = comm.size
 
     if not is_list:
         x = [x]
@@ -83,6 +83,25 @@ def allgather(x, axis, rank_list=None):
     if not is_list:
         x = x[0]
     return x
+
+
+def group_allgather(tensor_list, axis, out):
+    """It performs allgather on each tensor in the tensor list.
+
+    Parameters
+    ----------
+    tensor_list: List[Tensor]
+        A list of tensors to perform allgather
+    axis: int
+        The axis over which concatenation is to be performed
+    out: List[Tensor]
+        The ouptut of the allgather for each tensor
+    Returns
+    -------
+    ret: Tensor | [Tensor]
+        Concatenation results of each tensor
+    """
+    return sym._group_allgather(tensor_list, axis, out)
 
 
 def reduce(x, root, computation="sum"):
@@ -125,6 +144,25 @@ def reduce_scatter(x, computation="sum"):
         where rank represents rank number of the current process
     """
     return sym._reduce_scatter(x, computation)
+
+
+def group_reduce_scatter(tensor_list, computation="sum"):
+    """Performs reduction then scatter for each tensor in the list
+
+    Parameters
+    ----------
+    tensor_list: List[Tensor]
+        A list of tensors to perform reduce scatter
+    computation: string
+        The reduction operation, default is sum
+
+    Returns
+    -------
+    ret: List[Tensor]
+        reduction result of each tensor[rank] over all replicas,
+        where rank represents rank number of the current process
+    """
+    return sym._group_reduce_scatter(tensor_list, computation)
 
 
 def broadcast(x, root):

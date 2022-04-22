@@ -19,7 +19,7 @@
 #include "raf/binding.h"
 #include "raf/type.h"
 #include "raf/pass.h"
-#include "raf/dist_context.h"
+#include "raf/dist_config.h"
 #include "./compiler.h"
 
 namespace tvm {
@@ -39,7 +39,7 @@ using namespace raf::op;
 using namespace raf::value;
 using binding::LookupBinding;
 using binding::NDArrayBinding;
-using raf::distributed::DistContext;
+using raf::distributed::DistConfig;
 using tvm::relay::Shape;
 
 /*!
@@ -456,7 +456,7 @@ class VMFunctionCompiler : ExprFunctor<void(const Expr& expr)> {
                  })
           .Match("raf.op.vm.alloc_storage",
                  [this](const Array<Expr>& args, const Attrs& attrs, const Array<Type>& type_arg) {
-                   CHECK_EQ(args.size(), 5);
+                   CHECK(args.size() == 5 || args.size() == 6);
                    // Compute the size of the allocation.
                    this->VisitExpr(args[0]);
                    auto size_register = last_register_;
@@ -486,8 +486,17 @@ class VMFunctionCompiler : ExprFunctor<void(const Expr& expr)> {
                    std::string dtype_s = dtype_val.as<StringValueObj>()->value;
                    DataType dtype(String2DLDataType(dtype_s));
 
+                   // alloc_async
+                   bool alloc_async = true;
+                   if (args.size() == 6) {
+                     CHECK(args[5]->IsInstance<ConstantNode>());
+                     auto async_val = args[5].as<ConstantNode>()->value;
+                     CHECK(async_val->IsInstance<BoolValueObj>());
+                     alloc_async = async_val.as<BoolValueObj>()->value;
+                   }
+
                    Emit(Instruction::AllocStorage(size_register, alignment, dtype, device_type,
-                                                  device_id, NewRegister()));
+                                                  device_id, NewRegister(), alloc_async));
                  })
           .Match("raf.op.vm.free",
                  [this](const Array<Expr>& args, const Attrs& attrs, const Array<Type>& type_arg) {
@@ -857,7 +866,7 @@ IRModule VMCompiler::OptimizeModule(const IRModule& mod, const DeviceMap& device
 
     // optimization passes that transform BBNF into ANF
     if ((*it).second.device_type() == DevType::kCUDA()) {
-      if (DistContext::Global()->enable_data_parallel) {
+      if (DistConfig::Global()->enable_data_parallel) {
         // The current design of EnforceSync assumes ops are executed on multiple CUDA streams:
         // all computation ops are executed on a computation stream, and all communication
         // collectives are executed on another communication stream. Memory copy ops added in
