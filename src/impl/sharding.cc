@@ -163,9 +163,7 @@ std::string PrintAllocTable(const ObjectRef& ref) {
     for (int64_t i = ndim - 1; i >= 0; --i) {
       phy_index[i] = t1 % spec->phy_shape[i]->value;
       t1 /= spec->phy_shape[i]->value;
-
       logic_index[i] = phy_index[i]->value / spec->subgroup_shape[i]->value;
-
       subgroup_index[i] = phy_index[i]->value % spec->subgroup_shape[i]->value;
     }
     ss << "| " << spec->ranks[rank_idx]->value << " | ";
