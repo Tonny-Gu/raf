@@ -48,20 +48,16 @@ ShardSpec ShardSpec::make(Array<Integer> ranks, Array<Integer> phy_shape, Array<
   int64_t nshard = 1, ngroup = 1;
   
   auto t1 = rank_idx;
-  auto t2 = rank_idx;
-  auto t3 = rank_idx;
   for (int64_t i = ndim - 1; i >= 0; --i) {
-    subgroup_index[i] = t1 % subgroup_shape[i]->value;
-    t1 /= subgroup_shape[i]->value;
-    ngroup *= subgroup_shape[i]->value;
-
-    phy_index[i] = t2 % phy_shape[i]->value;
-    t2 /= phy_shape[i]->value;
+    phy_index[i] = t1 % phy_shape[i]->value;
+    t1 /= phy_shape[i]->value;
 
     logic_shape[i] = phy_shape[i]->value / subgroup_shape[i]->value;
-    logic_index[i] = t3 / logic_shape[i]->value;
-    t3 /= logic_shape[i]->value;
+    logic_index[i] = phy_index[i]->value / subgroup_shape[i]->value;
     nshard *= logic_shape[i]->value;
+
+    subgroup_index[i] = phy_index[i]->value % subgroup_shape[i]->value;
+    ngroup *= subgroup_shape[i]->value;
   }
 
   auto spec = make_object<ShardSpecObj>();
@@ -149,33 +145,45 @@ RAF_REGISTER_OBJECT_REFLECT(UnsetShardSpecObj);
 using tvm::ReprPrinter;
 using tvm::runtime::ObjectRef;
 
-void PrintAllocTable(const ObjectRef& ref, ReprPrinter* p) {
-  /*size_t dev_idx = 0;
-  const auto obj = Downcast<ShardSpec>(ref);
-  const auto num_dim = obj->subgroup_shape.size();
-  static thread_local size_t *indices = new size_t[num_dim];
-  std::function<void(int)> _print_alloc_table;
-  _print_alloc_table = [&](int depth) {
-    if (depth == num_dim) {
-      p->stream << (dev_idx != 0 ? " [" : "[");
-      for (size_t i = 0; i < num_dim; ++i) {
-        auto num_devices = obj->subgroup_shape[i]->value;
-        auto index = std::to_string(indices[i]);
-        p->stream << (num_devices == 1 ? ":" : index)
-                  << (i != num_dim - 1 ? ", " : "");
-      }
-      auto dev_info = obj->ranks[dev_idx++].c_str();
-      p->stream << "]@" << dev_info;
-    } else {
-      auto subgroup_num = obj->subgroup_shape[depth]->value;
-      for (size_t i = 0; i < subgroup_num; ++i) {
-        indices[depth] = i;
-        _print_alloc_table(depth + 1);
-      }
+std::string PrintAllocTable(const ObjectRef& ref) {
+  size_t dev_idx = 0;
+  const auto spec = Downcast<ShardSpec>(ref);
+  const auto ndim = spec->ndim_->value;
+
+  std::stringstream ss;
+
+  auto subgroup_index = std::vector<Integer>(ndim);
+  auto phy_index = std::vector<Integer>(ndim);
+  auto logic_index = std::vector<Integer>(ndim);
+
+  ss << "| Rank | Physical Index | Logic Index | Subgroup Index |" << std::endl;
+
+  for (int64_t rank_idx = 0; rank_idx < spec->ranks.size(); ++rank_idx) {
+    auto t1 = rank_idx;
+    for (int64_t i = ndim - 1; i >= 0; --i) {
+      phy_index[i] = t1 % spec->phy_shape[i]->value;
+      t1 /= spec->phy_shape[i]->value;
+
+      logic_index[i] = phy_index[i]->value / spec->subgroup_shape[i]->value;
+
+      subgroup_index[i] = phy_index[i]->value % spec->subgroup_shape[i]->value;
     }
-  };
-  _print_alloc_table(0);*/
+    ss << "| " << spec->ranks[rank_idx]->value << " | ";
+    for (auto arr : {phy_index, logic_index, subgroup_index}) {
+      ss << "(";
+      for (auto e : arr) {
+        ss << e << ", ";
+      }
+      ss.seekp(-2, std::ios_base::end);
+      ss << ") | ";
+    }
+    ss << std::endl;
+  }
+
+  return ss.str();
 }
+
+RAF_REGISTER_GLOBAL("raf.sharding.PrintAllocTable").set_body_typed(PrintAllocTable);
 
 TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
     .set_dispatch<ShardSpecObj>([](const ObjectRef& ref, ReprPrinter* p) {
