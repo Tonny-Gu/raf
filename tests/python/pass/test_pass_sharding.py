@@ -11,7 +11,7 @@ from raf.distributed.sharding import (
     ShardSpec,
     MirroredSpec,
     TupleSpec,
-    BaseSpec,
+    BaseShardSpec,
     ShardOpCallAttrs,
 )
 from raf._ffi.pass_ import AnnotateShardOpCall, ToGraphNormalForm, ExpandShardOpCall, InferType

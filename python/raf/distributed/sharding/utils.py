@@ -11,7 +11,7 @@ from typing import Callable, List, Tuple
 from raf._ffi.sharding._make import ShardOpCallAttrs
 from raf._ffi.op import GetOp
 from raf._lib import _register_func, relay
-from raf.distributed.sharding.shardspec import BaseSpec, MirroredSpec, ShardSpec, TupleSpec
+from raf.distributed.sharding.shardspec import BaseShardSpec, ShardSpec, UnsetShardSpec
 from raf._core.value import Value
 from raf import distributed as dist
 from raf.ir.anf_builder import ANFBuilder
@@ -85,7 +85,7 @@ def register_expansion_pattern(op_name):
     return decorator
 
 
-def extract_shardOpCall(call: relay.Call) -> Tuple[Op, List[Expr], BaseSpec, BaseSpec]:
+def extract_shardOpCall(call: relay.Call) -> Tuple[Op, List[Expr], BaseShardSpec, BaseShardSpec]:
     """Return some frequently-used object attributes as a tuple"""
     assert isinstance(call, relay.Call)
     return (call.op, call.args, call.attrs.shard_in, call.attrs.shard_out)

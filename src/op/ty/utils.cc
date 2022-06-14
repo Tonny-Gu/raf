@@ -45,12 +45,7 @@ class ValueTyper : public ValueFunctor<Type(const Value&)> {
     return TensorType::Scalar(DataType::Int(64));
   }
 
-  Type VisitValue_(const sharding::TupleSpecObj* value) override {
-    // fake type info
-    return TensorType::Scalar(DataType::Int(64));
-  }
-
-  Type VisitValue_(const sharding::MirroredSpecObj* value) override {
+  Type VisitValue_(const sharding::UnsetShardSpecObj* value) override {
     // fake type info
     return TensorType::Scalar(DataType::Int(64));
   }

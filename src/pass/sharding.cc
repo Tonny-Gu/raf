@@ -28,9 +28,6 @@ class ShardOpCallAttrsSetter : public ExprMutator {
 
   Expr VisitExpr_(const CallNode* node) override {
     const Expr& callee = node->op;
-    // static auto default_spec = MirroredSpec::make(false);
-    // static auto default_attrs =
-    //     ShardOpCallAttrs::make(BaseSpec(default_spec), BaseSpec(default_spec));
     if (callee->IsInstance<OpNode>()) {
       auto ref = GetRef<Expr>(node);
       if (_attrs_map.count(ref)) {

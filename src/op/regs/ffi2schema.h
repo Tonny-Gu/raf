@@ -37,7 +37,7 @@ inline value::Value ArrayLike(const registry::TVMArgValue& a, binding::GradTape*
     *tape = bound->tape;
     return bound->value;
   }
-  if (type_code == kTVMObjectHandle && a.IsObjectRef<sharding::BaseSpec>()) {
+  if (type_code == kTVMObjectHandle && a.IsObjectRef<sharding::BaseShardSpec>()) {
     return a;
   }
   if (type_code == kDLInt) {
