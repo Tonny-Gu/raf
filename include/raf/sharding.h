@@ -82,13 +82,13 @@ class UnsetShardSpec final : public BaseShardSpec {
 };
 
 struct ShardOpCallAttrs : public tvm::AttrsNode<ShardOpCallAttrs> {
-  static Attrs make(Array<BaseShardSpec> in, Array<BaseShardSpec> out);
-  Array<BaseShardSpec> in, out;
+  static Attrs make(Array<BaseShardSpec> sin, Array<BaseShardSpec> sout);
+  Array<BaseShardSpec> sin, sout;
   TVM_DECLARE_ATTRS(ShardOpCallAttrs, "raf.attrs.ShardOpCallAttrs") {
-    TVM_ATTR_FIELD(in)
+    TVM_ATTR_FIELD(sin)
         .set_default(NullValue<Array<BaseShardSpec>>())
         .describe("Sharding Specifications of inputs");
-    TVM_ATTR_FIELD(out)
+    TVM_ATTR_FIELD(sout)
         .set_default(NullValue<Array<BaseShardSpec>>())
         .describe("Sharding Specifications of outputs");
   }

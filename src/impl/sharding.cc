@@ -82,10 +82,10 @@ ShardSpec ShardSpec::make(Array<Integer> ranks, Array<Integer> phy_shape, Array<
   return ShardSpec(spec);
 }
 
-Attrs ShardOpCallAttrs::make(Array<BaseShardSpec> in, Array<BaseShardSpec> out) {
+Attrs ShardOpCallAttrs::make(Array<BaseShardSpec> sin, Array<BaseShardSpec> sout) {
   auto attrs = make_object<ShardOpCallAttrs>();
-  attrs->in = std::move(in);
-  attrs->out = std::move(out);
+  attrs->sin = std::move(sin);
+  attrs->sout = std::move(sout);
   return Attrs(attrs);
 }
 
@@ -213,7 +213,7 @@ TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
     .set_dispatch<ShardOpCallAttrs>([](const ObjectRef& ref, ReprPrinter* p) {
       const auto* n = static_cast<const ShardOpCallAttrs*>(ref.get());
       p->stream << "ShardOpCallAttrs("
-                << "in=" << n->in << ", out=" << n->out << ")";
+                << "in=" << n->sin << ", out=" << n->sout << ")";
     });
 
 TVM_REGISTER_NODE_TYPE(ShardOpCallAttrs);

@@ -47,7 +47,7 @@ class ShardOpCallExpander : public ExprMutator {
   Expr VisitExpr_(const CallNode* node) override {
     const Expr& op = node->op;
     const Attrs& attrs = node->attrs;
-    const auto* f = tvm::runtime::Registry::Get("raf.sharding._match_expansion_pattern");
+    const auto* f = tvm::runtime::Registry::Get("raf.sharding._match_expansion_rule");
     if (attrs.defined() && op->IsInstance<OpNode>() && attrs->IsInstance<ShardOpCallAttrs>()) {
       auto call = GetRef<Call>(node);
       Expr new_expr = (*f)(call);

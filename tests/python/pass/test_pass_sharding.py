@@ -9,16 +9,17 @@ from raf._core.executor import interpret
 from raf._op.imp import matmul
 from raf.distributed.sharding import (
     ShardSpec,
-    MirroredSpec,
-    TupleSpec,
     BaseShardSpec,
     ShardOpCallAttrs,
+)
+from raf.distributed.sharding import (
+    make_replicated_spec,
+    make_shard_spec
 )
 from raf._ffi.pass_ import AnnotateShardOpCall, ToGraphNormalForm, ExpandShardOpCall, InferType
 from raf._lib import relay
 from raf.testing import randn
 from raf.hybrid.hybrid import _make_argument, _unwrap
-from raf.testing.common import get_dist_info
 from tvm.relay.analysis.analysis import post_order_visit
 from tvm.runtime.ndarray import device
 
@@ -39,9 +40,9 @@ def test_shard_add():
     mod_before = record.mod
     mod_before = InferType()(mod_before)
 
-    attrs = ShardOpCallAttrs(
-        TupleSpec([MirroredSpec(), MirroredSpec()]), ShardSpec([3, 2, 1, 0], [2, 2], [1, 2])
-    )
+    s_spec = make_shard_spec([2, 2], [1, 2], 4)
+
+    attrs = ShardOpCallAttrs([s_spec, s_spec], [s_spec])
 
     print(m_x)
     call_list = []
@@ -52,6 +53,7 @@ def test_shard_add():
     attrs_map = {call_list[0]: attrs}
 
     mod0 = AnnotateShardOpCall(attrs_map)(mod_before)
+    print(raf._ffi.ir.AsText(mod0))
     mod1 = ToGraphNormalForm()(mod0)
     mod2 = ExpandShardOpCall()(mod1)
     print(raf._ffi.ir.AsText(mod2))
@@ -81,27 +83,25 @@ def test_shard_matmul():
 
         @raf.model.trace
         def forward(self, x, y):
-            # s_x = raf._reshard_r2s(x, ShardSpec([0, 1, 2, 3], [1, 4], [1, 1]))
-            # s_y = raf._reshard_r2s(y, ShardSpec([0, 1, 2, 3], [4, 1], [1, 1]))
-            s_z = raf.matmul(s_x, s_y)
+            s_z = raf.matmul(x, y)
             # z = raf.allreduce([s_z], "sum")
             return s_z
     
-    dctx = raf.distributed.get_context()
-    device = "cuda(%s)" % dctx.local_rank
+    comm = raf.distributed.get_communicator()
+    device = "cuda(%s)" % comm.local_rank
     model = Model()
     model.to(device=device)
     m_x = raf.array(np.arange(16, dtype="float32").reshape((4, 4)), device=device)
     m_y = raf.array(np.ones(16, dtype="float32").reshape((4, 4)), device=device)
-    print(m_x)
-    print(m_y)
+    s_x = raf._reshard_r2s(m_x, ShardSpec([0, 1, 2, 3], [1, 4], [1, 1], True))
+    s_y = raf._reshard_r2s(m_y, ShardSpec([0, 1, 2, 3], [4, 1], [1, 1], True))
     record = model._internal(m_x, m_y)
 
     mod_before = record.mod
 
     attrs = ShardOpCallAttrs(
-        TupleSpec([ShardSpec([0, 1, 2, 3], [1, 4], [1, 1]), ShardSpec([0, 1, 2, 3], [4, 1], [1, 1])]),
-        MirroredSpec()
+        [ShardSpec([0, 1, 2, 3], [1, 4], [1, 1], True), ShardSpec([0, 1, 2, 3], [4, 1], [1, 1], True)],
+        [make_replicated_spec(2, 4)]
     )
 
     call_list = []
@@ -110,7 +110,7 @@ def test_shard_matmul():
         lambda op: call_list.append(op) if isinstance(op, relay.Call) else None,
     )
     
-    attrs_map = {call_list[2]: attrs}
+    attrs_map = {call_list[0]: attrs}
 
     mod0 = AnnotateShardOpCall(attrs_map)(mod_before)
     mod1 = ToGraphNormalForm()(mod0)
@@ -119,7 +119,7 @@ def test_shard_matmul():
 
     print(raf._ffi.ir.AsText(mod3))
 
-    call = relay.Call(op=mod3["main"], args=[_make_argument(x) for x in (m_x, m_y)])
+    call = relay.Call(op=mod3["main"], args=[_make_argument(x) for x in (s_x, s_y)])
     result = _unwrap(interpret(call, mod3))
     print(result)
 
@@ -127,15 +127,15 @@ if __name__ == "__main__":
     # pytest.main([__file__])
     # test_shard_add()
     # test_reshard_r2s()
-    # test_shard_matmul()
+    test_shard_matmul()
 
-    model, _ = get_transformer_model("bert-base-uncased", batch_size=32, seq_length=128, dtype="float32")
-    model.to(device="cuda(0)")
-    model.train_mode() 
+    # model, _ = get_transformer_model("bert-base-uncased", batch_size=32, seq_length=128, dtype="float32")
+    # model.to(device="cuda(0)")
+    # model.train_mode() 
 
-    r_x, _ = randint((32, 128), low=0, high=10000, dtype="int64")
-    mod = model._internal(r_x).mod
-    print(raf._ffi.ir.AsText(mod))
+    # r_x, _ = randint((32, 128), low=0, high=10000, dtype="int64")
+    # mod = model._internal(r_x).mod
+    # print(raf._ffi.ir.AsText(mod))
 
     
 
