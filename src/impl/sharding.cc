@@ -37,7 +37,7 @@ int64_t ShardSpec::GetRankIdx(Array<Integer> ranks) {
   return -1;
 }
 
-ShardSpec ShardSpec::make(Array<Integer> ranks, Array<Integer> phy_shape, Array<Integer> subgroup_shape) {
+ShardSpec ShardSpec::make(Array<Integer> ranks, Array<Integer> phy_shape, Array<Integer> subgroup_shape, bool mutable_) {
   CHECK_EQ(phy_shape.size(), subgroup_shape.size());
   auto ndim = phy_shape.size();
   auto subgroup_index = std::vector<Integer>(ndim);
@@ -61,6 +61,7 @@ ShardSpec ShardSpec::make(Array<Integer> ranks, Array<Integer> phy_shape, Array<
   }
 
   auto spec = make_object<ShardSpecObj>();
+  spec->mutable_ = mutable_;
   spec->ndim_ = ndim;
   spec->nshard_ = nshard;
   spec->ngroup_ = ngroup;
@@ -148,7 +149,7 @@ using tvm::runtime::ObjectRef;
 std::string PrintAllocTable(const ObjectRef& ref) {
   size_t dev_idx = 0;
   const auto spec = Downcast<ShardSpec>(ref);
-  const auto ndim = spec->ndim_->value;
+  const auto ndim = spec->ndim_;
 
   std::stringstream ss;
 
@@ -186,7 +187,7 @@ RAF_REGISTER_GLOBAL("raf.sharding.PrintAllocTable").set_body_typed(PrintAllocTab
 TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
     .set_dispatch<ShardSpecObj>([](const ObjectRef& ref, ReprPrinter* p) {
       auto r = Downcast<ShardSpec>(ref);
-      auto ndim = r->ndim_->value;
+      auto ndim = r->ndim_;
       if (r->nshard_ == 1) {
         p->stream << "ShardSpec(Mirrored)";
       } else {

@@ -13,8 +13,8 @@ class BaseShardSpec(Value):
 class ShardSpec(BaseShardSpec):
     """Sharding Specifications"""
 
-    def __init__(self, ranks, phy_shape, subgroup_shape):
-        self.__init_handle_by_constructor__(_make.ShardSpec, ranks, phy_shape, subgroup_shape)
+    def __init__(self, ranks, phy_shape, subgroup_shape, mutable):
+        self.__init_handle_by_constructor__(_make.ShardSpec, ranks, phy_shape, subgroup_shape, mutable)
 
 
 @register_node("raf.sharding.UnsetShardSpec")

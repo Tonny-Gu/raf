@@ -26,11 +26,12 @@ class BaseShardSpec : public Value {
   RAF_OBJECT_REF(BaseShardSpec, Value, BaseShardSpecObj);
 };
 
-class ShardSpecObj : public BaseShardSpecObj {
+class ShardSpecObj final : public BaseShardSpecObj {
  public:
-  Integer ndim_;
-  Integer nshard_;
-  Integer ngroup_;
+  bool mutable_;
+  int64_t ndim_;
+  int64_t nshard_;
+  int64_t ngroup_;
   Array<Integer> ranks;
   Array<Integer> logic_shape;
   Array<Integer> logic_index_;
@@ -40,6 +41,7 @@ class ShardSpecObj : public BaseShardSpecObj {
   Array<Integer> subgroup_index_;
 
   void VisitAttrs(tvm::AttrVisitor* v) {
+    v->Visit("mutable", &mutable_);
     v->Visit("ndim", &ndim_);
     v->Visit("nshard", &nshard_);
     v->Visit("ngroup", &ngroup_);
@@ -56,9 +58,9 @@ class ShardSpecObj : public BaseShardSpecObj {
   RAF_FINAL_OBJECT(ShardSpecObj, BaseShardSpecObj);
 };
 
-class ShardSpec : public BaseShardSpec {
+class ShardSpec final : public BaseShardSpec {
  public:
-  static ShardSpec make(Array<Integer> ranks, Array<Integer> phy_shape, Array<Integer> subgroup_shape);
+  static ShardSpec make(Array<Integer> ranks, Array<Integer> phy_shape, Array<Integer> subgroup_shape, bool mutable_);
   static int64_t GetRankIdx(Array<Integer> ranks);
   RAF_OBJECT_REF(ShardSpec, BaseShardSpec, ShardSpecObj);
 };
@@ -70,7 +72,7 @@ class UnsetShardSpecObj final : public BaseShardSpecObj {
   RAF_FINAL_OBJECT(UnsetShardSpecObj, BaseShardSpecObj);
 };
 
-class UnsetShardSpec : public BaseShardSpec {
+class UnsetShardSpec final : public BaseShardSpec {
  public:
   static UnsetShardSpec make() {
     auto n = make_object<UnsetShardSpecObj>();
