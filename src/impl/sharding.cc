@@ -189,7 +189,7 @@ TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
       auto r = Downcast<ShardSpec>(ref);
       auto ndim = r->ndim_;
       if (r->nshard_ == 1) {
-        p->stream << "ShardSpec(Mirrored)";
+        p->stream << "ShardSpec(Replicated)";
       } else {
         p->stream << "ShardSpec(" << "[";
         for (size_t i = 0; i < ndim; ++i) {

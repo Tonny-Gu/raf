@@ -2,6 +2,8 @@
 import pytest
 import raf
 import numpy as np
+from raf.distributed.sharding.inferhint import infer_shardspec
+from raf.distributed.sharding.utils import make_unset_spec
 from raf.model.model import trace_memory, get_peak_memory
 from raf.testing import get_transformer_model, randint, randn_torch
 from raf._core.core_utils import str2dev
@@ -60,6 +62,51 @@ def test_shard_add():
     call = relay.Call(op=mod2["main"], args=[_make_argument(x) for x in (m_x, m_y)])
     result = _unwrap(interpret(call, mod2))
     print(result)
+
+def test_infer_hint():
+    class Model(raf.Model):
+        def build(self):
+            pass
+
+        @raf.model.trace
+        def forward(self, x, y):
+            z = raf.add(x, y)
+            return z
+
+    model = Model()
+    m_x = raf.array(np.arange(16, dtype="float").reshape((4, 4)))
+    m_y = raf.array(np.zeros(16, dtype="float").reshape((4, 4)))
+    record = model._internal(m_x, m_y)
+    mod_before = record.mod
+    mod_before = InferType()(mod_before)
+
+    s_spec = make_shard_spec([2, 2], [1, 2], 4)
+
+    attrs = ShardOpCallAttrs([s_spec, s_spec], [make_unset_spec()])
+
+    print(m_x)
+    call_list = []
+    post_order_visit(
+        mod_before["main"].body,
+        lambda op: call_list.append(op) if isinstance(op, relay.Call) else None,
+    )
+    attrs_map = {call_list[0]: attrs}
+
+    mod0 = AnnotateShardOpCall(attrs_map)(mod_before)
+    print(raf._ffi.ir.AsText(mod0))
+    mod1 = ToGraphNormalForm()(mod0)
+
+    call_list = []
+    post_order_visit(
+        mod1["main"].body,
+        lambda op: call_list.append(op) if isinstance(op, relay.Call) else None,
+    )
+    print(call_list[0])
+    print(infer_shardspec(call_list[0]))
+
+    # call = relay.Call(op=mod2["main"], args=[_make_argument(x) for x in (m_x, m_y)])
+    # result = _unwrap(interpret(call, mod2))
+    # print(result)
 
 def test_reshard_r2s():
     class Model(raf.Model):
@@ -127,7 +174,8 @@ if __name__ == "__main__":
     # pytest.main([__file__])
     # test_shard_add()
     # test_reshard_r2s()
-    test_shard_matmul()
+    # test_shard_matmul()
+    test_infer_hint()
 
     # model, _ = get_transformer_model("bert-base-uncased", batch_size=32, seq_length=128, dtype="float32")
     # model.to(device="cuda(0)")

@@ -1,5 +1,5 @@
 # pylint: disable=invalid-name, unused-argument
-"""RAF sharding system utilities"""
+"""Implementation of Expansion Rules"""
 from ctypes import Union
 import functools
 import numpy as np
@@ -119,7 +119,7 @@ def register_expansion_rule(op_name):
     return decorator
 
 @_register_func("raf.sharding._match_expansion_rule")
-def match_expansion_rule(call: relay.Call):
+def expand_opcall(call: relay.Call):
     """Match an eligible expansion rule and return expanded IR expr"""
     rules = expand_when.rules[call.op]
     s = ShardInfo(call)
