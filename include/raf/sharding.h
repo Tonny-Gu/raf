@@ -54,7 +54,20 @@ class ShardSpecObj final : public BaseShardSpecObj {
     v->Visit("subgroup_index", &subgroup_index_);
   }
 
+  bool SEqualReduce(const ShardSpecObj* other, tvm::SEqualReducer equal) const {
+    return equal(ranks, other->ranks) && equal(phy_shape, other->phy_shape)
+      && equal(subgroup_shape, other->subgroup_shape) && equal(mutable_, other->mutable_);
+  }
+  void SHashReduce(tvm::SHashReducer hash_reduce) const {
+    hash_reduce(ranks);
+    hash_reduce(phy_shape);
+    hash_reduce(subgroup_shape);
+    hash_reduce(mutable_);
+  }
+
   static constexpr const char* _type_key = "raf.sharding.ShardSpec";
+  static constexpr const bool _type_has_method_sequal_reduce = true;
+  static constexpr const bool _type_has_method_shash_reduce = true;
   RAF_FINAL_OBJECT(ShardSpecObj, BaseShardSpecObj);
 };
 
@@ -68,7 +81,16 @@ class ShardSpec final : public BaseShardSpec {
 class UnsetShardSpecObj final : public BaseShardSpecObj {
  public:
   void VisitAttrs(tvm::AttrVisitor* v) {}
+
+  bool SEqualReduce(const UnsetShardSpecObj* other, tvm::SEqualReducer equal) const {
+    return true;
+  }
+  void SHashReduce(tvm::SHashReducer hash_reduce) const {
+  }
+
   static constexpr const char* _type_key = "raf.sharding.UnsetShardSpec";
+  static constexpr const bool _type_has_method_sequal_reduce = true;
+  static constexpr const bool _type_has_method_shash_reduce = true;
   RAF_FINAL_OBJECT(UnsetShardSpecObj, BaseShardSpecObj);
 };
 

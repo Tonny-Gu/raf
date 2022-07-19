@@ -21,5 +21,8 @@ def make_replicated_spec(ndim: int, ranks = world_size_, mutable = True):
     subgroup_shape = phy_shape
     return ShardSpec(ranks, phy_shape, subgroup_shape, mutable)
 
+def _make_replicated_spec(ndim: int):
+    make_replicated_spec(ndim)
+
 def make_unset_spec():
     return UnsetShardSpec()

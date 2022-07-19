@@ -17,6 +17,7 @@ from raf import distributed as dist
 from raf.ir.anf_builder import ANFBuilder
 from tvm.relay import Call, Expr
 from tvm.ir import Op
+from tvm.runtime.object import Object
 
 pattern_map = {
     0: "kElemWise",
@@ -33,6 +34,7 @@ class ShardInfo:
     call: relay.Call
     op: Op
     args: List[Expr]
+    attrs: Object
     sin: List[BaseShardSpec]
     sout: List[BaseShardSpec]
     
@@ -41,6 +43,7 @@ class ShardInfo:
         self.call = call
         self.op = call.op
         self.args = call.args
+        self.attrs = call.attrs
         self.sin = call.attrs.sin
         self.sout = call.attrs.sout
 
@@ -51,6 +54,12 @@ def all_satisfied(conds: List[Callable[[ShardInfo], bool]]):
                 return False
         return True
     return func
+
+def is_same_spec(*args):
+    for e in args[1:]:
+        if not tvm.ir.structural_equal(args[0], e):
+            return False
+    return True
 
 def is_sharded(s: BaseShardSpec):
     return isinstance(s, ShardSpec)
@@ -126,8 +135,8 @@ def expand_opcall(call: relay.Call):
     for rule in rules.queue:
         _, _, cond, irgen = rule
         if cond(s):
-            break
-    return irgen(s)
+            return irgen(s)
+    return None 
 
 @expand_when(
     all_satisfied([
@@ -161,10 +170,15 @@ def reshard_sharded_to_replicated(s: ShardInfo):
 #     raise NotImplementedError("Unable to process the given sharding specifications")
 
 
-@expand_when(lambda s: s.sin[0] == s.sin[1] == s.sout[0])
+@expand_when(lambda s: is_same_spec(s.sin[0], s.sin[1], s.sout[0]))
 @register_expansion_rule(["raf.op.add", "raf.op.subtract"])
 def add_or_sub(s: ShardInfo):
     """add/sub -> add/sub"""
+    return relay.Call(s.op, s.args)
+
+@expand_when(lambda s: is_same_spec(s.sin[0], s.sout[0]))
+@register_expansion_rule(["raf.op.relu"])
+def element_wise(s: ShardInfo):
     return relay.Call(s.op, s.args)
 
 @expand_when(all_satisfied([

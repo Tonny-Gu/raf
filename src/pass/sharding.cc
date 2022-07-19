@@ -51,9 +51,52 @@ class ShardOpCallExpander : public ExprMutator {
     if (attrs.defined() && op->IsInstance<OpNode>() && attrs->IsInstance<ShardOpCallAttrs>()) {
       auto call = GetRef<Call>(node);
       Expr new_expr = (*f)(call);
-      return call.same_as(new_expr) ? new_expr : ExprMutator::VisitExpr(new_expr);
+      // return call.same_as(new_expr) ? new_expr : ExprMutator::VisitExpr(new_expr);
+      return new_expr;
     }
     return ExprMutator::VisitExpr_(node);
+  }
+};
+
+ // // Step 1: Propagate ShardSpec
+      // Array<BaseShardSpec> sin;
+      // for (int64_t i = 0; i < sattr->sin.size(); ++i) {
+      //   if (sattr->sin[i]->IsInstance<UnsetShardSpecObj>()) {
+      //     LOG(INFO) << i << " is unset shardspec";
+      //     bool flag_unchanged = true;
+      //     if (args[i]->IsInstance<CallNode>()) {
+      //       // Copy ShardSpec from previous output
+      //       LOG(INFO) << i << " is call";
+      //       const auto pcall = Downcast<Call>(args[i]);
+      //       if (pcall->attrs->IsInstance<ShardOpCallAttrs>()) {
+      //         const auto pattr = pcall->attrs.as<ShardOpCallAttrs>();
+      //         sin.push_back(pattr->sout[0]);
+      //         flag_unchanged = false;
+      //       }
+      //     } 
+      //     if (flag_unchanged) {
+      //       // sin[i] = ShardSpec::make()
+      //     }
+      //   } else {
+      //     sin.push_back(sattr->sin[i]);
+      //   }
+      // }
+
+class ShardSpecPropagator : public ExprMutator {
+ public:
+  Expr VisitExpr_(const CallNode* node) override {
+    Call call = Downcast<Call>(ExprMutator::VisitExpr_(node));
+    const Expr& op = call->op;
+    const Attrs& attrs = call->attrs;
+    const Array<Expr>& args = call->args;
+    const auto* f = tvm::runtime::Registry::Get("raf.sharding._infer_shardspec");
+    if (attrs.defined() && op->IsInstance<OpNode>() && attrs->IsInstance<ShardOpCallAttrs>()) {
+      LOG(INFO) << op << " " << call->op;
+
+      Expr new_expr = (*f)(call);
+      return new_expr;
+    }
+    return call;
   }
 };
 
@@ -96,6 +139,25 @@ Pass ExpandShardOpCall() {
 }
 
 RAF_REGISTER_GLOBAL("raf.pass_.ExpandShardOpCall").set_body_typed(ExpandShardOpCall);
+
+Pass InferShardSpec() {
+  return CreateModulePass(
+      [=](IRModule mod, const PassContext& pass_ctx) {
+        DLOG(INFO) << "pass::InferShardSpec";
+        IRModule updated_mod = IRModule(mod->functions);
+        for (auto kv : updated_mod->functions) {
+          if (kv.second.as<FunctionNode>()) {
+            auto setter = shard_pass::ShardSpecPropagator();
+            auto func = tvm::runtime::Downcast<Function>(setter.VisitExpr(kv.second));
+            updated_mod->Add(kv.first, func, true);
+          }
+        }
+        return updated_mod;
+      },
+      0, "InferShardSpec", {});
+}
+
+RAF_REGISTER_GLOBAL("raf.pass_.InferShardSpec").set_body_typed(InferShardSpec);
 
 }  // namespace pass
 }  // namespace raf

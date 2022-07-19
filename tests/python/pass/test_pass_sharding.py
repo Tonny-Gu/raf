@@ -18,12 +18,26 @@ from raf.distributed.sharding import (
     make_replicated_spec,
     make_shard_spec
 )
-from raf._ffi.pass_ import AnnotateShardOpCall, ToGraphNormalForm, ExpandShardOpCall, InferType
+from raf._ffi.pass_ import AnnotateShardOpCall, ToGraphNormalForm, ExpandShardOpCall, InferType, InferShardSpec
 from raf._lib import relay
 from raf.testing import randn
 from raf.hybrid.hybrid import _make_argument, _unwrap
+from tvm.ir import structural_equal
 from tvm.relay.analysis.analysis import post_order_visit
 from tvm.runtime.ndarray import device
+
+def test_shardspec():
+    a = make_shard_spec([1], ranks = 4)
+    b = make_shard_spec([1], ranks = 4)
+    print(structural_equal(a, b))
+    c = make_shard_spec([3], ranks = 4)
+    print(structural_equal(a, c))
+    d = make_shard_spec([1], ranks = 3)
+    print(structural_equal(a, d))
+    e = make_unset_spec()
+    f = make_unset_spec()
+    print(structural_equal(a, e))
+    print(structural_equal(e, f))
 
 def test_shard_add():
     class Model(raf.Model):
@@ -71,7 +85,8 @@ def test_infer_hint():
         @raf.model.trace
         def forward(self, x, y):
             z = raf.add(x, y)
-            return z
+            a = raf.relu(z)
+            return a
 
     model = Model()
     m_x = raf.array(np.arange(16, dtype="float").reshape((4, 4)))
@@ -83,6 +98,7 @@ def test_infer_hint():
     s_spec = make_shard_spec([2, 2], [1, 2], 4)
 
     attrs = ShardOpCallAttrs([s_spec, s_spec], [make_unset_spec()])
+    attrs1 = ShardOpCallAttrs([make_unset_spec()], [make_unset_spec()])
 
     print(m_x)
     call_list = []
@@ -90,23 +106,55 @@ def test_infer_hint():
         mod_before["main"].body,
         lambda op: call_list.append(op) if isinstance(op, relay.Call) else None,
     )
-    attrs_map = {call_list[0]: attrs}
+    attrs_map = {call_list[0]: attrs, call_list[1]: attrs1}
 
     mod0 = AnnotateShardOpCall(attrs_map)(mod_before)
-    print(raf._ffi.ir.AsText(mod0))
     mod1 = ToGraphNormalForm()(mod0)
+    mod2 = InferType()(mod1)
+    print(raf._ffi.ir.AsText(mod2))
 
+    mod3 = InferShardSpec()(mod2)
+    print(raf._ffi.ir.AsText(mod3))
+
+def test_infer_hint_with_reshard():
+    class Model(raf.Model):
+        def build(self):
+            pass
+
+        @raf.model.trace
+        def forward(self, x, y):
+            z = raf.add(x, y)
+            a = raf.relu(z)
+            return a
+
+    model = Model()
+    m_x = raf.array(np.arange(16, dtype="float").reshape((4, 4)))
+    m_y = raf.array(np.zeros(16, dtype="float").reshape((4, 4)))
+    record = model._internal(m_x, m_y)
+    mod_before = record.mod
+    mod_before = InferType()(mod_before)
+
+    print(m_x)
     call_list = []
     post_order_visit(
-        mod1["main"].body,
+        mod_before["main"].body,
         lambda op: call_list.append(op) if isinstance(op, relay.Call) else None,
     )
-    print(call_list[0])
-    print(infer_shardspec(call_list[0]))
 
-    # call = relay.Call(op=mod2["main"], args=[_make_argument(x) for x in (m_x, m_y)])
-    # result = _unwrap(interpret(call, mod2))
-    # print(result)
+    spec = make_shard_spec([2, 2], [1, 2], 4)
+
+    attrs_map = {
+        call_list[0]: ShardOpCallAttrs([make_unset_spec(), make_unset_spec()], [make_unset_spec()]),
+        call_list[1]: ShardOpCallAttrs([make_unset_spec()], [spec])
+    }
+
+    mod0 = AnnotateShardOpCall(attrs_map)(mod_before)
+    mod1 = ToGraphNormalForm()(mod0)
+    mod2 = InferType()(mod1)
+    print(raf._ffi.ir.AsText(mod2))
+
+    mod3 = InferShardSpec()(mod2)
+    print(raf._ffi.ir.AsText(mod3))
 
 def test_reshard_r2s():
     class Model(raf.Model):
@@ -172,10 +220,11 @@ def test_shard_matmul():
 
 if __name__ == "__main__":
     # pytest.main([__file__])
+    # test_shardspec()
     # test_shard_add()
     # test_reshard_r2s()
     # test_shard_matmul()
-    test_infer_hint()
+    test_infer_hint_with_reshard()
 
     # model, _ = get_transformer_model("bert-base-uncased", batch_size=32, seq_length=128, dtype="float32")
     # model.to(device="cuda(0)")

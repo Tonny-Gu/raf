@@ -352,6 +352,13 @@ Pass AnnotateShardOpCall(const ir::Map<ir::Expr, ir::Attrs>& attrs_map);
 Pass ExpandShardOpCall();
 
 /*!
+ * \brief .
+ *
+ * \return .
+ */
+Pass InferShardSpec();
+
+/*!
  * \brief This pass transforms BBNF into ANF and schedules operators to improve overlapping
  * between computation and communication.
  * \return The created pass.
