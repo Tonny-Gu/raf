@@ -141,7 +141,7 @@ def test_infer_hint_with_reshard():
         lambda op: call_list.append(op) if isinstance(op, relay.Call) else None,
     )
 
-    spec = make_shard_spec([2, 2], [1, 2], 4)
+    spec = make_shard_spec([2, 2], [1, 2], 4, mutable=False)
 
     attrs_map = {
         call_list[0]: ShardOpCallAttrs([make_unset_spec(), make_unset_spec()], [make_unset_spec()]),
