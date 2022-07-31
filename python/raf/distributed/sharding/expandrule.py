@@ -159,7 +159,7 @@ def reshard_replicated_to_sharded(s: ShardInfo):
         assert dim_size % dim_nshard == 0
         begin.append(int((dim_size // dim_nshard) * idx))
         end.append(int((dim_size // dim_nshard) * (idx + 1)))
-    return relay.Call(GetOp("raf.op.strided_slice"), [s.args[0], raf.ir.const(begin), raf.ir.const(end), raf.ir.const(None), raf.ir.const("end")])
+    return relay.Call(GetOp("raf.op.strided_slice"), [s.args[0], raf.ir.const(begin), raf.ir.const(end), raf.ir.const([1] * spec.ndim), raf.ir.const("end")])
 
 @expand_when(
     all_satisfied([
