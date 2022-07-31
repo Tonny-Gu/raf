@@ -148,8 +148,18 @@ def expand_opcall(call: relay.Call):
 @register_expansion_rule("raf.op._reshard")
 def reshard_replicated_to_sharded(s: ShardInfo):
     """_reshard -> _reshard_r2s (strided_slice)"""
-    spec = Value.as_const_expr(s.sout)
-    return relay.Call(GetOp("raf.op._reshard_r2s"), [s.args[0], spec])
+    # spec = Value.as_const_expr(s.sout)
+    # return relay.Call(GetOp("raf.op._reshard_r2s"), [s.args[0], spec])
+
+    begin, end = [], []
+    shape = s.args[0].checked_type.concrete_shape
+    spec = s.sout[0]
+    # spec = ShardSpec()
+    for idx, dim_nshard, dim_size in zip(spec.logic_index, spec.logic_shape, shape):
+        assert dim_size % dim_nshard == 0
+        begin.append(int((dim_size // dim_nshard) * idx))
+        end.append(int((dim_size // dim_nshard) * (idx + 1)))
+    return relay.Call(GetOp("raf.op.strided_slice"), [s.args[0], raf.ir.const(begin), raf.ir.const(end), raf.ir.const(None), raf.ir.const("end")])
 
 @expand_when(
     all_satisfied([

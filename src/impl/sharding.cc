@@ -89,6 +89,28 @@ Attrs ShardOpCallAttrs::make(Array<BaseShardSpec> sin, Array<BaseShardSpec> sout
   return Attrs(attrs);
 }
 
+void Reshard(const CallValues& call) {
+  const auto* args = call->args.as<ShardUnaryArgs>();
+  CHECK(args != nullptr);
+  const DLTensor* x = args->x;
+  std::vector<int64_t> shape(x->shape, x->shape + x->ndim);
+  call->out = TensorValue::Assemble(/*dev=*/x->device,
+                                    /*dtype=*/x->dtype,
+                                    /*shape=*/shape);
+  call->device = x->device;
+}
+
+RAF_OP_DECLARE("raf.op._reshard", Reshard);
+
+Type Reshard_Infer(const CallValues& call) {
+  const auto* args = call->args.as<UnaryArgs>();
+  CHECK(args != nullptr);
+  auto data = Downcast<TensorType>(GetType(args->x));
+  return TensorType(data->shape, data->dtype);
+}
+
+RAF_OP_TYPE("raf.op._reshard", "Reshard", Reshard_Infer);
+
 void Reshard_R2S(const CallValues& call) {
   const auto* args = call->args.as<ShardUnaryArgs>();
   CHECK(args != nullptr);
