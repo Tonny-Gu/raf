@@ -37,6 +37,7 @@ Type IdentityType(const CallValues& value) {
 }
 
 RAF_OP_TYPE("raf.op._allreduce", "NCCLAllReduce", IdentityType<AllreduceArgs>);
+RAF_OP_TYPE("raf.op._all_to_all", "NCCLAllToAll", IdentityType<AllToAllArgs>);
 RAF_OP_TYPE("raf.op._broadcast", "NCCLBroadcast", IdentityType<BroadcastArgs>);
 RAF_OP_TYPE("raf.op._reduce", "NCCLReduce", IdentityType<CommReduceArgs>);
 
@@ -48,10 +49,21 @@ Type ReduceScatterInfer(const CallValues& value) {
   CHECK(args != nullptr);
   CHECK_GE(args->x.size(), 1U);
   const auto& ty = GetType(args->x[0]);
-  for (const auto& x : args->x) {
-    (*structural_equal)(GetType(x), ty, true, true);
+  if (args->x.size() == 1) {
+    int size = GetGlobalCommunicator()->size;
+    auto tpn = ty.as<TensorTypeNode>();
+    auto shape = tpn->shape;
+    auto old_size = shape[0].as<IntImmNode>()->value;
+    CHECK(old_size % size == 0);
+    auto new_size = old_size / size;
+    shape.Set(0, Integer(new_size));
+    return TensorType(shape, DataType(tpn->dtype));
+  } else {
+    for (const auto& x : args->x) {
+      (*structural_equal)(GetType(x), ty, true, true);
+    }
+    return ty;
   }
-  return ty;
 }
 
 RAF_OP_TYPE("raf.op._reduce_scatter", "NCCLReduceScatter", ReduceScatterInfer);

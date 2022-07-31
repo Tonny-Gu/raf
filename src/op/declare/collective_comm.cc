@@ -128,9 +128,15 @@ void ReduceScatter(const CallValues& call) {
   CHECK_GE(tvs.size(), 1U);
   const DLTensor* x = tvs[0];
   std::vector<int64_t> shape(x->shape, x->shape + x->ndim);
-  for (const auto& tv : tvs) {
-    const DLTensor* x = tv;
-    CHECK(shape == std::vector<int64_t>(x->shape, x->shape + x->ndim));
+  if (tvs.size() == 1) {
+    int size = GetGlobalCommunicator()->size;
+    CHECK(shape[0] % size == 0);
+    shape[0] = shape[0] / size;
+  } else {
+    for (const auto& tv : tvs) {
+      const DLTensor* x = tv;
+      CHECK(shape == std::vector<int64_t>(x->shape, x->shape + x->ndim));
+    }
   }
   call->device = x->device;
   call->out = TensorValue::Assemble(/*ctx=*/x->device,
@@ -201,6 +207,31 @@ void Send(const CallValues& call) {
                                     /*dtype=*/x->dtype,
                                     /*shape=*/std::vector<int64_t>{});
 }
+
+void AllToAll(const CallValues& call) {
+  const auto* args = call->args.as<AllToAllArgs>();
+  CHECK(args != nullptr);
+  ir::Array<Value> ret;
+  auto& tv = args->x;
+  const DLTensor* x = tv[0];
+  call->device = x->device;
+  for (int i = 0; i < tv.size(); ++i) {
+    const DLTensor* x = tv[i];
+    std::vector<int64_t> shape(x->shape, x->shape + x->ndim);
+    ret.push_back(TensorValue::Assemble(/*dev=*/x->device,
+                                        /*dtype=*/x->dtype,
+                                        /*shape=*/shape));
+  }
+  if (ret.size() == 1) {
+    call->out = ret[0];
+  } else {
+    call->out = TupleValue::make(ir::Array<Value>(ret.begin(), ret.end()));
+  }
+}
+
+RAF_OP_DECLARE("raf.op._all_to_all", AllToAll)
+    .set_attr<TOpPattern>("TOpPattern", kOpaque)
+    .set_attr<TRAFCollective>("TRAFCollective", true);
 
 RAF_OP_DECLARE("raf.op._send", Send)
     .set_attr<TOpPattern>("TOpPattern", kOpaque)

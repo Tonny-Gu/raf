@@ -90,26 +90,19 @@ set_property(
 )
 
 file(GLOB_RECURSE RAF_CXX_SOURCE_FILES
-  ${CMAKE_CURRENT_LIST_DIR}/src/analysis/*.cc
-  ${CMAKE_CURRENT_LIST_DIR}/src/common/*.cc
-  ${CMAKE_CURRENT_LIST_DIR}/src/device_api/cpu/*.cc
-  ${CMAKE_CURRENT_LIST_DIR}/src/memory_pool/*.cc
-  ${CMAKE_CURRENT_LIST_DIR}/src/op/schema/*.cc
-  ${CMAKE_CURRENT_LIST_DIR}/src/op/declare/*.cc
-  ${CMAKE_CURRENT_LIST_DIR}/src/op/regs/*.cc
-  ${CMAKE_CURRENT_LIST_DIR}/src/op/grad/*.cc
-  ${CMAKE_CURRENT_LIST_DIR}/src/op/dialect/tvm/*.cc
-  ${CMAKE_CURRENT_LIST_DIR}/src/op/base_ops.cc
-  ${CMAKE_CURRENT_LIST_DIR}/src/op/from_relay/*.cc
-  ${CMAKE_CURRENT_LIST_DIR}/src/op/ty/*.cc
-  ${CMAKE_CURRENT_LIST_DIR}/src/pass/*.cc
-  ${CMAKE_CURRENT_LIST_DIR}/src/impl/*.cc
-  ${CMAKE_CURRENT_LIST_DIR}/src/profiler/memory_profiler.cc
-  ${CMAKE_CURRENT_LIST_DIR}/src/profiler/op_profiler.cc
-  ${CMAKE_CURRENT_LIST_DIR}/src/profiler/scope_timer.cc
-  ${CMAKE_CURRENT_LIST_DIR}/src/profiler/base/*.cc
-  ${CMAKE_CURRENT_LIST_DIR}/src/distributed/common/*.cc
+  ${CMAKE_CURRENT_LIST_DIR}/src/*/*.cc
 )
+file(GLOB_RECURSE RAF_EXCLUDE_CXX_SOURCE_FILES
+  ${CMAKE_CURRENT_LIST_DIR}/src/device_api/cuda/*.cc
+  ${CMAKE_CURRENT_LIST_DIR}/src/distributed/cuda/*.cc
+  ${CMAKE_CURRENT_LIST_DIR}/src/op/dialect/cublas/*.cc
+  ${CMAKE_CURRENT_LIST_DIR}/src/op/dialect/cuda/*.cc
+  ${CMAKE_CURRENT_LIST_DIR}/src/op/dialect/cudnn/*.cc
+  ${CMAKE_CURRENT_LIST_DIR}/src/op/dialect/cutlass/*.cc
+  ${CMAKE_CURRENT_LIST_DIR}/src/op/dialect/nccl/*.cc
+  ${CMAKE_CURRENT_LIST_DIR}/src/profiler/cuda/*.cc
+)
+list(REMOVE_ITEM RAF_CXX_SOURCE_FILES ${RAF_EXCLUDE_CXX_SOURCE_FILES})
 
 if (${RAF_USE_CUDA} STREQUAL "OFF")
   set(RAF_CUDA_SOURCE_FILES "")
@@ -121,8 +114,15 @@ else ()
   enable_language(CUDA)
   set(CMAKE_CUDA_ARCHITECTURES ${RAF_CUDA_ARCH})
   set(RAF_CXX_FLAGS ${RAF_CXX_FLAGS} -DRAF_USE_CUDA)
-  set(RAF_CUDA_FLAGS ${RAF_CUDA_FLAGS} -DRAF_USE_CUDA
-      -gencode=arch=compute_${RAF_CUDA_ARCH},code=sm_${RAF_CUDA_ARCH})
+
+  foreach(ARCH ${RAF_CUDA_ARCH})
+    set(CODES)
+    list(APPEND CODES sm_${ARCH})
+    list(APPEND CODES compute_${ARCH})
+    list(JOIN CODES "," CODES_STR)
+    list(APPEND RAF_CUDA_ARCH_LIST "-gencode=arch=compute_${ARCH},code=\[${CODES_STR}\]")
+  endforeach()
+  set(RAF_CUDA_FLAGS ${RAF_CUDA_FLAGS} -DRAF_USE_CUDA ${RAF_CUDA_ARCH_LIST})
 
   file(GLOB_RECURSE RAF_CUDA_SOURCE_FILES
     ${CMAKE_CURRENT_LIST_DIR}/src/device_api/cuda/*.cc
@@ -231,6 +231,14 @@ set_target_properties(raf PROPERTIES
   # CUDA_RESOLVE_DEVICE_SYMBOLS
 )
 raf_target_add_sanitizer(raf)
+
+install(
+      DIRECTORY "include/."
+      DESTINATION "include"
+      FILES_MATCHING
+      PATTERN "*.h")
+install(TARGETS raf
+      LIBRARY DESTINATION lib)
 
 ################# Apps #################
 add_subdirectory(${PROJECT_SOURCE_DIR}/apps/include_raf/)
