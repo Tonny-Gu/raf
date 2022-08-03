@@ -1,5 +1,6 @@
 # pylint: disable=missing-function-docstring, missing-class-docstring, invalid-name, protected-access
 import pytest
+import yarl
 import raf
 import numpy as np
 from raf.distributed.sharding.inferhint import infer_shardspec
@@ -178,7 +179,8 @@ def test_reshard_r2s():
 
         @raf.model.trace
         def forward(self, x):
-            return raf._reshard(x)
+            y = raf._reshard(x)
+            return raf._reshard(y)
     
     comm = raf.distributed.get_communicator()
     device = "cuda(%s)" % comm.local_rank
@@ -189,9 +191,14 @@ def test_reshard_r2s():
 
     mod_before = record.mod
 
-    attrs = ShardOpCallAttrs(
+    attr1 = ShardOpCallAttrs(
         [make_replicated_spec(2, ranks=4, mutable=False)],
         [make_shard_spec([2, 2], ranks=4, mutable=False)]
+    )
+
+    attr2 = ShardOpCallAttrs(
+        [make_shard_spec([2, 2], ranks=4, mutable=False)],
+        [make_replicated_spec(2, ranks=4, mutable=False)]
     )
 
     call_list = []
@@ -200,18 +207,19 @@ def test_reshard_r2s():
         lambda op: call_list.append(op) if isinstance(op, relay.Call) else None,
     )
     
-    attrs_map = {call_list[0]: attrs}
+    attrs_map = {call_list[0]: attr1, call_list[1]: attr2}
 
     mod0 = AnnotateShardOpCall(attrs_map)(mod_before)
     mod1 = ToGraphNormalForm()(mod0)
     mod2 = InferType()(mod1)
+    print(raf._ffi.ir.AsText(mod2))
     mod3 = ExpandShardOpCall()(mod2)
-
     print(raf._ffi.ir.AsText(mod3))
+    
 
-    call = relay.Call(op=mod3["main"], args=[_make_argument(x) for x in (m_x, )])
-    result = _unwrap(interpret(call, mod3))
-    print(result)
+    # call = relay.Call(op=mod3["main"], args=[_make_argument(x) for x in (m_x, )])
+    # result = _unwrap(interpret(call, mod3))
+    # print(result)
     
 def test_shard_matmul():
     class Model(raf.Model):

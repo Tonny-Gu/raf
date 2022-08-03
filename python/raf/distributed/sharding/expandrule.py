@@ -17,6 +17,7 @@ from raf import distributed as dist
 from raf.ir.anf_builder import ANFBuilder
 from tvm.relay import Call, Expr
 from tvm.ir import Op
+from tvm.relay.op.transform import full
 from tvm.runtime.object import Object
 
 pattern_map = {
@@ -148,9 +149,6 @@ def expand_opcall(call: relay.Call):
 @register_expansion_rule("raf.op._reshard")
 def reshard_replicated_to_sharded(s: ShardInfo):
     """_reshard -> _reshard_r2s (strided_slice)"""
-    # spec = Value.as_const_expr(s.sout)
-    # return relay.Call(GetOp("raf.op._reshard_r2s"), [s.args[0], spec])
-
     begin, end = [], []
     shape = s.args[0].checked_type.concrete_shape
     spec = s.sout[0]
@@ -163,15 +161,27 @@ def reshard_replicated_to_sharded(s: ShardInfo):
 
 @expand_when(
     all_satisfied([
-        lambda s: is_sharded(s.sout[1]),
-        lambda s: is_replicated(s.sin[0]),
+        lambda s: print(s.sin[0], s.sout[0]) or True,
+        lambda s: is_sharded(s.sin[0]),
+        lambda s: is_replicated(s.sout[0]),
     ]),
     priority=1,
 )
 @register_expansion_rule("raf.op._reshard")
 def reshard_sharded_to_replicated(s: ShardInfo):
     """_reshard -> _reshard_s2r (allgather)"""
-    return relay.Call(GetOp("raf.op._reshard_s2r"), [s.args[0], s.sin])
+    spec = s.sin[0]
+    axis = []
+    full_shape = []
+    for i in range(spec.ndim):
+        if spec.logic_shape[i] > 0:
+            axis.append(i)
+        full_shape.append(int(spec.logic_shape[i]))
+        full_shape.append(int(spec.subgroup_shape[i]))
+    ranks = np.array([int(e) for e in spec.ranks]).reshape(full_shape)
+    nshard_on_dim = int(spec.logic_shape[axis[0]])
+    rank_list = np.moveaxis(ranks, axis[0], -1).reshape((ranks.size // nshard_on_dim, nshard_on_dim))
+    return relay.Call(GetOp("raf.op._allgather"), [s.args[0], raf.ir.const(axis[0]), raf.ir.const(rank_list.tolist())])
 
 # @expand_when(always_apply, priority=0)
 # @register_expansion_rule("raf.op._reshard")
