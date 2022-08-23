@@ -44,6 +44,9 @@ def to_tensor(a):
     if isinstance(a, BaseShardSpec):
         return Value.as_const_expr(a)
 
+    if isinstance(a, BaseShardSpec):
+        return Value.as_const_expr(a)
+
     if not isinstance(a, np.ndarray):
         a = np.array(a)
 

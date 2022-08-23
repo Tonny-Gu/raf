@@ -194,8 +194,6 @@ OPS = [
     Op(name="roi_align_dx", schema_name="roi_align_dx"),
     # Sharding ops
     Op(name="_reshard", schema_name="unary"),
-    Op(name="_reshard_r2s", schema_name="shard_unary"),
-    Op(name="_reshard_s2r", schema_name="shard_unary"),
     # Stream ops
     Op(name="set_stream", schema_name="set_stream"),
     Op(name="add_event", schema_name="event"),

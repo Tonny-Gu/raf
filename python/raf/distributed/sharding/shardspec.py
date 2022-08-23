@@ -1,6 +1,8 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # pylint: disable=invalid-name, unused-argument
-"""RAF sharding specifications and attributes."""
-from typing import List
+"""Definition of RAF sharding specifications and attributes."""
 from raf._core.core_utils import register_node
 from raf._ffi.sharding import _make
 from raf._core.value import Value
@@ -27,7 +29,9 @@ class ShardSpec(BaseShardSpec):
     subgroup_index: Array
 
     def __init__(self, ranks, phy_shape, subgroup_shape, mutable):
-        self.__init_handle_by_constructor__(_make.ShardSpec, ranks, phy_shape, subgroup_shape, mutable)
+        self.__init_handle_by_constructor__(
+            _make.ShardSpec, ranks, phy_shape, subgroup_shape, mutable
+        )
 
 
 @register_node("raf.sharding.UnsetShardSpec")
